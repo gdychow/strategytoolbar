@@ -1,7 +1,22 @@
-# Optional convenience wrapper around `docker run` — not a hard dependency,
-# the image is entirely self-contained. Cloudflare Tunnel (cloudflared)
-# points at whatever host:port this container is published on; it isn't
-# part of this compose file since it isn't a dependency of the app itself.
+# Two services, started together as one unit: the app, and its own
+# Postgres — not a sprawl of unrelated containers. Cloudflare Tunnel
+# (cloudflared) points at whatever host:port the app service is published
+# on; it isn't part of this compose file since it isn't a dependency of
+# the app itself.
+#
+# Requires a .env file in this same directory (gitignored — never commit
+# it) with exactly these three variables. Copy .env.example to .env and
+# fill them in:
+#
+#   ADMIN_EMAILS       comma-separated, case-insensitive — whoever's email
+#                       matches gets isAdmin=true
+#   SESSION_SECRET      random string signing session cookies, e.g.:
+#                       node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+#   POSTGRES_PASSWORD   used both by the db service and by the app's
+#                       DATABASE_URL below
+#
+# DOMAIN and AZURE_CLIENT_ID are not secrets (a public-client SPA ID is
+# meant to be client-visible) so they're set directly below instead.
 services:
   strategy-toolbar:
     build: .
@@ -10,4 +25,29 @@ services:
       - "8080:8080"
     environment:
       - DOMAIN=toolbar.gavinchow.me
+      - AZURE_CLIENT_ID=2d499447-2b3d-4da8-ba78-ff5d1b1699b1
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@db:5432/strategytoolbar
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=strategytoolbar
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:

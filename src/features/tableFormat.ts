@@ -1,8 +1,10 @@
 /**
  * Port of D_Tables.bas's TableAutoFormat/TableAutoFormat_2Axis: applies a
- * branded header style to a table (dark green header row, white text,
- * grey body text, brand-grey borders — colors match the custClrLst already
- * baked into the templates, see the custom-colours audit).
+ * branded header style to a table (dark header row, white text, grey body
+ * text, grey borders). Colors/fonts come from config/theme.json rather
+ * than being hardcoded here — swap that file to retheme without touching
+ * this logic. It's bundled at build time (esbuild inlines JSON imports),
+ * so a change means rebuild, not a code edit.
  *
  * One real behavioural difference from the VBA original: VBA only
  * restyled the cells the user had individually selected (`Cell(i,j).Selected`),
@@ -13,16 +15,14 @@
  * in objectFormat.ts's table branch.
  */
 
+import theme from "../config/theme.json";
+
 /** cell.borders/fill/font/margins all require PowerPointApi 1.9. */
 export function isTableCellFormattingSupported(): boolean {
   return Office.context.requirements.isSetSupported("PowerPointApi", "1.9");
 }
 
-const BORDER_GREY = "#505050";
-const WHITE = "#FFFFFF";
-const BODY_TEXT = "#383838";
-const HEADER_GREEN = "#115C36"; // Wiley "Dark Green" — matches custClrLst
-const AXIS_GREY = "#D8D9DA"; // Wiley "Light Gray 1" — matches custClrLst
+const { borderColor: BORDER_GREY, cellFill: WHITE, bodyText: BODY_TEXT, headerFill: HEADER_GREEN, axisFill: AXIS_GREY, borderWeight: BORDER_WEIGHT, cellMargin: CELL_MARGIN, headerFont: HEADER_FONT, bodyFont: BODY_FONT } = theme.tableStyle;
 
 function getSelectedTable(shapes: PowerPoint.Shape[]): PowerPoint.Shape {
   if (shapes.length !== 1) {
@@ -34,7 +34,7 @@ function getSelectedTable(shapes: PowerPoint.Shape[]): PowerPoint.Shape {
 function styleBordersGrey(cell: PowerPoint.TableCell): void {
   for (const edge of [cell.borders.top, cell.borders.bottom, cell.borders.left, cell.borders.right]) {
     edge.color = BORDER_GREY;
-    edge.weight = 0.75;
+    edge.weight = BORDER_WEIGHT;
     edge.transparency = 0;
   }
 }
@@ -47,12 +47,12 @@ function whiteBorderEdges(cell: PowerPoint.TableCell, edges: Array<"top" | "bott
 
 function baseCellStyle(cell: PowerPoint.TableCell): void {
   styleBordersGrey(cell);
-  cell.margins.left = 2.8;
-  cell.margins.right = 2.8;
-  cell.margins.top = 2.8;
-  cell.margins.bottom = 2.8;
+  cell.margins.left = CELL_MARGIN;
+  cell.margins.right = CELL_MARGIN;
+  cell.margins.top = CELL_MARGIN;
+  cell.margins.bottom = CELL_MARGIN;
   cell.fill.setSolidColor(WHITE);
-  cell.font.name = "Open Sans";
+  cell.font.name = BODY_FONT;
   cell.font.bold = false;
   cell.font.color = BODY_TEXT;
 }
@@ -79,7 +79,7 @@ export async function applyHeaderRowStyle(): Promise<void> {
 
         if (r === 0) {
           cell.fill.setSolidColor(HEADER_GREEN);
-          cell.font.name = "Open Sans ExtraBold";
+          cell.font.name = HEADER_FONT;
           cell.font.color = WHITE;
           whiteBorderEdges(cell, ["top", "bottom", "left", "right"]);
         } else if (r === 1) {
@@ -121,7 +121,7 @@ export async function applyHeaderRowAndColumnStyle(): Promise<void> {
 
         if (r === 0) {
           cell.fill.setSolidColor(HEADER_GREEN);
-          cell.font.name = "Open Sans ExtraBold";
+          cell.font.name = HEADER_FONT;
           cell.font.color = WHITE;
           whiteBorderEdges(cell, ["top", "bottom", "left", "right"]);
           if (c === 0) {
@@ -135,7 +135,7 @@ export async function applyHeaderRowAndColumnStyle(): Promise<void> {
 
         if (c === 0 && r !== 0) {
           cell.fill.setSolidColor(AXIS_GREY);
-          cell.font.name = "Open Sans";
+          cell.font.name = BODY_FONT;
           cell.font.bold = true;
           cell.font.color = BODY_TEXT;
           whiteBorderEdges(cell, ["left"]);

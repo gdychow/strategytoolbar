@@ -3,6 +3,8 @@ import * as Layout from "../features/layout";
 import * as FillLineColors from "../features/fillLineColors";
 import * as OtherTweaks from "../features/otherTweaks";
 import * as TableFormat from "../features/tableFormat";
+import * as Auth from "../auth/msal";
+import theme from "../config/theme.json";
 
 function bindButton(id: string, handler: () => Promise<void>): void {
   const el = document.getElementById(id);
@@ -53,6 +55,26 @@ Office.onReady((info) => {
 
   const statusEl = document.getElementById("status");
   if (statusEl) bindStatusElement(statusEl);
+
+  // Sign-in prototype (Phase 1 of the admin/auth plan — no backend calls yet).
+  bindButton("btnSignIn", async () => {
+    const user = await Auth.signIn((step) => notify(step));
+    const claimsEl = document.getElementById("authClaims") as HTMLElement;
+    claimsEl.style.display = "block";
+    claimsEl.textContent = JSON.stringify(user, null, 2);
+    notify(user.email ? `Signed in as ${user.email}` : "Signed in, but no email claim was returned — check the Azure app registration's optional claims.");
+  });
+  setSectionEnabled(
+    "sectionAuth",
+    Auth.isNestedAppAuthSupported(),
+    "Nested App Authentication isn't supported on this PowerPoint build."
+  );
+
+  // Default swatch colour comes from config/theme.json, not hardcoded in the HTML.
+  for (const id of ["fillColorInput", "lineColorInput", "textColorInput"]) {
+    const input = document.getElementById(id) as HTMLInputElement | null;
+    if (input) input.value = theme.defaultColorSwatch;
+  }
 
   // Fill, line & text color
   bindColorAutoApply("fillColorInput", async (hex) => {
@@ -143,5 +165,5 @@ Office.onReady((info) => {
     "Requires a newer PowerPoint build (PowerPointApi 1.9) than this one has."
   );
 
-  notify(`Ready. Host: ${info.host} / ${info.platform}`);
+  notify(`Ready. Host: ${info.host} / ${info.platform} / NAA supported: ${Auth.isNestedAppAuthSupported()}`);
 });

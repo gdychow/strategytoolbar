@@ -1,0 +1,15 @@
+{
+  "tableStyle": {
+    "headerFill": "#115C36",
+    "headerText": "#FFFFFF",
+    "headerFont": "Open Sans ExtraBold",
+    "axisFill": "#D8D9DA",
+    "bodyText": "#383838",
+    "bodyFont": "Open Sans",
+    "borderColor": "#505050",
+    "borderWeight": 0.75,
+    "cellFill": "#FFFFFF",
+    "cellMargin": 2.8
+  },
+  "defaultColorSwatch": "#1F4E79"
+}

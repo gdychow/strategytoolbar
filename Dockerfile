@@ -1,6 +1,7 @@
-# Multi-stage build: compile with the full Node toolchain, then ship only
-# the static output (dist/) in a minimal runtime image. No other containers
-# required — TLS is expected to terminate upstream (e.g. Cloudflare Tunnel).
+# Multi-stage build: compile with the full Node toolchain, then ship a
+# runtime image with only production dependencies (Express/pg/jose/
+# cookie-parser — no esbuild/typescript). Two containers total with
+# docker-compose (this app + Postgres) — no other dependencies beyond that.
 
 FROM node:20-alpine AS builder
 WORKDIR /app
@@ -16,7 +17,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV USE_TLS=false
 ENV PORT=8080
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 COPY server.js docker-entrypoint.sh ./
+COPY server ./server
 RUN chmod +x docker-entrypoint.sh
 COPY --from=builder --chown=node:node /app/dist ./dist
 EXPOSE 8080
