@@ -1,0 +1,16 @@
+{
+  "name": "strategy-toolbar-addin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Strategy Toolbar Redux - PowerPoint Office Add-in (Windows + Mac)",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "start": "node server.js"
+  },
+  "devDependencies": {
+    "@types/office-js": "^1.0.400",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}

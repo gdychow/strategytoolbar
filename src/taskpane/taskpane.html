@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Strategy Toolbar</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="/taskpane.css" />
+</head>
+<body>
+  <div id="status" class="status">Loading...</div>
+
+  <section id="sectionColor">
+    <h2>Fill, Line &amp; Text Color</h2>
+    <div class="color-row">
+      <label for="fillColorInput">Fill</label>
+      <input type="color" id="fillColorInput" value="#1F4E79" />
+      <button id="btnNoFill">No Fill</button>
+    </div>
+    <div class="color-row">
+      <label for="lineColorInput">Line</label>
+      <input type="color" id="lineColorInput" value="#1F4E79" />
+      <button id="btnNoLine">No Line</button>
+    </div>
+    <div class="color-row">
+      <label for="textColorInput">Text</label>
+      <input type="color" id="textColorInput" value="#1F4E79" />
+    </div>
+  </section>
+
+  <section id="sectionPosition">
+    <h2>Position &amp; Size</h2>
+    <div class="btn-row">
+      <button id="btnGetPosition">Get Position</button>
+      <button id="btnSetPosition">Set Position</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnGetPositionBottom">Get Position (Bottom)</button>
+      <button id="btnSetPositionBottom">Set Position (Bottom)</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnFixSize">Fix Size</button>
+      <button id="btnFixWidth">Fix Width</button>
+      <button id="btnFixHeight">Fix Height</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnSwitchPositions">Switch Positions</button>
+    </div>
+  </section>
+
+  <section id="sectionAlign">
+    <h2>Align &amp; Distribute</h2>
+    <div class="btn-row">
+      <button id="btnHvAlign">Grid Align</button>
+      <button id="btnHvDistribute">Grid Distribute</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnDistributeH">Distribute Horizontally</button>
+      <button id="btnDistributeV">Distribute Vertically</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnEdgeJoinH">Edge Join (Horizontal)</button>
+      <button id="btnEdgeJoinV">Edge Join (Vertical)</button>
+    </div>
+  </section>
+
+  <section id="sectionCentre">
+    <h2>Centre on Slide</h2>
+    <p class="unsupported-note"></p>
+    <div class="btn-row">
+      <button id="btnCentreH">Centre Horizontal</button>
+      <button id="btnCentreV">Centre Vertical</button>
+      <button id="btnCentreHV">Centre Both</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnTwoUpLeft">Two-Up: Left</button>
+      <button id="btnTwoUpRight">Two-Up: Right</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnHalfSlideLeft">Half-Slide: Left</button>
+      <button id="btnHalfSlideRight">Half-Slide: Right</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnResetMargins">Reset Template Margins</button>
+    </div>
+  </section>
+
+  <section id="sectionAngles">
+    <h2>Angle Tools</h2>
+    <p class="unsupported-note"></p>
+    <div class="btn-row">
+      <button id="btnAlignAngles">Align Angles</button>
+      <button id="btnChevronAlign">Chevron Align</button>
+    </div>
+  </section>
+
+  <section id="sectionOtherTweaks">
+    <h2>Other Tweaks</h2>
+    <div class="btn-row">
+      <button id="btnToggleWordWrap">Toggle Word Wrap</button>
+      <button id="btnToggleAutoSize">Toggle Autosize</button>
+    </div>
+    <div class="color-row">
+      <label for="marginInput">Margin</label>
+      <input type="number" id="marginInput" value="7.2" step="0.5" style="width: 56px;" />
+      <button id="btnSetMargins">Set Margins</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnClearText">Clear Text</button>
+      <button id="btnPasteAsText">Paste as Text</button>
+    </div>
+    <div class="btn-row">
+      <button id="btnBulletsOn">Bullets On</button>
+      <button id="btnBulletsOff">Bullets Off</button>
+    </div>
+  </section>
+
+  <section id="sectionTables">
+    <h2>Table AutoFormat</h2>
+    <p class="unsupported-note"></p>
+    <div class="btn-row">
+      <button id="btnTableHeaderRow">Header Row Style</button>
+      <button id="btnTableHeaderRowCol">Header Row + Column Style</button>
+    </div>
+  </section>
+
+  <script src="/taskpane.js"></script>
+</body>
+</html>

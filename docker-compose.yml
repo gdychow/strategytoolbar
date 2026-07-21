@@ -1,0 +1,13 @@
+# Optional convenience wrapper around `docker run` — not a hard dependency,
+# the image is entirely self-contained. Cloudflare Tunnel (cloudflared)
+# points at whatever host:port this container is published on; it isn't
+# part of this compose file since it isn't a dependency of the app itself.
+services:
+  strategy-toolbar:
+    build: .
+    image: strategy-toolbar-addin:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - DOMAIN=toolbar.gavinchow.me
+    restart: unless-stopped
