@@ -22,7 +22,13 @@ const useTls = process.env.USE_TLS !== "false";
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
-app.use(express.static(ROOT));
+// Office Add-in task panes on Mac are known to cache their web content
+// aggressively (WKWebView), which can silently leave an old taskpane.js
+// running after a deploy with no visible sign anything is wrong.
+// "no-cache" doesn't disable caching — it forces a revalidation request on
+// every load, so a change always takes effect on the next reload instead of
+// needing the user to manually clear the Office cache.
+app.use(express.static(ROOT, { setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") }));
 
 const SESSION_COOKIE = "session";
 const cookieOptions = {
