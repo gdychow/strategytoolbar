@@ -137,9 +137,29 @@ function refreshLibrarySection(user: SessionUser | null): void {
   }
 }
 
+/**
+ * fetch() with a hard timeout. Without this, a hung request (this task
+ * pane's first-ever same-origin fetch to its own backend, from inside the
+ * sideloaded WKWebView) can leave a Promise neither resolved nor rejected
+ * forever — a plain .catch() doesn't help with that, since there's nothing
+ * to catch. Confirmed as the root cause of the whole task pane appearing to
+ * freeze on "Loading...": the pre-fix startup code awaited a session check
+ * before wiring any buttons, so a hang there blocked everything, including
+ * Sign In itself.
+ */
+async function fetchWithTimeout(input: string, init: RequestInit = {}, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 /** Exchanges a fresh Microsoft ID token for our own session cookie. */
 async function establishSession(idToken: string): Promise<void> {
-  const res = await fetch("/api/auth/session", {
+  const res = await fetchWithTimeout("/api/auth/session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ idToken }),
@@ -147,21 +167,40 @@ async function establishSession(idToken: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to establish session (${res.status}).`);
 }
 
-/** Checks whether the session cookie from a previous sign-in is still valid, without forcing an interactive prompt. */
+/** Checks whether the session cookie from a previous sign-in is still valid, without forcing an interactive prompt. Never throws — a failed/timed-out check just means "not signed in". */
 async function getSessionUser(): Promise<SessionUser | null> {
-  const res = await fetch("/api/auth/me");
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetchWithTimeout("/api/auth/me");
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
-Office.onReady(async (info) => {
+function updateSignInStatus(user: SessionUser | null): void {
+  const el = document.getElementById("signInStatus");
+  if (!el) return;
+  if (user) {
+    el.textContent = `Signed in as ${user.email ?? user.displayName ?? "unknown user"}${user.isAdmin ? " (admin)" : ""}.`;
+    el.classList.add("signed-in");
+  } else {
+    el.textContent = "Not signed in.";
+    el.classList.remove("signed-in");
+  }
+}
+
+/** Applies a change in sign-in state everywhere it matters — the status line and the Content Library gate. */
+function applySessionState(user: SessionUser | null): void {
+  updateSignInStatus(user);
+  refreshLibrarySection(user);
+}
+
+Office.onReady((info) => {
   if (info.host !== Office.HostType.PowerPoint) return;
 
   const statusEl = document.getElementById("status");
   if (statusEl) bindStatusElement(statusEl);
-
-  let sessionUser = await getSessionUser().catch(() => null);
-  refreshLibrarySection(sessionUser);
 
   bindButton("btnSignIn", async () => {
     const user = await Auth.signIn((step) => notify(step));
@@ -173,8 +212,7 @@ Office.onReady(async (info) => {
       return;
     }
     await establishSession(user.idToken);
-    sessionUser = await getSessionUser();
-    refreshLibrarySection(sessionUser);
+    applySessionState(await getSessionUser());
     notify(`Signed in as ${user.email}`);
   });
   setSectionEnabled(
@@ -192,6 +230,7 @@ Office.onReady(async (info) => {
     showLibraryFinishRow(false);
     notify("Done — temporary slide removed.");
   });
+  applySessionState(null); // starting state — the background check below updates this once it resolves, however long that takes
 
   // Default swatch colour comes from config/theme.json, not hardcoded in the HTML.
   for (const id of ["fillColorInput", "lineColorInput", "textColorInput"]) {
@@ -289,4 +328,9 @@ Office.onReady(async (info) => {
   );
 
   notify(`Ready. Host: ${info.host} / ${info.platform} / NAA supported: ${Auth.isNestedAppAuthSupported()}`);
+
+  // Checked in the background, only after everything above is already
+  // wired and interactive — see fetchWithTimeout's comment for why this
+  // must never be awaited directly in the startup path above.
+  getSessionUser().then(applySessionState);
 });

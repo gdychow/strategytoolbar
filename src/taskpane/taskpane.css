@@ -102,6 +102,16 @@ button:disabled {
   margin: 0 0 6px;
 }
 
+.sign-in-status {
+  font-size: 11px;
+  color: #555;
+  margin: 0 0 6px;
+}
+
+.sign-in-status.signed-in {
+  color: #1a7a3c;
+}
+
 .library-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
