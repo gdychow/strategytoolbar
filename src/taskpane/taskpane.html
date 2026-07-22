@@ -18,6 +18,22 @@
     <pre id="authClaims" style="font-size: 11px; background: #f5f5f5; padding: 6px; border-radius: 4px; white-space: pre-wrap; display: none;"></pre>
   </section>
 
+  <section id="sectionLibrary">
+    <h2>Content Library</h2>
+    <p class="unsupported-note"></p>
+    <div class="btn-row">
+      <label for="librarySelect">Category</label>
+      <select id="librarySelect">
+        <option value="text">Text</option>
+      </select>
+    </div>
+    <div id="libraryGrid" class="library-grid"></div>
+    <div id="libraryFinishRow" class="library-finish-row" style="display: none;">
+      <p>Content added and selected on a temporary slide. Copy it (Ctrl/Cmd+C), click your slide, paste (Ctrl/Cmd+V), then click Finish.</p>
+      <button id="btnLibraryFinish">Finish</button>
+    </div>
+  </section>
+
   <section id="sectionColor">
     <h2>Fill, Line &amp; Text Color</h2>
     <div class="color-row">

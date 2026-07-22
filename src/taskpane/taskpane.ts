@@ -3,6 +3,7 @@ import * as Layout from "../features/layout";
 import * as FillLineColors from "../features/fillLineColors";
 import * as OtherTweaks from "../features/otherTweaks";
 import * as TableFormat from "../features/tableFormat";
+import * as Library from "../features/libraryInsert";
 import * as Auth from "../auth/msal";
 import theme from "../config/theme.json";
 
@@ -50,25 +51,147 @@ function setSectionEnabled(sectionId: string, enabled: boolean, reason?: string)
   }
 }
 
-Office.onReady((info) => {
+interface SessionUser {
+  oid: string;
+  tid: string;
+  email: string | null;
+  displayName: string | null;
+  isAdmin: boolean;
+}
+
+let currentFileInsertHandle: Library.FileInsertHandle | null = null;
+
+function showLibraryFinishRow(show: boolean): void {
+  const grid = document.getElementById("libraryGrid");
+  const finishRow = document.getElementById("libraryFinishRow");
+  const select = document.getElementById("librarySelect") as HTMLSelectElement | null;
+  if (grid) (grid as HTMLElement).style.display = show ? "none" : "grid";
+  if (finishRow) (finishRow as HTMLElement).style.display = show ? "block" : "none";
+  if (select) select.disabled = show;
+}
+
+async function handleLibraryItemClick(item: Library.CatalogItem): Promise<void> {
+  const handle = await Library.insertCatalogItem(item);
+  if (handle) {
+    currentFileInsertHandle = handle;
+    showLibraryFinishRow(true);
+    notify(`"${item.title}" added on a temporary slide — copy it across, then click Finish.`);
+  } else {
+    notify(`"${item.title}" inserted.`);
+  }
+}
+
+function renderLibraryGrid(items: Library.CatalogItem[]): void {
+  const grid = document.getElementById("libraryGrid");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  for (const item of items) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "library-item";
+
+    if (item.thumbnailUrl) {
+      const img = document.createElement("img");
+      img.src = item.thumbnailUrl;
+      img.alt = item.title;
+      button.appendChild(img);
+    } else {
+      const placeholder = document.createElement("span");
+      placeholder.className = "library-item-placeholder";
+      button.appendChild(placeholder);
+    }
+
+    const label = document.createElement("span");
+    label.textContent = item.title;
+    button.appendChild(label);
+
+    button.addEventListener("click", withErrorHandling(() => handleLibraryItemClick(item)));
+    grid.appendChild(button);
+  }
+}
+
+async function loadLibrary(): Promise<void> {
+  const select = document.getElementById("librarySelect") as HTMLSelectElement | null;
+  const items = await Library.fetchCatalog(select?.value ?? "text");
+  renderLibraryGrid(items);
+}
+
+/** Gates and (re)populates the Content Library section whenever sign-in state changes. */
+function refreshLibrarySection(user: SessionUser | null): void {
+  const signedIn = !!user;
+  const supported = Library.isLibraryInsertSupported();
+  setSectionEnabled(
+    "sectionLibrary",
+    signedIn && supported,
+    signedIn ? "Requires a newer PowerPoint build (PowerPointApi 1.2) than this one has." : "Sign in above to browse the content library."
+  );
+
+  if (signedIn && supported) {
+    loadLibrary().catch((err) => notify(`Error: ${err instanceof Error ? err.message : String(err)}`, "error"));
+  } else {
+    const grid = document.getElementById("libraryGrid");
+    if (grid) grid.innerHTML = "";
+    showLibraryFinishRow(false);
+    currentFileInsertHandle = null;
+  }
+}
+
+/** Exchanges a fresh Microsoft ID token for our own session cookie. */
+async function establishSession(idToken: string): Promise<void> {
+  const res = await fetch("/api/auth/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  });
+  if (!res.ok) throw new Error(`Failed to establish session (${res.status}).`);
+}
+
+/** Checks whether the session cookie from a previous sign-in is still valid, without forcing an interactive prompt. */
+async function getSessionUser(): Promise<SessionUser | null> {
+  const res = await fetch("/api/auth/me");
+  if (!res.ok) return null;
+  return res.json();
+}
+
+Office.onReady(async (info) => {
   if (info.host !== Office.HostType.PowerPoint) return;
 
   const statusEl = document.getElementById("status");
   if (statusEl) bindStatusElement(statusEl);
 
-  // Sign-in prototype (Phase 1 of the admin/auth plan — no backend calls yet).
+  let sessionUser = await getSessionUser().catch(() => null);
+  refreshLibrarySection(sessionUser);
+
   bindButton("btnSignIn", async () => {
     const user = await Auth.signIn((step) => notify(step));
     const claimsEl = document.getElementById("authClaims") as HTMLElement;
     claimsEl.style.display = "block";
     claimsEl.textContent = JSON.stringify(user, null, 2);
-    notify(user.email ? `Signed in as ${user.email}` : "Signed in, but no email claim was returned — check the Azure app registration's optional claims.");
+    if (!user.email) {
+      notify("Signed in, but no email claim was returned — check the Azure app registration's optional claims.", "error");
+      return;
+    }
+    await establishSession(user.idToken);
+    sessionUser = await getSessionUser();
+    refreshLibrarySection(sessionUser);
+    notify(`Signed in as ${user.email}`);
   });
   setSectionEnabled(
     "sectionAuth",
     Auth.isNestedAppAuthSupported(),
     "Nested App Authentication isn't supported on this PowerPoint build."
   );
+
+  // Content Library
+  document.getElementById("librarySelect")?.addEventListener("change", withErrorHandling(loadLibrary));
+  bindButton("btnLibraryFinish", async () => {
+    if (!currentFileInsertHandle) return;
+    await Library.finishFileInsert(currentFileInsertHandle);
+    currentFileInsertHandle = null;
+    showLibraryFinishRow(false);
+    notify("Done — temporary slide removed.");
+  });
 
   // Default swatch colour comes from config/theme.json, not hardcoded in the HTML.
   for (const id of ["fillColorInput", "lineColorInput", "textColorInput"]) {

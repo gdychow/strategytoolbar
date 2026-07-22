@@ -37,4 +37,70 @@ async function upsertUser({ oid, tid, email, displayName }) {
   return result.rows[0];
 }
 
-module.exports = { pool, waitForDatabase, upsertUser };
+/** Shared/admin catalog items in one category, in display order. */
+async function listSharedCatalogItems(category) {
+  const result = await pool.query(
+    `SELECT id, category, title, insert_mode, reconstruct_spec, thumbnail_path, sort_order
+     FROM catalog_items
+     WHERE category = $1 AND owner_oid IS NULL
+     ORDER BY sort_order, id`,
+    [category]
+  );
+  return result.rows;
+}
+
+/** All shared/admin catalog items across every category — used by the /admin read-only table. */
+async function listAllCatalogItems() {
+  const result = await pool.query(
+    `SELECT id, category, title, insert_mode, thumbnail_path, sort_order
+     FROM catalog_items
+     WHERE owner_oid IS NULL
+     ORDER BY category, sort_order, id`
+  );
+  return result.rows;
+}
+
+/** A single catalog item by ID, including source_file — used to resolve the file for a 'file'-mode insert. */
+async function getCatalogItem(id) {
+  const result = await pool.query(
+    `SELECT id, category, title, insert_mode, source_file, reconstruct_spec, thumbnail_path, sort_order
+     FROM catalog_items WHERE id = $1`,
+    [id]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Removes every shared item in a category, so scripts/seed-catalog.js can reseed it from scratch — simplest way to stay idempotent across both insert_mode shapes (source_file is UNIQUE but NULL for 'reconstruct' items, so ON CONFLICT can't dedupe those). */
+async function deleteCatalogItemsByCategory(category) {
+  await pool.query(`DELETE FROM catalog_items WHERE category = $1 AND owner_oid IS NULL`, [category]);
+}
+
+/** Inserts one shared catalog item. Used only by scripts/seed-catalog.js, always after a same-category deleteCatalogItemsByCategory(). */
+async function insertCatalogItem({ category, title, insertMode, sourceFile, reconstructSpec, thumbnailPath, sortOrder }) {
+  const result = await pool.query(
+    `INSERT INTO catalog_items (category, title, insert_mode, source_file, reconstruct_spec, thumbnail_path, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id`,
+    [
+      category,
+      title,
+      insertMode,
+      sourceFile ?? null,
+      reconstructSpec ? JSON.stringify(reconstructSpec) : null,
+      thumbnailPath ?? null,
+      sortOrder ?? 0,
+    ]
+  );
+  return result.rows[0];
+}
+
+module.exports = {
+  pool,
+  waitForDatabase,
+  upsertUser,
+  listSharedCatalogItems,
+  listAllCatalogItems,
+  getCatalogItem,
+  deleteCatalogItemsByCategory,
+  insertCatalogItem,
+};

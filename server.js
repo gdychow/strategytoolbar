@@ -5,8 +5,15 @@ const fs = require("fs");
 const https = require("https");
 const os = require("os");
 
-const { waitForDatabase, upsertUser } = require("./server/db");
+const {
+  waitForDatabase,
+  upsertUser,
+  listSharedCatalogItems,
+  listAllCatalogItems,
+  getCatalogItem,
+} = require("./server/db");
 const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken } = require("./server/auth");
+const { resolveCatalogFilePath } = require("./server/catalog");
 
 const PORT = process.env.PORT || 3000;
 const ROOT = path.join(__dirname, "dist");
@@ -93,13 +100,69 @@ app.post("/api/auth/signout", (req, res) => {
   res.status(204).end();
 });
 
-// Phase 3: proves the authorization boundary works end-to-end. Deliberately
-// a bare placeholder — the real catalog upload/management UI is Tier 3's
-// own work, built on top of this once it exists.
-app.get("/admin", (req, res) => {
+// Tier 3: the shared content library. Any signed-in user can browse and
+// insert from it — it's "shared", not "admin-only to read". source_file
+// itself is never client-supplied: the client only ever sends a numeric
+// item ID, and the server looks up which file (if any) that row points at.
+app.get("/api/catalog/:category", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  const items = await listSharedCatalogItems(req.params.category);
+  res.json(
+    items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      insertMode: item.insert_mode,
+      reconstructSpec: item.reconstruct_spec,
+      thumbnailUrl: item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}` : null,
+    }))
+  );
+});
+
+app.get("/api/catalog/file/:itemId", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+
+  const item = await getCatalogItem(req.params.itemId);
+  if (!item || item.insert_mode !== "file") {
+    return res.status(404).json({ error: "Not found." });
+  }
+
+  let filePath;
+  try {
+    filePath = resolveCatalogFilePath(item.source_file);
+  } catch (err) {
+    console.error("Catalog file path resolution failed:", err.message);
+    return res.status(500).json({ error: "Server error." });
+  }
+
+  res.type("application/vnd.openxmlformats-officedocument.presentationml.presentation");
+  res.sendFile(filePath, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: "File not found." });
+  });
+});
+
+// Phase 3: proves the authorization boundary works end-to-end. Now also
+// gives the owner a read-only view of what scripts/seed-catalog.js has
+// loaded — real upload/edit UI is still out of scope (content is seeded
+// via script for v1).
+app.get("/admin", async (req, res) => {
   if (!req.user) return res.status(401).send("Sign in first.");
   if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
-  res.send(`<!doctype html><html><body><h1>Welcome, admin</h1><p>Signed in as ${req.user.email}. Catalog management goes here.</p></body></html>`);
+
+  const items = await listAllCatalogItems();
+  const rows = items
+    .map(
+      (item) =>
+        `<tr><td>${item.title}</td><td>${item.category}</td><td>${item.insert_mode}</td><td>${item.thumbnail_path ? "yes" : "no"}</td></tr>`
+    )
+    .join("");
+  res.send(`<!doctype html><html><body>
+    <h1>Welcome, admin</h1>
+    <p>Signed in as ${req.user.email}.</p>
+    <table border="1" cellpadding="4">
+      <tr><th>Title</th><th>Category</th><th>Insert mode</th><th>Thumbnail</th></tr>
+      ${rows}
+    </table>
+  </body></html>`);
 });
 
 function startServer() {

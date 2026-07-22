@@ -27,8 +27,11 @@ services:
       - DOMAIN=toolbar.gavinchow.me
       - AZURE_CLIENT_ID=2d499447-2b3d-4da8-ba78-ff5d1b1699b1
       - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@db:5432/strategytoolbar
+      - CATALOG_DIR=/app/data/catalog
     env_file:
       - .env
+    volumes:
+      - catalog_files:/app/data/catalog
     depends_on:
       db:
         condition: service_healthy
@@ -51,3 +54,4 @@ services:
 
 volumes:
   pgdata:
+  catalog_files:

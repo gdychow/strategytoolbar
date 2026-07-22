@@ -21,6 +21,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY server.js docker-entrypoint.sh ./
 COPY server ./server
+COPY scripts ./scripts
+COPY db/seed ./db/seed
 RUN chmod +x docker-entrypoint.sh
 COPY --from=builder --chown=node:node /app/dist ./dist
 EXPOSE 8080

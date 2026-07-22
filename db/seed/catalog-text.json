@@ -1,0 +1,157 @@
+{
+  "category": "text",
+  "items": [
+    {
+      "title": "Bulleted List (2-Level)",
+      "insertMode": "file",
+      "sourceFile": "text/text-001.pptx",
+      "thumbnail": "text/bulleted-list.png",
+      "sortOrder": 1
+    },
+    {
+      "title": "Chart Title — Top Center",
+      "insertMode": "reconstruct",
+      "thumbnail": "text/chart-title-top-center.png",
+      "sortOrder": 2,
+      "reconstructSpec": {
+        "kind": "textBox",
+        "left": 429.7,
+        "top": 107.05,
+        "width": 100.6,
+        "height": 32.72,
+        "rotation": 0,
+        "fill": null,
+        "line": null,
+        "paragraphs": [
+          { "level": 0, "bullet": null, "runs": [{ "text": "Chart Title", "bold": true, "italic": null, "size": 16, "fontName": null, "color": "#000000" }] },
+          { "level": 0, "bullet": null, "runs": [{ "text": "Secondary Title", "bold": null, "italic": null, "size": 14, "fontName": null, "color": "#000000" }] }
+        ]
+      }
+    },
+    {
+      "title": "Chart Title — Top Left",
+      "insertMode": "reconstruct",
+      "thumbnail": "text/chart-title-top-left.png",
+      "sortOrder": 3,
+      "reconstructSpec": {
+        "kind": "textBox",
+        "left": 196.38,
+        "top": 106.92,
+        "width": 100.6,
+        "height": 32.72,
+        "rotation": 0,
+        "fill": null,
+        "line": null,
+        "paragraphs": [
+          { "level": 0, "bullet": null, "runs": [{ "text": "Chart Title", "bold": true, "italic": null, "size": 16, "fontName": null, "color": "#000000" }] },
+          { "level": 0, "bullet": null, "runs": [{ "text": "Secondary Title", "bold": null, "italic": null, "size": 14, "fontName": null, "color": "#000000" }] }
+        ]
+      }
+    },
+    {
+      "title": "Chart Title — Bottom Left",
+      "insertMode": "reconstruct",
+      "thumbnail": "text/chart-title-bottom-left.png",
+      "sortOrder": 4,
+      "reconstructSpec": {
+        "kind": "textBox",
+        "left": 196.38,
+        "top": 292.68,
+        "width": 100.6,
+        "height": 32.72,
+        "rotation": 0,
+        "fill": null,
+        "line": null,
+        "paragraphs": [
+          { "level": 0, "bullet": null, "runs": [{ "text": "Chart Title", "bold": true, "italic": null, "size": 16, "fontName": null, "color": "#000000" }] },
+          { "level": 0, "bullet": null, "runs": [{ "text": "Secondary Title", "bold": null, "italic": null, "size": 14, "fontName": null, "color": "#000000" }] }
+        ]
+      }
+    },
+    {
+      "title": "Footnote / Source Line (Tab-Aligned)",
+      "insertMode": "reconstruct",
+      "thumbnail": "text/footnote-source-line.png",
+      "sortOrder": 5,
+      "reconstructSpec": {
+        "kind": "textBox",
+        "left": 28.35,
+        "top": 461.9,
+        "width": 903.31,
+        "height": 26.17,
+        "rotation": 0,
+        "fill": null,
+        "line": null,
+        "paragraphs": [
+          { "level": 0, "bullet": null, "runs": [{ "text": "1)\tEither use tab key or two spaces", "bold": null, "italic": null, "size": 8, "fontName": null, "color": "#000000" }] },
+          { "level": 0, "bullet": null, "runs": [{ "text": "Note:\tEither use tab key or two spaces", "bold": null, "italic": null, "size": 8, "fontName": null, "color": "#000000" }] },
+          { "level": 0, "bullet": null, "runs": [{ "text": "Source:\t…", "bold": null, "italic": null, "size": 8, "fontName": null, "color": "#000000" }] }
+        ]
+      }
+    },
+    {
+      "title": "Data Label — Center",
+      "insertMode": "reconstruct",
+      "thumbnail": "text/data-label-center.png",
+      "sortOrder": 6,
+      "reconstructSpec": {
+        "kind": "textBox",
+        "left": 429.45,
+        "top": 200.64,
+        "width": 101.1,
+        "height": 13.09,
+        "rotation": 0,
+        "fill": null,
+        "line": null,
+        "paragraphs": [
+          { "level": 0, "bullet": null, "runs": [{ "text": "Data Label Center", "bold": null, "italic": null, "size": 12, "fontName": null, "color": "#000000" }] }
+        ]
+      }
+    },
+    {
+      "title": "Data Label — Left",
+      "insertMode": "reconstruct",
+      "thumbnail": "text/data-label-left.png",
+      "sortOrder": 7,
+      "reconstructSpec": {
+        "kind": "textBox",
+        "left": 449.13,
+        "top": 200.0,
+        "width": 61.75,
+        "height": 14.38,
+        "rotation": 0,
+        "fill": null,
+        "line": null,
+        "paragraphs": [
+          { "level": 0, "bullet": null, "runs": [{ "text": "Data Label Left", "bold": null, "italic": null, "size": 12, "fontName": null, "color": "#000000" }] }
+        ]
+      }
+    },
+    {
+      "title": "Data Label — Right",
+      "insertMode": "reconstruct",
+      "thumbnail": "text/data-label-right.png",
+      "sortOrder": 8,
+      "reconstructSpec": {
+        "kind": "textBox",
+        "left": 449.13,
+        "top": 200.0,
+        "width": 61.75,
+        "height": 14.38,
+        "rotation": 0,
+        "fill": null,
+        "line": null,
+        "paragraphs": [
+          { "level": 0, "bullet": null, "runs": [{ "text": "Data Label Right", "bold": null, "italic": null, "size": 12, "fontName": null, "color": "#000000" }] }
+        ]
+      }
+    },
+    {
+      "title": "Callout / Speech Bubble Note",
+      "insertMode": "file",
+      "sourceFile": "text/text-010.pptx",
+      "thumbnail": "text/callout-speech-bubble.png",
+      "sortOrder": 9
+    }
+  ]
+}
