@@ -28,6 +28,11 @@ COPY server.js docker-entrypoint.sh ./
 COPY server ./server
 COPY scripts ./scripts
 COPY db/seed ./db/seed
+# src/config/auth.json is read directly by server.js (the /admin browser
+# sign-in page's clientId/authority) — everything else under src/ is only
+# ever consumed by the esbuild bundle (already in dist/), so this one file
+# is copied explicitly rather than the whole src/ tree.
+COPY src/config/auth.json ./src/config/auth.json
 RUN chmod +x docker-entrypoint.sh
 COPY --from=builder --chown=node:node /app/dist ./dist
 # Pre-creates the catalog_files mount point owned by node:node so Docker

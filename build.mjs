@@ -46,7 +46,13 @@ async function copyStaticAssets() {
   await cp("src/taskpane/taskpane.css", "dist/taskpane.css");
   await cp("assets", "dist/assets", { recursive: true });
   await cp(prod ? "manifest.prod.xml" : "manifest.xml", "dist/manifest.xml");
-  console.log("Copied taskpane.html (with build stamp)/css, assets/, and manifest.xml into dist/");
+  // Vendored fresh from node_modules on every build (not committed to the
+  // repo) so it always matches package.json's pinned @azure/msal-browser
+  // version — used by /admin's standalone browser sign-in page, which
+  // deliberately isn't part of the esbuild bundle (see server.js).
+  await mkdir("dist/vendor", { recursive: true });
+  await cp("node_modules/@azure/msal-browser/lib/msal-browser.min.js", "dist/vendor/msal-browser.min.js");
+  console.log("Copied taskpane.html (with build stamp)/css, assets/, vendor/, and manifest.xml into dist/");
 }
 
 if (watch) {

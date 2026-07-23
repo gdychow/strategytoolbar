@@ -18,6 +18,10 @@ const {
 } = require("./server/db");
 const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken } = require("./server/auth");
 const { THUMBNAILS_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath } = require("./server/catalog");
+// Same clientId/authority the task pane's NAA client uses (src/auth/msal.ts)
+// — reused as-is by /admin's separate, standard-MSAL browser sign-in flow
+// below. Plain JSON, requirable directly from Node with no build step.
+const authConfig = require("./src/config/auth.json");
 
 const PORT = process.env.PORT || 3000;
 const ROOT = path.join(__dirname, "dist");
@@ -181,6 +185,51 @@ const upload = multer({
   },
 });
 
+// Renders a standalone MSAL sign-in page for browser access to /admin — a
+// second, independent auth flow from the task pane's NAA client
+// (src/auth/msal.ts), since NAA specifically requires the Office host
+// bridge (Office.auth) and won't function in a plain browser tab. Uses the
+// UMD build vendored into dist/vendor by build.mjs rather than the esbuild
+// bundle, since /admin has deliberately stayed framework-free. Posts the
+// resulting idToken to the same POST /api/auth/session the task pane uses.
+function renderSignInPage() {
+  return `<!doctype html><html><body>
+    <h1>Strategy Toolbar Admin</h1>
+    <p id="status">Not signed in.</p>
+    <button id="btnSignIn">Sign In</button>
+    <script src="/vendor/msal-browser.min.js"></script>
+    <script>
+      const statusEl = document.getElementById("status");
+      const msalInstance = new msal.PublicClientApplication({
+        auth: {
+          clientId: ${JSON.stringify(authConfig.clientId)},
+          authority: ${JSON.stringify(authConfig.authority)},
+          redirectUri: window.location.origin + "/admin",
+        },
+        cache: { cacheLocation: "sessionStorage" },
+      });
+      const ready = msalInstance.initialize();
+
+      document.getElementById("btnSignIn").addEventListener("click", async () => {
+        try {
+          await ready;
+          const result = await msalInstance.loginPopup({ scopes: ["User.Read"] });
+          statusEl.textContent = "Signed in as " + (result.account?.username ?? "unknown") + " — finishing...";
+          const res = await fetch("/api/auth/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: result.idToken }),
+          });
+          if (!res.ok) throw new Error("Failed to establish session (" + res.status + ").");
+          window.location.reload();
+        } catch (err) {
+          statusEl.textContent = "Sign-in failed: " + (err && err.message ? err.message : String(err));
+        }
+      });
+    </script>
+  </body></html>`;
+}
+
 // Phase 3 proved the authorization boundary; this now also lets the owner
 // fix real curation mistakes (wrong title, wrong category, wrong
 // thumbnail) directly, instead of hand-editing a seed JSON file and
@@ -188,7 +237,10 @@ const upload = multer({
 // insert_mode/source_file/reconstruct_spec stay out of this UI entirely —
 // those are still owned by the slice+seed script pipeline. Creating new
 // items is also out of scope here (deferred, not forgotten).
-app.get("/admin", requireAdmin, async (req, res) => {
+app.get("/admin", async (req, res) => {
+  if (!req.user) return res.send(renderSignInPage());
+  if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
+
   const items = await listAllCatalogItems();
   const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
   const rows = items
