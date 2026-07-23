@@ -17,7 +17,6 @@
 
 import {
   createNestablePublicClientApplication,
-  InteractionRequiredAuthError,
   type IPublicClientApplication,
   type AuthenticationResult,
 } from "@azure/msal-browser";
@@ -99,11 +98,18 @@ export async function signIn(onProgress?: (step: string) => void): Promise<Signe
     const result = await instance.ssoSilent(request);
     return toSignedInUser(result);
   } catch (error) {
-    if (error instanceof InteractionRequiredAuthError) {
-      onProgress?.("Silent sign-in needs interaction — opening popup...");
-      const result = await instance.acquireTokenPopup(request);
-      return toSignedInUser(result);
-    }
-    throw error;
+    // Falls back to a popup for *any* ssoSilent failure, not just
+    // InteractionRequiredAuthError — ssoSilent works via a hidden iframe,
+    // which needs the same storage/cookie access a real top-level page
+    // gets; inside Office-on-web the task pane is already an iframe, so a
+    // second, nested hidden iframe can end up storage-partitioned and just
+    // hang until MSAL's own timeout fires (confirmed: "timed_out", not
+    // InteractionRequiredAuthError, so the old narrower check never
+    // reached this fallback at all). A popup opens as its own top-level
+    // window with normal storage access, so it isn't subject to the same
+    // nested-iframe restriction.
+    onProgress?.("Silent sign-in didn't complete — opening popup...");
+    const result = await instance.acquireTokenPopup(request);
+    return toSignedInUser(result);
   }
 }
