@@ -179,8 +179,15 @@ button:disabled {
 }
 
 .library-item img {
+  /* No fixed aspect-ratio here on purpose: generated thumbnails (see
+     scripts/slice-catalog-source.py) are now cropped to each item's real
+     content, so their natural aspect ratio varies per item (a wide chart
+     legend vs. a small square icon). Forcing a 16:9 box here would
+     letterbox/pillarbox that crop with white bars, recreating the exact
+     whitespace problem the crop was built to remove. max-height keeps any
+     unusually tall crop from dominating the grid. */
   width: 100%;
-  aspect-ratio: 16 / 9;
+  max-height: 140px;
   object-fit: contain;
   background: #fff;
   border: 1px solid #c8c8c8;
