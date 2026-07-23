@@ -17,24 +17,46 @@ function bindButton(id: string, handler: () => Promise<void>): void {
 }
 
 /**
- * Applies a colour as the user picks it, with no separate Apply click.
- * Listens on `input` rather than `change`: macOS's native colour panel has
- * no explicit commit action, so `change` (which needs one) is unreliable in
- * WKWebView-hosted Mac Office task panes, while `input` fires live as the
- * user moves around the picker. Debounced so dragging around the picker
- * doesn't fire a PowerPoint.run call per pixel — it applies once movement
- * settles for 150ms.
+ * Wires a swatch + caret + hidden native <input type="color"> as one
+ * control. The swatch is the default click target and applies the
+ * currently-held color immediately — no picker in the way, so reusing the
+ * same color across several shapes is one click each time. The caret opens
+ * the native picker to actually change the color; picking a new one there
+ * applies it too (listened on `input` rather than `change`, since macOS's
+ * native colour panel has no explicit commit action — `change` is
+ * unreliable in WKWebView-hosted Mac Office task panes, while `input`
+ * fires live as the user moves around the picker) and updates the swatch.
+ * Debounced so dragging around the picker doesn't fire a PowerPoint.run
+ * call per pixel — it applies once movement settles for 150ms.
  */
-function bindColorAutoApply(inputId: string, handler: (hex: string) => Promise<void>): void {
-  const input = document.getElementById(inputId) as HTMLInputElement | null;
-  if (!input) {
-    console.warn(`Color input #${inputId} not found in taskpane.html`);
+function bindColorControl(baseId: string, handler: (hex: string) => Promise<void>): void {
+  const input = document.getElementById(`${baseId}Input`) as HTMLInputElement | null;
+  const swatch = document.getElementById(`${baseId}Swatch`) as HTMLButtonElement | null;
+  const caret = document.getElementById(`${baseId}Caret`) as HTMLButtonElement | null;
+  if (!input || !swatch || !caret) {
+    console.warn(`Color control #${baseId} not found in taskpane.html`);
     return;
   }
+
+  const syncSwatch = () => {
+    swatch.style.backgroundColor = input.value;
+  };
+  syncSwatch();
+
   let debounceTimer: number | undefined;
   input.addEventListener("input", () => {
+    syncSwatch();
     window.clearTimeout(debounceTimer);
     debounceTimer = window.setTimeout(withErrorHandling(() => handler(input.value)), 150);
+  });
+
+  swatch.addEventListener("click", withErrorHandling(() => handler(input.value)));
+  caret.addEventListener("click", () => {
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+    } else {
+      input.click();
+    }
   });
 }
 
@@ -239,15 +261,15 @@ Office.onReady((info) => {
   }
 
   // Fill, line & text color
-  bindColorAutoApply("fillColorInput", async (hex) => {
+  bindColorControl("fillColor", async (hex) => {
     await FillLineColors.fillColor(FillLineColors.hexToRgb(hex));
     notify(`Fill set to ${hex}.`);
   });
-  bindColorAutoApply("lineColorInput", async (hex) => {
+  bindColorControl("lineColor", async (hex) => {
     await FillLineColors.lineColor(FillLineColors.hexToRgb(hex));
     notify(`Line set to ${hex}.`);
   });
-  bindColorAutoApply("textColorInput", async (hex) => {
+  bindColorControl("textColor", async (hex) => {
     await FillLineColors.textColor(FillLineColors.hexToRgb(hex));
     notify(`Text color set to ${hex}.`);
   });

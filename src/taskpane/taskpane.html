@@ -43,18 +43,24 @@
   <section id="sectionColor">
     <h2>Fill, Line &amp; Text Color</h2>
     <div class="color-row">
-      <label for="fillColorInput">Fill</label>
-      <input type="color" id="fillColorInput" />
+      <label for="fillColorSwatch">Fill</label>
+      <button type="button" id="fillColorSwatch" class="color-swatch" title="Apply fill color"></button>
+      <button type="button" id="fillColorCaret" class="color-caret" aria-label="Choose fill color">▾</button>
+      <input type="color" id="fillColorInput" class="color-input-hidden" tabindex="-1" />
       <button id="btnNoFill">No Fill</button>
     </div>
     <div class="color-row">
-      <label for="lineColorInput">Line</label>
-      <input type="color" id="lineColorInput" />
+      <label for="lineColorSwatch">Line</label>
+      <button type="button" id="lineColorSwatch" class="color-swatch" title="Apply line color"></button>
+      <button type="button" id="lineColorCaret" class="color-caret" aria-label="Choose line color">▾</button>
+      <input type="color" id="lineColorInput" class="color-input-hidden" tabindex="-1" />
       <button id="btnNoLine">No Line</button>
     </div>
     <div class="color-row">
-      <label for="textColorInput">Text</label>
-      <input type="color" id="textColorInput" />
+      <label for="textColorSwatch">Text</label>
+      <button type="button" id="textColorSwatch" class="color-swatch" title="Apply text color"></button>
+      <button type="button" id="textColorCaret" class="color-caret" aria-label="Choose text color">▾</button>
+      <input type="color" id="textColorInput" class="color-input-hidden" tabindex="-1" />
     </div>
   </section>
 
