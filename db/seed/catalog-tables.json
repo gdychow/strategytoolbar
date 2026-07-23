@@ -1,0 +1,187 @@
+{
+  "category": "tables",
+  "items": [
+    {
+      "title": "Tables #1",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-001.pptx",
+      "thumbnail": "tables/tables-001.png",
+      "sortOrder": 1
+    },
+    {
+      "title": "Tables #2",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-002.pptx",
+      "thumbnail": "tables/tables-002.png",
+      "sortOrder": 2
+    },
+    {
+      "title": "Tables #3",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-003.pptx",
+      "thumbnail": "tables/tables-003.png",
+      "sortOrder": 3
+    },
+    {
+      "title": "Tables #4",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-004.pptx",
+      "thumbnail": "tables/tables-004.png",
+      "sortOrder": 4
+    },
+    {
+      "title": "Tables #5",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-005.pptx",
+      "thumbnail": "tables/tables-005.png",
+      "sortOrder": 5
+    },
+    {
+      "title": "Tables #6",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-006.pptx",
+      "thumbnail": "tables/tables-006.png",
+      "sortOrder": 6
+    },
+    {
+      "title": "Tables #7",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-007.pptx",
+      "thumbnail": "tables/tables-007.png",
+      "sortOrder": 7
+    },
+    {
+      "title": "Tables #8",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-008.pptx",
+      "thumbnail": "tables/tables-008.png",
+      "sortOrder": 8
+    },
+    {
+      "title": "Tables #9",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-009.pptx",
+      "thumbnail": "tables/tables-009.png",
+      "sortOrder": 9
+    },
+    {
+      "title": "Tables #10",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-010.pptx",
+      "thumbnail": "tables/tables-010.png",
+      "sortOrder": 10
+    },
+    {
+      "title": "Tables #11",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-011.pptx",
+      "thumbnail": "tables/tables-011.png",
+      "sortOrder": 11
+    },
+    {
+      "title": "Tables #12",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-012.pptx",
+      "thumbnail": "tables/tables-012.png",
+      "sortOrder": 12
+    },
+    {
+      "title": "Tables #13",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-013.pptx",
+      "thumbnail": "tables/tables-013.png",
+      "sortOrder": 13
+    },
+    {
+      "title": "Tables #14",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-014.pptx",
+      "thumbnail": "tables/tables-014.png",
+      "sortOrder": 14
+    },
+    {
+      "title": "Tables #15",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-015.pptx",
+      "thumbnail": "tables/tables-015.png",
+      "sortOrder": 15
+    },
+    {
+      "title": "Tables #16",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-016.pptx",
+      "thumbnail": "tables/tables-016.png",
+      "sortOrder": 16
+    },
+    {
+      "title": "Tables #17",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-017.pptx",
+      "thumbnail": "tables/tables-017.png",
+      "sortOrder": 17
+    },
+    {
+      "title": "Tables #18",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-018.pptx",
+      "thumbnail": "tables/tables-018.png",
+      "sortOrder": 18
+    },
+    {
+      "title": "Tables #19",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-019.pptx",
+      "thumbnail": "tables/tables-019.png",
+      "sortOrder": 19
+    },
+    {
+      "title": "Tables #20",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-020.pptx",
+      "thumbnail": "tables/tables-020.png",
+      "sortOrder": 20
+    },
+    {
+      "title": "Tables #21",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-021.pptx",
+      "thumbnail": "tables/tables-021.png",
+      "sortOrder": 21
+    },
+    {
+      "title": "Tables #22",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-022.pptx",
+      "thumbnail": "tables/tables-022.png",
+      "sortOrder": 22
+    },
+    {
+      "title": "Tables #23",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-023.pptx",
+      "thumbnail": "tables/tables-023.png",
+      "sortOrder": 23
+    },
+    {
+      "title": "Tables #24",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-024.pptx",
+      "thumbnail": "tables/tables-024.png",
+      "sortOrder": 24
+    },
+    {
+      "title": "Tables #25",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-025.pptx",
+      "thumbnail": "tables/tables-025.png",
+      "sortOrder": 25
+    },
+    {
+      "title": "Tables #26",
+      "insertMode": "file",
+      "sourceFile": "tables/tables-026.pptx",
+      "thumbnail": "tables/tables-026.png",
+      "sortOrder": 26
+    }
+  ]
+}
