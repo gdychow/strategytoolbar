@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS catalog_items (
   insert_mode TEXT NOT NULL CHECK (insert_mode IN ('reconstruct', 'file')),
   source_file TEXT UNIQUE,  -- 'file' mode only, e.g. 'text/text-010.pptx', resolved under CATALOG_DIR
   reconstruct_spec JSONB,   -- 'reconstruct' mode only: preset type(s), position/size, fill, line, rotation, adjustments, text runs
-  thumbnail_path TEXT,      -- relative path under assets/catalog/thumbnails/, nullable
+  thumbnail_path TEXT,      -- relative path under CATALOG_DIR/thumbnails/ (persistent volume, not the image), nullable
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   FOREIGN KEY (owner_oid, owner_tid) REFERENCES users (oid, tid),

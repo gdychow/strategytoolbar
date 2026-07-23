@@ -30,6 +30,12 @@ COPY scripts ./scripts
 COPY db/seed ./db/seed
 RUN chmod +x docker-entrypoint.sh
 COPY --from=builder --chown=node:node /app/dist ./dist
+# Pre-creates the catalog_files mount point owned by node:node so Docker
+# propagates that ownership onto a fresh named volume on first mount —
+# named volumes otherwise default to root ownership, which the node user
+# (see USER below) can't write into (the entrypoint's thumbnails/ seed and
+# server/catalog.js's own mkdirSync both write here at startup).
+RUN mkdir -p /app/data/catalog && chown -R node:node /app/data/catalog
 EXPOSE 8080
 USER node
 ENTRYPOINT ["./docker-entrypoint.sh"]

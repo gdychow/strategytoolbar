@@ -94,6 +94,35 @@ async function insertCatalogItem({ category, title, insertMode, sourceFile, reco
   return result.rows[0];
 }
 
+/** Updates a shared item's title/category/sort_order — never insert_mode/source_file/reconstruct_spec, which stay owned by the slice+seed script pipeline. owner_oid IS NULL mirrors listAllCatalogItems' scope, as defense in depth against this admin-only surface ever touching a future private item. */
+async function updateCatalogItem({ id, title, category, sortOrder }) {
+  const result = await pool.query(
+    `UPDATE catalog_items SET title = $2, category = $3, sort_order = $4
+     WHERE id = $1 AND owner_oid IS NULL
+     RETURNING id`,
+    [id, title, category, sortOrder]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Points thumbnail_path at a newly-uploaded file. Kept separate from updateCatalogItem so an edit that doesn't touch the thumbnail never overwrites it with NULL. */
+async function updateCatalogItemThumbnail({ id, thumbnailPath }) {
+  const result = await pool.query(
+    `UPDATE catalog_items SET thumbnail_path = $2 WHERE id = $1 AND owner_oid IS NULL RETURNING id`,
+    [id, thumbnailPath]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Deletes one shared catalog item. RETURNING id lets the caller distinguish "deleted" from "already gone" (404 vs. success) instead of silently no-op'ing. */
+async function deleteCatalogItem(id) {
+  const result = await pool.query(
+    `DELETE FROM catalog_items WHERE id = $1 AND owner_oid IS NULL RETURNING id`,
+    [id]
+  );
+  return result.rows[0] ?? null;
+}
+
 module.exports = {
   pool,
   waitForDatabase,
@@ -103,4 +132,7 @@ module.exports = {
   getCatalogItem,
   deleteCatalogItemsByCategory,
   insertCatalogItem,
+  updateCatalogItem,
+  updateCatalogItemThumbnail,
+  deleteCatalogItem,
 };
