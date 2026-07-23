@@ -21,8 +21,8 @@ const options = {
  * .git is excluded from the build context) and falls back to asking git
  * directly for local/non-Docker builds, where .git is available on disk.
  */
-function getBuildStamp() {
-  const commit =
+function getCommit() {
+  return (
     process.env.GIT_COMMIT ||
     (() => {
       try {
@@ -30,14 +30,19 @@ function getBuildStamp() {
       } catch {
         return "unknown";
       }
-    })();
-  return `${commit} · built ${new Date().toISOString()}`;
+    })()
+  );
 }
 
 async function copyStaticAssets() {
   await mkdir("dist/assets", { recursive: true });
+  const commit = getCommit();
+  const buildStamp = `${commit} · built ${new Date().toISOString()}`;
   const html = await readFile("src/taskpane/taskpane.html", "utf8");
-  await writeFile("dist/taskpane.html", html.replace("__BUILD_INFO__", getBuildStamp()));
+  await writeFile(
+    "dist/taskpane.html",
+    html.replace("__BUILD_INFO__", buildStamp).replaceAll("__CACHE_BUST__", commit)
+  );
   await cp("src/taskpane/taskpane.css", "dist/taskpane.css");
   await cp("assets", "dist/assets", { recursive: true });
   await cp(prod ? "manifest.prod.xml" : "manifest.xml", "dist/manifest.xml");
