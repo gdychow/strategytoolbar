@@ -17,6 +17,7 @@
 
 import {
   createNestablePublicClientApplication,
+  BrowserAuthError,
   type IPublicClientApplication,
   type AuthenticationResult,
 } from "@azure/msal-browser";
@@ -109,7 +110,25 @@ export async function signIn(onProgress?: (step: string) => void): Promise<Signe
     // window with normal storage access, so it isn't subject to the same
     // nested-iframe restriction.
     onProgress?.("Silent sign-in didn't complete — opening popup...");
-    const result = await instance.acquireTokenPopup(request);
-    return toSignedInUser(result);
+    try {
+      const result = await instance.acquireTokenPopup(request);
+      return toSignedInUser(result);
+    } catch (popupError) {
+      // A ssoSilent call that times out (rather than cleanly rejecting)
+      // can leave MSAL's own "interaction in progress" lock set — a known
+      // msal-browser gap, confirmed against node_modules source
+      // (BrowserConstants/ClientApplication): acquireTokenPopup's finally
+      // block is what normally clears that lock, but ssoSilent's timeout
+      // path never reaches it. That stuck lock then rejects the very next
+      // interactive call (this popup) with interaction_in_progress. Retry
+      // once with overrideInteractionInProgress — a documented public
+      // PopupRequest option for exactly this case, not an internal hack.
+      if (popupError instanceof BrowserAuthError && popupError.errorCode === "interaction_in_progress") {
+        onProgress?.("Clearing a stuck sign-in state and retrying...");
+        const result = await instance.acquireTokenPopup({ ...request, overrideInteractionInProgress: true });
+        return toSignedInUser(result);
+      }
+      throw popupError;
+    }
   }
 }
