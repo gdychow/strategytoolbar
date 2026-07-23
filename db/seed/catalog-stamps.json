@@ -1,0 +1,1078 @@
+{
+  "category": "stamps",
+  "items": [
+    {
+      "title": "Insert Text Here",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 366.63,
+        "top": 170.81,
+        "width": 226.75,
+        "height": 198.38,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#FFFF00"
+        },
+        "line": {
+          "color": null,
+          "widthPt": null
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": null,
+            "runs": [
+              {
+                "text": "Insert Text Here",
+                "bold": null,
+                "italic": null,
+                "size": 11.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-001.png",
+      "sortOrder": 1
+    },
+    {
+      "title": "WHO?",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 849.93,
+        "top": 8.89,
+        "width": 101.62,
+        "height": 18.37,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "WHO?",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-002.png",
+      "sortOrder": 2
+    },
+    {
+      "title": "x. Ghost",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "textBox",
+        "left": 3.6,
+        "top": 3.51,
+        "width": 626.75,
+        "height": 14.37,
+        "rotation": 0.0,
+        "fill": {
+          "type": "BACKGROUND (5)",
+          "note": "non-solid fill - verify manually against ShapeFill API"
+        },
+        "line": {
+          "color": null,
+          "widthPt": null
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "x. Ghost",
+                "bold": null,
+                "italic": null,
+                "size": 9.0,
+                "fontName": "+mn-lt",
+                "color": "#000000"
+              }
+            ]
+          }
+        ]
+      },
+      "thumbnail": "stamps/stamps-003.png",
+      "sortOrder": 3
+    },
+    {
+      "title": "Stamps #4",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 452.5,
+        "top": 242.5,
+        "width": 55.0,
+        "height": 55.0,
+        "rotation": 0.0,
+        "fill": {
+          "type": "BACKGROUND (5)",
+          "note": "non-solid fill - verify manually against ShapeFill API"
+        },
+        "line": {
+          "color": "#DA0035",
+          "widthPt": 4.5
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": []
+          }
+        ],
+        "presetGeometry": "Ellipse"
+      },
+      "thumbnail": "stamps/stamps-004.png",
+      "sortOrder": 4
+    },
+    {
+      "title": "BLANK FLAG",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 870.97,
+        "top": 10.4,
+        "width": 80.58,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "BLANK FLAG",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-005.png",
+      "sortOrder": 5
+    },
+    {
+      "title": "CONFIDENTIAL",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 853.17,
+        "top": 10.4,
+        "width": 98.38,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "CONFIDENTIAL",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-006.png",
+      "sortOrder": 6
+    },
+    {
+      "title": "DRAFT",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 906.83,
+        "top": 10.4,
+        "width": 44.73,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "DRAFT",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-007.png",
+      "sortOrder": 7
+    },
+    {
+      "title": "ILLUSTRATIVE",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 864.12,
+        "top": 10.4,
+        "width": 87.43,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "ILLUSTRATIVE",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-008.png",
+      "sortOrder": 8
+    },
+    {
+      "title": "PRELIMINARY",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 863.41,
+        "top": 10.4,
+        "width": 88.15,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "PRELIMINARY",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-009.png",
+      "sortOrder": 9
+    },
+    {
+      "title": "Stamps #10",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 2.88,
+        "top": 2.14,
+        "width": 244.0,
+        "height": 16.38,
+        "rotation": 0.0,
+        "fill": null,
+        "line": null,
+        "text": null,
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-010.png",
+      "sortOrder": 10
+    },
+    {
+      "title": "BACKUP",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 897.22,
+        "top": 10.4,
+        "width": 54.34,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "BACKUP",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-011.png",
+      "sortOrder": 11
+    },
+    {
+      "title": "FOR DISCUSSION",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 844.98,
+        "top": 10.4,
+        "width": 106.58,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "FOR DISCUSSION",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-012.png",
+      "sortOrder": 12
+    },
+    {
+      "title": "EXAMPLE",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 889.91,
+        "top": 10.4,
+        "width": 61.64,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "EXAMPLE",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-013.png",
+      "sortOrder": 13
+    },
+    {
+      "title": "BLANK FLAG",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 870.97,
+        "top": 10.4,
+        "width": 80.58,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#DA0035"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "BLANK FLAG",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-014.png",
+      "sortOrder": 14
+    },
+    {
+      "title": "CONFIDENTIAL",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 856.33,
+        "top": 10.4,
+        "width": 95.23,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#DA0035"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "CONFIDENTIAL",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-015.png",
+      "sortOrder": 15
+    },
+    {
+      "title": "DRAFT",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 912.38,
+        "top": 10.4,
+        "width": 39.17,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#FF1837"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "DRAFT",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-016.png",
+      "sortOrder": 16
+    },
+    {
+      "title": "ILLUSTRATIVE",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 864.12,
+        "top": 10.4,
+        "width": 87.43,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#DA0035"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "ILLUSTRATIVE",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-017.png",
+      "sortOrder": 17
+    },
+    {
+      "title": "PRELIMINARY",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 863.41,
+        "top": 10.4,
+        "width": 88.15,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#DA0035"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "PRELIMINARY",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-018.png",
+      "sortOrder": 18
+    },
+    {
+      "title": "BACKUP",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 897.22,
+        "top": 10.4,
+        "width": 54.34,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#DA0035"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "BACKUP",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-019.png",
+      "sortOrder": 19
+    },
+    {
+      "title": "FOR DISCUSSION",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 844.98,
+        "top": 10.4,
+        "width": 106.58,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#DA0035"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "FOR DISCUSSION",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-020.png",
+      "sortOrder": 20
+    },
+    {
+      "title": "BLANK FLAG",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 870.97,
+        "top": 10.4,
+        "width": 80.58,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#18B7FB"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "BLANK FLAG",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-021.png",
+      "sortOrder": 21
+    },
+    {
+      "title": "EXAMPLE",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 889.91,
+        "top": 10.4,
+        "width": 61.64,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#18B7FB"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "EXAMPLE",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-022.png",
+      "sortOrder": 22
+    },
+    {
+      "title": "CONFIDENTIAL",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 856.33,
+        "top": 10.4,
+        "width": 95.23,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#18B7FB"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "CONFIDENTIAL",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-023.png",
+      "sortOrder": 23
+    },
+    {
+      "title": "DRAFT",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 906.83,
+        "top": 10.4,
+        "width": 44.73,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#18B7FB"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "DRAFT",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-024.png",
+      "sortOrder": 24
+    },
+    {
+      "title": "ILLUSTRATIVE",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 864.12,
+        "top": 10.4,
+        "width": 87.43,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#18B7FB"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "ILLUSTRATIVE",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-025.png",
+      "sortOrder": 25
+    },
+    {
+      "title": "PRELIMINARY",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 863.41,
+        "top": 10.4,
+        "width": 88.15,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#18B7FB"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "PRELIMINARY",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-026.png",
+      "sortOrder": 26
+    },
+    {
+      "title": "BACKUP",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 897.22,
+        "top": 10.4,
+        "width": 54.34,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#18B7FB"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "BACKUP",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-027.png",
+      "sortOrder": 27
+    },
+    {
+      "title": "FOR DISCUSSION",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 844.98,
+        "top": 10.4,
+        "width": 106.58,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#18B7FB"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "FOR DISCUSSION",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-028.png",
+      "sortOrder": 28
+    },
+    {
+      "title": "EXAMPLE",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 889.91,
+        "top": 10.4,
+        "width": 61.64,
+        "height": 17.98,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#18B7FB"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "EXAMPLE",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "stamps/stamps-029.png",
+      "sortOrder": 29
+    }
+  ]
+}

@@ -5,18 +5,23 @@ library .pptx (e.g. Text.pptx), classifies each slide's real content (the
 inert think-cell placeholder frame is always stripped first, regardless of
 mode) as either:
 
-  reconstruct - every real shape is plain preset geometry (<a:prstGeom>) or
-    a plain text box, so it can be rebuilt with full fidelity via
-    addGeometricShape/addTextBox/addGroup at insert time (see
+  reconstruct - every real shape is a plain text box, or preset geometry
+    (<a:prstGeom>) whose prst has a confirmed, hand-checked entry in
+    PRST_TO_GEOMETRIC_SHAPE_TYPE below - so it can be rebuilt with full
+    fidelity via addGeometricShape/addTextBox/addGroup at insert time (see
     src/features/libraryInsert.ts). No .pptx file is kept for these items
     long-term - one is sliced to a scratch directory purely to render its
     thumbnail, then discarded.
 
   file - anything else (custom <a:custGeom> geometry, embedded pictures,
-    tables/other graphicFrames) - no PowerPoint JS API can reconstruct
-    these, so the slide is sliced out into its own minimal single-slide
-    .pptx under <output-dir>/<category>/, to be inserted via
-    insertSlidesFromBase64 at runtime.
+    tables/other graphicFrames, or a prstGeom whose preset isn't in
+    PRST_TO_GEOMETRIC_SHAPE_TYPE) - no PowerPoint JS API can reconstruct
+    the first group, and the last group is deliberately not guessed at:
+    addGeometricShape would silently accept a wrong-but-validly-spelled
+    enum value and render the wrong shape, with no error. Either way the
+    slide is sliced out into its own minimal single-slide .pptx under
+    <output-dir>/<category>/, to be inserted via insertSlidesFromBase64 at
+    runtime.
 
 Every item (both modes) also gets a thumbnail, rendered via macOS
 QuickLook (`qlmanage -t`, a stock command-line tool - no LibreOffice/
@@ -103,10 +108,98 @@ def has_custom_bullet_char(element) -> bool:
     return element.find(".//" + qn("a:buChar")) is not None
 
 
+# Maps an OOXML <a:prstGeom prst="..."> value to the exact string
+# PowerPoint.GeometricShapeType's TypeScript enum uses (per
+# node_modules/@types/office-js), which src/features/libraryInsert.ts
+# passes straight to addGeometricShape with no translation of its own.
+# These are NOT simply the prst value capitalized - some are different
+# words entirely ("rect" -> "Rectangle", not "Rect") - so this is a
+# deliberately conservative, hand-checked subset against the real enum
+# list, not a guessed/mechanical transform. A prst NOT in this table
+# routes to 'file' mode instead (see classify_shape_tree) rather than
+# risk emitting a wrong-but-validly-spelled enum value, which
+# addGeometricShape would silently accept and render as the WRONG shape
+# with no error - a much worse failure mode than falling back to the
+# already-proven file-mode insert path.
+PRST_TO_GEOMETRIC_SHAPE_TYPE = {
+    "rect": "Rectangle",
+    "ellipse": "Ellipse",
+    "roundRect": "RoundRectangle",
+    "triangle": "Triangle",
+    "rtTriangle": "RightTriangle",
+    "diamond": "Diamond",
+    "parallelogram": "Parallelogram",
+    "trapezoid": "Trapezoid",
+    "pentagon": "Pentagon",
+    "hexagon": "Hexagon",
+    "heptagon": "Heptagon",
+    "octagon": "Octagon",
+    "decagon": "Decagon",
+    "dodecagon": "Dodecagon",
+    "star4": "Star4",
+    "star5": "Star5",
+    "star6": "Star6",
+    "star7": "Star7",
+    "star8": "Star8",
+    "star10": "Star10",
+    "star12": "Star12",
+    "star16": "Star16",
+    "star24": "Star24",
+    "star32": "Star32",
+    "chevron": "Chevron",
+    "donut": "Donut",
+    "heart": "Heart",
+    "sun": "Sun",
+    "moon": "Moon",
+    "cube": "Cube",
+    "can": "Can",
+    "cloud": "Cloud",
+    "wave": "Wave",
+    "plus": "Plus",
+    "arc": "Arc",
+    "chord": "Chord",
+    "bevel": "Bevel",
+    "frame": "Frame",
+    "corner": "Corner",
+    "pie": "Pie",
+    "blockArc": "BlockArc",
+    "smileyFace": "SmileyFace",
+    "lightningBolt": "LightningBolt",
+    "plaque": "Plaque",
+    "teardrop": "Teardrop",
+    "homePlate": "HomePlate",
+    "rightArrow": "RightArrow",
+    "leftArrow": "LeftArrow",
+    "upArrow": "UpArrow",
+    "downArrow": "DownArrow",
+    "leftRightArrow": "LeftRightArrow",
+    "upDownArrow": "UpDownArrow",
+    "leftBracket": "LeftBracket",
+    "rightBracket": "RightBracket",
+    "leftBrace": "LeftBrace",
+    "rightBrace": "RightBrace",
+    "wedgeRectCallout": "WedgeRectCallout",
+    # Deliberately NOT mapped: prst="line" has no GeometricShapeType
+    # equivalent at all (confirmed against the real addGeometricShape
+    # method signature's full literal-union parameter type, not just the
+    # enum declaration) - a straight line needs PowerPoint.Slide.addLine,
+    # a different API this project doesn't call from the reconstruct path
+    # yet. Left unmapped so classify_shape_tree correctly routes it to
+    # file mode instead.
+}
+
+
 def classify_shape_tree(shape) -> str:
     """Returns 'file' if anything under this shape can't be reconstructed, else 'reconstruct'."""
     el = shape._element
     if has_cust_geom(el) or has_picture(el) or has_other_graphic_frame(el) or has_custom_bullet_char(el):
+        return "file"
+    prst_el = el.find(".//" + qn("a:prstGeom"))
+    if prst_el is not None and prst_el.get("prst") not in PRST_TO_GEOMETRIC_SHAPE_TYPE:
+        # A geometric shape (not a plain text box, which has no prstGeom at
+        # all) whose preset isn't a confirmed, mapped enum value - see
+        # PRST_TO_GEOMETRIC_SHAPE_TYPE's comment for why this falls back
+        # to file mode rather than guessing.
         return "file"
     return "reconstruct"
 
@@ -183,8 +276,13 @@ def extract_reconstruct_spec(shape):
     }
     if not is_text_box:
         prst_el = shape._element.find(".//" + qn("a:prstGeom"))
-        spec["presetGeometry"] = prst_el.get("prst") if prst_el is not None else None
-        spec["_todo"] = "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        prst = prst_el.get("prst") if prst_el is not None else None
+        # classify_shape_tree() only classifies a shape 'reconstruct' when
+        # its prst is a confirmed key in PRST_TO_GEOMETRIC_SHAPE_TYPE, so
+        # this is a direct (not .get-with-fallback) lookup on purpose - a
+        # KeyError here means that invariant broke, which should fail
+        # loudly rather than silently emit an unmapped/wrong value.
+        spec["presetGeometry"] = PRST_TO_GEOMETRIC_SHAPE_TYPE[prst]
     return spec
 
 
@@ -351,18 +449,10 @@ def main():
     seed_path.write_text(json.dumps({"category": category, "items": items}, indent=2) + "\n")
 
     file_mode_count = sum(1 for i in items if i["insertMode"] == "file")
-    todo_count = sum(1 for i in items if "_todo" in json.dumps(i))
     print(f"Wrote {len(items)} item(s) to {seed_path}", file=sys.stderr)
     if file_mode_count:
         print(f"Sliced {file_mode_count} 'file'-mode .pptx file(s) into: {category_dir}", file=sys.stderr)
     print(f"Generated thumbnails into: {thumbnails_dir}", file=sys.stderr)
-    if todo_count:
-        print(
-            f"NOTE: {todo_count} reconstruct-mode item(s) contain a presetGeometry value that needs "
-            "manual verification against PowerPoint.GeometricShapeType before relying on it (see each "
-            "item's reconstructSpec._todo field).",
-            file=sys.stderr,
-        )
     print(
         f'Ready to seed as-is: node scripts/seed-catalog.js {seed_path}\n'
         f"Titles are rough (auto-filled from slide text) - correct via /admin after seeding, not by re-running this script.",

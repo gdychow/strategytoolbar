@@ -46,8 +46,7 @@
             ]
           }
         ],
-        "presetGeometry": "wedgeRectCallout",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "WedgeRectCallout"
       },
       "thumbnail": "objects/objects-003.png",
       "sortOrder": 3
@@ -101,8 +100,7 @@
             ]
           }
         ],
-        "presetGeometry": "rect",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Rectangle"
       },
       "thumbnail": "objects/objects-005.png",
       "sortOrder": 5
@@ -120,8 +118,7 @@
         "fill": null,
         "line": null,
         "text": null,
-        "presetGeometry": "ellipse",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Ellipse"
       },
       "thumbnail": "objects/objects-007.png",
       "sortOrder": 7
@@ -139,8 +136,7 @@
         "fill": null,
         "line": null,
         "text": null,
-        "presetGeometry": "rect",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Rectangle"
       },
       "thumbnail": "objects/objects-008.png",
       "sortOrder": 8
@@ -158,8 +154,7 @@
         "fill": null,
         "line": null,
         "text": null,
-        "presetGeometry": "rect",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Rectangle"
       },
       "thumbnail": "objects/objects-009.png",
       "sortOrder": 9
@@ -198,8 +193,7 @@
             ]
           }
         ],
-        "presetGeometry": "chevron",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Chevron"
       },
       "thumbnail": "objects/objects-010.png",
       "sortOrder": 10
@@ -238,8 +232,7 @@
             ]
           }
         ],
-        "presetGeometry": "homePlate",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "HomePlate"
       },
       "thumbnail": "objects/objects-011.png",
       "sortOrder": 11
@@ -278,8 +271,7 @@
             ]
           }
         ],
-        "presetGeometry": "rect",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Rectangle"
       },
       "thumbnail": "objects/objects-012.png",
       "sortOrder": 12
@@ -325,8 +317,7 @@
             ]
           }
         ],
-        "presetGeometry": "ellipse",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Ellipse"
       },
       "thumbnail": "objects/objects-014.png",
       "sortOrder": 14
@@ -365,8 +356,7 @@
             ]
           }
         ],
-        "presetGeometry": "ellipse",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Ellipse"
       },
       "thumbnail": "objects/objects-015.png",
       "sortOrder": 15

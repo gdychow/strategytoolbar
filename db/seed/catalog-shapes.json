@@ -40,8 +40,7 @@
             "runs": []
           }
         ],
-        "presetGeometry": "rightArrow",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "RightArrow"
       },
       "thumbnail": "shapes/shapes-003.png",
       "sortOrder": 3
@@ -71,8 +70,7 @@
             "runs": []
           }
         ],
-        "presetGeometry": "leftRightArrow",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "LeftRightArrow"
       },
       "thumbnail": "shapes/shapes-004.png",
       "sortOrder": 4
@@ -109,28 +107,15 @@
             "runs": []
           }
         ],
-        "presetGeometry": "leftBrace",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "LeftBrace"
       },
       "thumbnail": "shapes/shapes-006.png",
       "sortOrder": 6
     },
     {
       "title": "Shapes #7",
-      "insertMode": "reconstruct",
-      "reconstructSpec": {
-        "kind": "geometricShape",
-        "left": 473.5,
-        "top": 261.63,
-        "width": 13.0,
-        "height": 16.75,
-        "rotation": 0.0,
-        "fill": null,
-        "line": null,
-        "text": null,
-        "presetGeometry": "line",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
-      },
+      "insertMode": "file",
+      "sourceFile": "shapes/shapes-007.pptx",
       "thumbnail": "shapes/shapes-007.png",
       "sortOrder": 7
     },
@@ -159,8 +144,7 @@
             "runs": []
           }
         ],
-        "presetGeometry": "triangle",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Triangle"
       },
       "thumbnail": "shapes/shapes-008.png",
       "sortOrder": 8
@@ -190,8 +174,7 @@
             "runs": []
           }
         ],
-        "presetGeometry": "triangle",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Triangle"
       },
       "thumbnail": "shapes/shapes-009.png",
       "sortOrder": 9
@@ -221,8 +204,7 @@
             "runs": []
           }
         ],
-        "presetGeometry": "triangle",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Triangle"
       },
       "thumbnail": "shapes/shapes-010.png",
       "sortOrder": 10
@@ -240,71 +222,22 @@
         "fill": null,
         "line": null,
         "text": null,
-        "presetGeometry": "triangle",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+        "presetGeometry": "Triangle"
       },
       "thumbnail": "shapes/shapes-011.png",
       "sortOrder": 11
     },
     {
       "title": "Shapes #12",
-      "insertMode": "reconstruct",
-      "reconstructSpec": {
-        "kind": "geometricShape",
-        "left": 28.35,
-        "top": 270.0,
-        "width": 903.31,
-        "height": 0.0,
-        "rotation": 0.0,
-        "fill": {
-          "type": "BACKGROUND (5)",
-          "note": "non-solid fill - verify manually against ShapeFill API"
-        },
-        "line": {
-          "color": "#808080",
-          "widthPt": 0.75
-        },
-        "text": [
-          {
-            "level": 0,
-            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
-            "runs": []
-          }
-        ],
-        "presetGeometry": "line",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
-      },
+      "insertMode": "file",
+      "sourceFile": "shapes/shapes-012.pptx",
       "thumbnail": "shapes/shapes-012.png",
       "sortOrder": 12
     },
     {
       "title": "Shapes #13",
-      "insertMode": "reconstruct",
-      "reconstructSpec": {
-        "kind": "geometricShape",
-        "left": 480.0,
-        "top": 107.05,
-        "width": 0.0,
-        "height": 357.08,
-        "rotation": 0.0,
-        "fill": {
-          "type": "BACKGROUND (5)",
-          "note": "non-solid fill - verify manually against ShapeFill API"
-        },
-        "line": {
-          "color": "#808080",
-          "widthPt": 0.75
-        },
-        "text": [
-          {
-            "level": 0,
-            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
-            "runs": []
-          }
-        ],
-        "presetGeometry": "line",
-        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
-      },
+      "insertMode": "file",
+      "sourceFile": "shapes/shapes-013.pptx",
       "thumbnail": "shapes/shapes-013.png",
       "sortOrder": 13
     },
