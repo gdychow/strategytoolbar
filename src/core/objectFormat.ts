@@ -43,16 +43,29 @@ export function toHexColor(rgb: RGB): string {
   return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`;
 }
 
-const TEXT_CAPABLE_TYPES = new Set<PowerPoint.ShapeType | string>([
-  PowerPoint.ShapeType.geometricShape,
-  PowerPoint.ShapeType.callout,
-  PowerPoint.ShapeType.diagram,
-  PowerPoint.ShapeType.freeform,
-  PowerPoint.ShapeType.line,
-  PowerPoint.ShapeType.graphic,
-  PowerPoint.ShapeType.image,
-  PowerPoint.ShapeType.unsupported, // covers TextBox/TextEffect-equivalent shapes on some hosts
-]);
+// Deliberately not a module-level constant: PowerPoint.ShapeType's actual
+// enum values aren't guaranteed to exist yet at module-evaluation time
+// (window.PowerPoint is populated asynchronously by office.js's own host
+// handshake, not synchronously when its <script> tag finishes) — reading
+// them here unconditionally can throw "PowerPoint is not defined" before
+// Office.onReady ever runs, crashing the whole script. Computed lazily on
+// first real use instead, by which point Office.onReady has already fired.
+let _textCapableTypes: Set<PowerPoint.ShapeType | string> | null = null;
+function textCapableTypes(): Set<PowerPoint.ShapeType | string> {
+  if (!_textCapableTypes) {
+    _textCapableTypes = new Set([
+      PowerPoint.ShapeType.geometricShape,
+      PowerPoint.ShapeType.callout,
+      PowerPoint.ShapeType.diagram,
+      PowerPoint.ShapeType.freeform,
+      PowerPoint.ShapeType.line,
+      PowerPoint.ShapeType.graphic,
+      PowerPoint.ShapeType.image,
+      PowerPoint.ShapeType.unsupported, // covers TextBox/TextEffect-equivalent shapes on some hosts
+    ]);
+  }
+  return _textCapableTypes;
+}
 
 /** Port of ApplyShapeFormatting */
 function applyShapeFormatting(shape: PowerPoint.Shape, action: "Fill" | "Line", opts: ShapeFormatOptions): void {
@@ -158,7 +171,7 @@ async function formatShape(
   }
 
   if (action === "Text") {
-    if (TEXT_CAPABLE_TYPES.has(shape.type)) {
+    if (textCapableTypes().has(shape.type)) {
       applyTextFormatting(shape.textFrame.textRange, textOpts);
     }
   } else {

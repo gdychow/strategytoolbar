@@ -43,16 +43,26 @@
  * functions that claim to differ but would look identical.
  */
 
-const TEXT_CAPABLE_TYPES = new Set<PowerPoint.ShapeType | string>([
-  PowerPoint.ShapeType.geometricShape,
-  PowerPoint.ShapeType.callout,
-  PowerPoint.ShapeType.diagram,
-  PowerPoint.ShapeType.freeform,
-  PowerPoint.ShapeType.line,
-  PowerPoint.ShapeType.graphic,
-  PowerPoint.ShapeType.image,
-  PowerPoint.ShapeType.unsupported,
-]);
+// See the identical note in core/objectFormat.ts: not a module-level
+// constant, since window.PowerPoint isn't guaranteed populated yet at
+// module-evaluation time — reading its enum values here unconditionally
+// can crash the whole script before Office.onReady ever runs.
+let _textCapableTypes: Set<PowerPoint.ShapeType | string> | null = null;
+function textCapableTypes(): Set<PowerPoint.ShapeType | string> {
+  if (!_textCapableTypes) {
+    _textCapableTypes = new Set([
+      PowerPoint.ShapeType.geometricShape,
+      PowerPoint.ShapeType.callout,
+      PowerPoint.ShapeType.diagram,
+      PowerPoint.ShapeType.freeform,
+      PowerPoint.ShapeType.line,
+      PowerPoint.ShapeType.graphic,
+      PowerPoint.ShapeType.image,
+      PowerPoint.ShapeType.unsupported,
+    ]);
+  }
+  return _textCapableTypes;
+}
 
 async function withSelectedShapes(fn: (context: PowerPoint.RequestContext, shapes: PowerPoint.Shape[]) => Promise<void>): Promise<void> {
   await PowerPoint.run(async (context) => {
@@ -138,7 +148,7 @@ async function clearShapeText(context: PowerPoint.RequestContext, shape: PowerPo
     return;
   }
 
-  if (TEXT_CAPABLE_TYPES.has(shape.type)) {
+  if (textCapableTypes().has(shape.type)) {
     shape.textFrame.deleteText();
   }
 }
