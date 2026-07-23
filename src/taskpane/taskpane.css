@@ -36,6 +36,7 @@ section:first-of-type h2 {
 }
 
 .color-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -69,7 +70,7 @@ section:first-of-type h2 {
 }
 
 .color-caret {
-  width: 18px;
+  width: 24px;
   height: 26px;
   padding: 0;
   margin-right: 2px;
@@ -77,13 +78,27 @@ section:first-of-type h2 {
   border-radius: 0 4px 4px 0;
   cursor: pointer;
   flex: 0 0 auto;
-  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
   line-height: 1;
   background: #fafafa;
 }
 
+/*
+ * Positioned (not display:none) so showPicker()/click() reliably opens the
+ * native picker across engines, but pinned to the row's top-left — right
+ * under the swatch/caret — via .color-row's position:relative. Without an
+ * explicit top/left here the browser falls back to each element's own
+ * "static position" heuristic for an absolutely-positioned flex child,
+ * which was placing the (invisible) input, and therefore the OS color
+ * picker anchored to it, far from the caret that opened it.
+ */
 .color-input-hidden {
   position: absolute;
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   padding: 0;
