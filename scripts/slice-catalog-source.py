@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-One-time content-prep step for Tier 3's shared catalog. For a given
-boilerplate library .pptx (e.g. Text.pptx), classifies each slide's real
-content (the inert think-cell placeholder frame is always stripped first,
-regardless of mode) as either:
+Content-prep step for Tier 3's shared catalog. For a given boilerplate
+library .pptx (e.g. Text.pptx), classifies each slide's real content (the
+inert think-cell placeholder frame is always stripped first, regardless of
+mode) as either:
 
   reconstruct - every real shape is plain preset geometry (<a:prstGeom>) or
     a plain text box, so it can be rebuilt with full fidelity via
     addGeometricShape/addTextBox/addGroup at insert time (see
-    src/features/libraryInsert.ts). No .pptx file is written for these
-    items - a draft reconstruct_spec JSON fragment is printed instead, for
-    a human to check and fold into db/seed/catalog-<category>.json.
+    src/features/libraryInsert.ts). No .pptx file is kept for these items
+    long-term - one is sliced to a scratch directory purely to render its
+    thumbnail, then discarded.
 
   file - anything else (custom <a:custGeom> geometry, embedded pictures,
     tables/other graphicFrames) - no PowerPoint JS API can reconstruct
@@ -18,16 +18,31 @@ regardless of mode) as either:
     .pptx under <output-dir>/<category>/, to be inserted via
     insertSlidesFromBase64 at runtime.
 
+Every item (both modes) also gets a thumbnail, rendered via macOS
+QuickLook (`qlmanage -t`, a stock command-line tool - no LibreOffice/
+poppler install needed, confirmed against a real sliced file) into
+<output-dir>/thumbnails/<category>/, and a rough title auto-filled from
+the slide's own text (or "<Category> #N" for text-less shapes/graphics).
+Titles and thumbnails generated this way are meant to be rough starting
+points, not final - db/seed/catalog-<category>.json is written directly
+in the exact shape scripts/seed-catalog.js expects, ready to seed
+immediately; use /admin afterward to correct any title, thumbnail, or
+category assignment that needs a human's judgment, without re-running
+this script or redeploying.
+
 Usage:
     python3 scripts/slice-catalog-source.py <source.pptx> <category-slug> [output-dir]
 
 Example:
     python3 scripts/slice-catalog-source.py \
-        "../Package Files/StrategyToolbar/BoilerPlates/16x9/Text.pptx" \
-        text data/catalog
+        "../Package Files/StrategyToolbar/BoilerPlates/16x9/Objects.pptx" \
+        objects data/catalog
 """
 import json
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from pptx import Presentation
@@ -37,6 +52,7 @@ from pptx.util import Emu
 
 THINK_CELL_MARKER = "think-cell"
 EMU_PER_POINT = 12700
+THUMBNAIL_SIZE = 320  # matches Text's existing hand-made thumbnails (320x180 for 16x9 content)
 
 
 def is_think_cell_placeholder(shape) -> bool:
@@ -161,7 +177,12 @@ def extract_reconstruct_spec(shape):
 def extract_text_hint(shape) -> str:
     if not shape.has_text_frame:
         return ""
-    return " / ".join(p.text for p in shape.text_frame.paragraphs if p.text.strip())[:80]
+    # p.text preserves "\x0b" for a <a:br/> soft line break within a
+    # paragraph (e.g. "Total Savings\x0b= $23 Billion") - a literal
+    # control character, not just cosmetically odd, so it's replaced
+    # rather than left for a human to notice later in /admin.
+    texts = (p.text.replace("\x0b", " ").strip() for p in shape.text_frame.paragraphs)
+    return " / ".join(t for t in texts if t)[:80]
 
 
 def slice_single_slide(source_path: Path, slide_index: int, dest_path: Path) -> None:
@@ -185,6 +206,29 @@ def slice_single_slide(source_path: Path, slide_index: int, dest_path: Path) -> 
     prs.save(str(dest_path))
 
 
+def generate_thumbnail(slide_pptx_path: Path, dest_path: Path) -> bool:
+    """
+    Renders slide_pptx_path (a single-slide .pptx) to a PNG via macOS
+    QuickLook - no LibreOffice/poppler install needed. Returns False (and
+    logs a warning) if QuickLook doesn't produce output for this slide -
+    observed occasionally for unusual content - so the caller can skip the
+    thumbnail rather than aborting the whole category run.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        subprocess.run(
+            ["qlmanage", "-t", "-s", str(THUMBNAIL_SIZE), "-o", tmp, str(slide_pptx_path)],
+            capture_output=True,
+            check=False,
+        )
+        produced = Path(tmp) / f"{slide_pptx_path.name}.png"
+        if not produced.exists():
+            print(f"  warning: qlmanage produced no thumbnail for {slide_pptx_path.name}", file=sys.stderr)
+            return False
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(produced), str(dest_path))
+        return True
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
@@ -194,48 +238,87 @@ def main():
     category = sys.argv[2]
     output_root = Path(sys.argv[3]) if len(sys.argv) > 3 else Path("data/catalog")
     category_dir = output_root / category
+    thumbnails_dir = output_root / "thumbnails" / category
 
     prs = Presentation(str(source_path))
-    results = []
+    items = []
 
-    for index, slide in enumerate(prs.slides):
-        real_shapes = [s for s in slide.shapes if not is_think_cell_placeholder(s)]
-        if not real_shapes:
-            print(f"slide {index + 1}: no real content shape found, skipping", file=sys.stderr)
-            continue
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_dir = Path(scratch)
 
-        mode = "reconstruct" if all(classify_shape_tree(s) == "reconstruct" for s in real_shapes) else "file"
-        text_hint = " | ".join(filter(None, (extract_text_hint(s) for s in real_shapes)))
+        for index, slide in enumerate(prs.slides):
+            real_shapes = [s for s in slide.shapes if not is_think_cell_placeholder(s)]
+            if not real_shapes:
+                print(f"slide {index + 1}: no real content shape found, skipping", file=sys.stderr)
+                continue
 
-        if mode == "file":
-            filename = f"{category}-{index + 1:03d}.pptx"
-            dest = category_dir / filename
-            slice_single_slide(source_path, index, dest)
-            results.append(
-                {
-                    "slideIndex": index + 1,
-                    "insertMode": "file",
-                    "sourceFile": f"{category}/{filename}",
-                    "textHint": text_hint,
-                }
-            )
-        else:
-            if len(real_shapes) == 1:
-                spec = extract_reconstruct_spec(real_shapes[0])
+            mode = "reconstruct" if all(classify_shape_tree(s) == "reconstruct" for s in real_shapes) else "file"
+            text_hint = " | ".join(filter(None, (extract_text_hint(s) for s in real_shapes)))
+            title = text_hint if text_hint else f"{category.capitalize()} #{index + 1}"
+            slide_filename = f"{category}-{index + 1:03d}.pptx"
+
+            # Every item gets sliced to a single-slide .pptx, regardless of
+            # mode - for 'file' items this is the real, permanent catalog
+            # content; for 'reconstruct' items it's a scratch file that
+            # exists only long enough to render a faithful thumbnail from
+            # (the real content is the reconstructSpec JSON below).
+            if mode == "file":
+                slide_pptx_path = category_dir / slide_filename
             else:
-                spec = {"kind": "group", "shapes": [extract_reconstruct_spec(s) for s in real_shapes]}
-            results.append(
-                {
-                    "slideIndex": index + 1,
-                    "insertMode": "reconstruct",
-                    "textHint": text_hint,
-                    "reconstructSpec": spec,
-                }
-            )
+                slide_pptx_path = scratch_dir / slide_filename
+            slice_single_slide(source_path, index, slide_pptx_path)
 
-    print(json.dumps(results, indent=2))
-    if any(r["insertMode"] == "file" for r in results):
-        print(f"\nSliced 'file'-mode items into: {category_dir}", file=sys.stderr)
+            thumbnail_filename = f"{category}-{index + 1:03d}.png"
+            has_thumbnail = generate_thumbnail(slide_pptx_path, thumbnails_dir / thumbnail_filename)
+            thumbnail_rel = f"{category}/{thumbnail_filename}" if has_thumbnail else None
+
+            if mode == "file":
+                items.append(
+                    {
+                        "title": title,
+                        "insertMode": "file",
+                        "sourceFile": f"{category}/{slide_filename}",
+                        "thumbnail": thumbnail_rel,
+                        "sortOrder": index + 1,
+                    }
+                )
+            else:
+                if len(real_shapes) == 1:
+                    spec = extract_reconstruct_spec(real_shapes[0])
+                else:
+                    spec = {"kind": "group", "shapes": [extract_reconstruct_spec(s) for s in real_shapes]}
+                items.append(
+                    {
+                        "title": title,
+                        "insertMode": "reconstruct",
+                        "reconstructSpec": spec,
+                        "thumbnail": thumbnail_rel,
+                        "sortOrder": index + 1,
+                    }
+                )
+
+    seed_path = Path("db/seed") / f"catalog-{category}.json"
+    seed_path.parent.mkdir(parents=True, exist_ok=True)
+    seed_path.write_text(json.dumps({"category": category, "items": items}, indent=2) + "\n")
+
+    file_mode_count = sum(1 for i in items if i["insertMode"] == "file")
+    todo_count = sum(1 for i in items if "_todo" in json.dumps(i))
+    print(f"Wrote {len(items)} item(s) to {seed_path}", file=sys.stderr)
+    if file_mode_count:
+        print(f"Sliced {file_mode_count} 'file'-mode .pptx file(s) into: {category_dir}", file=sys.stderr)
+    print(f"Generated thumbnails into: {thumbnails_dir}", file=sys.stderr)
+    if todo_count:
+        print(
+            f"NOTE: {todo_count} reconstruct-mode item(s) contain a presetGeometry value that needs "
+            "manual verification against PowerPoint.GeometricShapeType before relying on it (see each "
+            "item's reconstructSpec._todo field).",
+            file=sys.stderr,
+        )
+    print(
+        f'Ready to seed as-is: node scripts/seed-catalog.js {seed_path}\n'
+        f"Titles are rough (auto-filled from slide text) - correct via /admin after seeding, not by re-running this script.",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

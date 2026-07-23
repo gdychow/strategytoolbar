@@ -1,0 +1,382 @@
+{
+  "category": "objects",
+  "items": [
+    {
+      "title": "Text attached to cloud",
+      "insertMode": "file",
+      "sourceFile": "objects/objects-001.pptx",
+      "thumbnail": "objects/objects-001.png",
+      "sortOrder": 1
+    },
+    {
+      "title": "Objects #2",
+      "insertMode": "file",
+      "sourceFile": "objects/objects-002.pptx",
+      "thumbnail": "objects/objects-002.png",
+      "sortOrder": 2
+    },
+    {
+      "title": "Total Savings = $23 Billion",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 435.69,
+        "top": 252.0,
+        "width": 88.62,
+        "height": 36.0,
+        "rotation": 0.0,
+        "fill": null,
+        "line": {
+          "color": "#000000",
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "Total Savings = $23 Billion",
+                "bold": null,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#383838"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "wedgeRectCallout",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-003.png",
+      "sortOrder": 3
+    },
+    {
+      "title": "Bullet A / Bullet B / Bullet C / Bullet D",
+      "insertMode": "file",
+      "sourceFile": "objects/objects-004.pptx",
+      "thumbnail": "objects/objects-004.png",
+      "sortOrder": 4
+    },
+    {
+      "title": "Total Savings = $23 Billion",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 433.94,
+        "top": 251.63,
+        "width": 92.12,
+        "height": 36.75,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#FFFFFF"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "Total Savings",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#383838"
+              },
+              {
+                "text": "= $23 Billion",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#383838"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "rect",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-005.png",
+      "sortOrder": 5
+    },
+    {
+      "title": "Objects #7",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 184.82,
+        "top": 485.46,
+        "width": 106.07,
+        "height": 15.75,
+        "rotation": 0.0,
+        "fill": null,
+        "line": null,
+        "text": null,
+        "presetGeometry": "ellipse",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-007.png",
+      "sortOrder": 7
+    },
+    {
+      "title": "Objects #8",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 166.63,
+        "top": 470.02,
+        "width": 626.75,
+        "height": 12.0,
+        "rotation": 0.0,
+        "fill": null,
+        "line": null,
+        "text": null,
+        "presetGeometry": "rect",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-008.png",
+      "sortOrder": 8
+    },
+    {
+      "title": "Objects #9",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 863.19,
+        "top": 140.51,
+        "width": 45.1,
+        "height": 256.25,
+        "rotation": 0.0,
+        "fill": null,
+        "line": null,
+        "text": null,
+        "presetGeometry": "rect",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-009.png",
+      "sortOrder": 9
+    },
+    {
+      "title": "Text",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 420.0,
+        "top": 240.0,
+        "width": 120.0,
+        "height": 60.0,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#115C36"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 2.25
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "Text",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "chevron",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-010.png",
+      "sortOrder": 10
+    },
+    {
+      "title": "Insert Text Here",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 420.0,
+        "top": 268.0,
+        "width": 120.0,
+        "height": 60.0,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#115C36"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 2.25
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "Insert Text Here",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "homePlate",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-011.png",
+      "sortOrder": 11
+    },
+    {
+      "title": "Insert Text Here",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 420.0,
+        "top": 268.0,
+        "width": 120.0,
+        "height": 60.0,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#115C36"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "Insert Text Here",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "rect",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-012.png",
+      "sortOrder": 12
+    },
+    {
+      "title": "Objects #13",
+      "insertMode": "file",
+      "sourceFile": "objects/objects-013.pptx",
+      "thumbnail": "objects/objects-013.png",
+      "sortOrder": 13
+    },
+    {
+      "title": "#",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 470.0,
+        "top": 260.0,
+        "width": 20.0,
+        "height": 20.0,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#DA0035"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "#",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#FFFFFF"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "ellipse",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-014.png",
+      "sortOrder": 14
+    },
+    {
+      "title": "#",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 470.0,
+        "top": 260.0,
+        "width": 20.0,
+        "height": 20.0,
+        "rotation": 0.0,
+        "fill": {
+          "type": "solid",
+          "color": "#D8D9DA"
+        },
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": [
+              {
+                "text": "#",
+                "bold": true,
+                "italic": null,
+                "size": 12.0,
+                "fontName": null,
+                "color": "#000000"
+              }
+            ]
+          }
+        ],
+        "presetGeometry": "ellipse",
+        "_todo": "map presetGeometry (raw OOXML prst value) to a PowerPoint.GeometricShapeType enum member by hand"
+      },
+      "thumbnail": "objects/objects-015.png",
+      "sortOrder": 15
+    },
+    {
+      "title": "\u2026 / \u2026 / \u2026",
+      "insertMode": "file",
+      "sourceFile": "objects/objects-016.pptx",
+      "thumbnail": "objects/objects-016.png",
+      "sortOrder": 16
+    }
+  ]
+}
