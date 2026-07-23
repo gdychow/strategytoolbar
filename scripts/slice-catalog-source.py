@@ -30,6 +30,13 @@ immediately; use /admin afterward to correct any title, thumbnail, or
 category assignment that needs a human's judgment, without re-running
 this script or redeploying.
 
+Thumbnails are cropped to the real content shapes' combined bounding box
+(plus padding), not the whole 16x9 slide - most catalog items are small
+relative to a full slide canvas, and a full-slide thumbnail is mostly
+white space. Rendered at a higher resolution than the final crop needs
+(see RENDER_SIZE) so a small, tightly-cropped shape still has enough
+source pixels to look sharp rather than blurry.
+
 Usage:
     python3 scripts/slice-catalog-source.py <source.pptx> <category-slug> [output-dir]
 
@@ -45,6 +52,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from PIL import Image
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.oxml.ns import qn
@@ -52,7 +60,13 @@ from pptx.util import Emu
 
 THINK_CELL_MARKER = "think-cell"
 EMU_PER_POINT = 12700
-THUMBNAIL_SIZE = 320  # matches Text's existing hand-made thumbnails (320x180 for 16x9 content)
+# Whole-slide render resolution fed into the content-bbox crop below - much
+# higher than the ~320px final thumbnail size, since a small shape crops
+# down to a small fraction of this; too low a render size and small items
+# end up visibly blurry once cropped.
+RENDER_SIZE = 1600
+CONTENT_PADDING_FRAC = 0.15  # of the content bbox's larger dimension
+CONTENT_PADDING_MIN_PT = 8
 
 
 def is_think_cell_placeholder(shape) -> bool:
@@ -206,17 +220,42 @@ def slice_single_slide(source_path: Path, slide_index: int, dest_path: Path) -> 
     prs.save(str(dest_path))
 
 
-def generate_thumbnail(slide_pptx_path: Path, dest_path: Path) -> bool:
+def compute_content_bbox_pt(shapes, slide_width_pt: float, slide_height_pt: float):
+    """
+    Combined bounding box (left, top, right, bottom, in points) of every
+    given shape, padded by CONTENT_PADDING_FRAC of its own larger
+    dimension (at least CONTENT_PADDING_MIN_PT) and clamped to the slide's
+    canvas - used to crop a full-slide thumbnail render down to the actual
+    content instead of a mostly-blank 16x9 slide.
+    """
+    lefts, tops, rights, bottoms = [], [], [], []
+    for shape in shapes:
+        left, top = emu_to_pt(shape.left), emu_to_pt(shape.top)
+        width, height = emu_to_pt(shape.width), emu_to_pt(shape.height)
+        lefts.append(left)
+        tops.append(top)
+        rights.append(left + width)
+        bottoms.append(top + height)
+
+    left, top, right, bottom = min(lefts), min(tops), max(rights), max(bottoms)
+    pad = max(CONTENT_PADDING_FRAC * max(right - left, bottom - top), CONTENT_PADDING_MIN_PT)
+    left, top = max(0.0, left - pad), max(0.0, top - pad)
+    right, bottom = min(slide_width_pt, right + pad), min(slide_height_pt, bottom + pad)
+    return left, top, right, bottom
+
+
+def generate_thumbnail(slide_pptx_path: Path, dest_path: Path, content_bbox_pt, slide_width_pt: float, slide_height_pt: float) -> bool:
     """
     Renders slide_pptx_path (a single-slide .pptx) to a PNG via macOS
-    QuickLook - no LibreOffice/poppler install needed. Returns False (and
-    logs a warning) if QuickLook doesn't produce output for this slide -
+    QuickLook - no LibreOffice/poppler install needed - then crops to
+    content_bbox_pt (see compute_content_bbox_pt). Returns False (and logs
+    a warning) if QuickLook doesn't produce output for this slide -
     observed occasionally for unusual content - so the caller can skip the
     thumbnail rather than aborting the whole category run.
     """
     with tempfile.TemporaryDirectory() as tmp:
         subprocess.run(
-            ["qlmanage", "-t", "-s", str(THUMBNAIL_SIZE), "-o", tmp, str(slide_pptx_path)],
+            ["qlmanage", "-t", "-s", str(RENDER_SIZE), "-o", tmp, str(slide_pptx_path)],
             capture_output=True,
             check=False,
         )
@@ -224,8 +263,14 @@ def generate_thumbnail(slide_pptx_path: Path, dest_path: Path) -> bool:
         if not produced.exists():
             print(f"  warning: qlmanage produced no thumbnail for {slide_pptx_path.name}", file=sys.stderr)
             return False
+
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(produced), str(dest_path))
+        img = Image.open(produced)
+        scale_x = img.width / slide_width_pt
+        scale_y = img.height / slide_height_pt
+        left, top, right, bottom = content_bbox_pt
+        box_px = (round(left * scale_x), round(top * scale_y), round(right * scale_x), round(bottom * scale_y))
+        img.crop(box_px).save(dest_path)
         return True
 
 
@@ -241,6 +286,7 @@ def main():
     thumbnails_dir = output_root / "thumbnails" / category
 
     prs = Presentation(str(source_path))
+    slide_width_pt, slide_height_pt = emu_to_pt(prs.slide_width), emu_to_pt(prs.slide_height)
     items = []
 
     with tempfile.TemporaryDirectory() as scratch:
@@ -268,8 +314,11 @@ def main():
                 slide_pptx_path = scratch_dir / slide_filename
             slice_single_slide(source_path, index, slide_pptx_path)
 
+            content_bbox_pt = compute_content_bbox_pt(real_shapes, slide_width_pt, slide_height_pt)
             thumbnail_filename = f"{category}-{index + 1:03d}.png"
-            has_thumbnail = generate_thumbnail(slide_pptx_path, thumbnails_dir / thumbnail_filename)
+            has_thumbnail = generate_thumbnail(
+                slide_pptx_path, thumbnails_dir / thumbnail_filename, content_bbox_pt, slide_width_pt, slide_height_pt
+            )
             thumbnail_rel = f"{category}/{thumbnail_filename}" if has_thumbnail else None
 
             if mode == "file":
