@@ -6,7 +6,7 @@
     xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
     xsi:type="TaskPaneApp">
 
-  <Id>8a2f5e10-6b3c-4e7a-9f1d-2c4b6e8a0d3f</Id>
+  <Id>15e2608e-07d9-4f12-8a7c-18158275f61b</Id>
   <Version>0.1.0.2</Version>
   <ProviderName>Strategy Toolbar Redux</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
