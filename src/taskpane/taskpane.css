@@ -6,6 +6,14 @@ body {
   color: #222;
 }
 
+.build-info {
+  font-size: 10px;
+  color: #999;
+  text-align: right;
+  margin-bottom: 4px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
 h2 {
   font-size: 13px;
   margin: 16px 0 6px;

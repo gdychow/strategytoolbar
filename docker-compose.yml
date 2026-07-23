@@ -19,7 +19,14 @@
 # meant to be client-visible) so they're set directly below instead.
 services:
   strategy-toolbar:
-    build: .
+    build:
+      context: .
+      args:
+        # Stamped onto the task pane as plain static HTML so it's visible
+        # even when Office.js fails to initialize. Set GIT_COMMIT in the
+        # shell before `docker compose up --build` to pass the real commit
+        # through; defaults to "unknown" otherwise.
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     image: strategy-toolbar-addin:latest
     ports:
       - "8080:8080"

@@ -7,6 +7,11 @@
   <link rel="stylesheet" href="/taskpane.css" />
 </head>
 <body>
+  <!-- Plain static HTML, not JS-driven: visible immediately on page load even
+       if Office.js/taskpane.js never finish initializing, so it's usable as a
+       "did the browser actually load the latest deploy" check independent of
+       whatever's wrong with the rest of the page. -->
+  <div id="buildInfo" class="build-info">__BUILD_INFO__</div>
   <div id="status" class="status">Loading...</div>
 
   <section id="sectionAuth">

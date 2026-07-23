@@ -10,6 +10,11 @@ RUN npm ci
 COPY tsconfig.json build.mjs manifest.xml manifest.prod.xml ./
 COPY src ./src
 COPY assets ./assets
+# .git is excluded from the build context (see .dockerignore), so the git
+# commit for the visible on-page build stamp is passed in from the host
+# (which does have .git) rather than computed inside the image.
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
 RUN npx tsc --noEmit && node build.mjs --prod
 
 FROM node:20-alpine AS runtime
