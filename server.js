@@ -26,6 +26,14 @@ const authConfig = require("./src/config/auth.json");
 const PORT = process.env.PORT || 3000;
 const ROOT = path.join(__dirname, "dist");
 const useTls = process.env.USE_TLS !== "false";
+// Cache-busting token for thumbnail URLs, appended as ?v=. Cache-Control:
+// no-cache alone wasn't sufficient for WKWebView-hosted task panes on Mac
+// earlier this session (taskpane.js/css needed an actual URL change, not
+// just a header, to force a real reload) — thumbnails have the same
+// problem once a category's images get regenerated, but no build step of
+// their own to stamp a git commit into, so a per-process-start timestamp
+// serves the same purpose: it changes on every deploy/restart.
+const ASSET_VERSION = Date.now();
 
 const app = express();
 app.use(express.json());
@@ -36,7 +44,13 @@ app.use(cookieParser());
 // root) lets any thumbnail not yet on the volume (e.g. local dev, where
 // docker-entrypoint.sh's one-time seed never runs) still resolve from the
 // dist/ mount below, unchanged from today's behavior.
-app.use("/assets/catalog/thumbnails", express.static(THUMBNAILS_DIR));
+// Same "no-cache" reasoning as the dist/ mount below: WKWebView-hosted
+// task panes on Mac cache aggressively and don't reliably revalidate on
+// their own, confirmed earlier for taskpane.js/css — thumbnail images hit
+// the exact same problem once a category's thumbnails get regenerated
+// (e.g. the crop-to-content fix), since image URLs have no cache-busting
+// query string the way taskpane.js/css do.
+app.use("/assets/catalog/thumbnails", express.static(THUMBNAILS_DIR, { setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") }));
 
 // Office Add-in task panes on Mac are known to cache their web content
 // aggressively (WKWebView), which can silently leave an old taskpane.js
@@ -135,7 +149,7 @@ app.get("/api/catalog/:category", async (req, res) => {
       title: item.title,
       insertMode: item.insert_mode,
       reconstructSpec: item.reconstruct_spec,
-      thumbnailUrl: item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}` : null,
+      thumbnailUrl: item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}?v=${ASSET_VERSION}` : null,
     }))
   );
 });
@@ -253,7 +267,7 @@ app.get("/admin", async (req, res) => {
   const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
   const rows = items
     .map((item) => {
-      const thumbUrl = item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}` : null;
+      const thumbUrl = item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}?v=${ASSET_VERSION}` : null;
       const categoryOptions = CATALOG_CATEGORIES.map(
         (c) => `<option value="${c}"${c === item.category ? " selected" : ""}>${c}</option>`
       ).join("");
