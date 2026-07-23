@@ -45,14 +45,26 @@ async function getMsalInstance(): Promise<IPublicClientApplication> {
   return msalInstance;
 }
 
-/** Needed for Office-on-web, where NAA identifies the account via a login hint rather than an ambient OS session. Harmless on desktop even though v1 targets desktop only. */
-async function getLoginHint(): Promise<string | undefined> {
-  try {
-    const authContext = await Office.auth.getAuthContext();
-    return authContext?.userPrincipalName;
-  } catch {
-    return undefined;
+/**
+ * Needed for Office-on-web, where NAA identifies the account via a login
+ * hint rather than an ambient OS session. Harmless on desktop even though
+ * v1 targets desktop only. Cached (module-level, like msalInstance) so a
+ * click on Sign In never has to await this itself — see signIn()'s comment
+ * for why that matters.
+ */
+let loginHintPromise: Promise<string | undefined> | null = null;
+function getLoginHint(): Promise<string | undefined> {
+  if (!loginHintPromise) {
+    loginHintPromise = (async () => {
+      try {
+        const authContext = await Office.auth.getAuthContext();
+        return authContext?.userPrincipalName;
+      } catch {
+        return undefined;
+      }
+    })();
   }
+  return loginHintPromise;
 }
 
 export interface SignedInUser {
@@ -73,18 +85,42 @@ function toSignedInUser(result: AuthenticationResult): SignedInUser {
 }
 
 /**
- * Signs the user in, preferring a silent flow (ssoSilent) and falling back
- * to an interactive popup only when Microsoft requires it (first sign-in,
- * expired session, MFA, etc.) — matches "persistent with occasional
- * rechecking" rather than prompting every time.
+ * Passively restores a prior sign-in via ssoSilent, with no popup and no
+ * user interaction — call this once in the background on startup (never
+ * from the Sign In button's click handler; see signIn()'s comment for why
+ * that split matters). Never throws: any failure just means "not signed
+ * in yet", which is a normal, expected outcome for a first-time user.
+ */
+export async function trySilentSignIn(): Promise<SignedInUser | null> {
+  try {
+    const instance = await getMsalInstance();
+    const loginHint = await getLoginHint();
+    if (!loginHint) return null; // ssoSilent needs a hint (or a cached account) to target
+    const result = await instance.ssoSilent({ scopes: ["User.Read"], loginHint });
+    return toSignedInUser(result);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Signs the user in interactively via a popup. Deliberately does NOT try
+ * ssoSilent first (use trySilentSignIn for that, in the background, on
+ * startup): browsers only allow window.open() to bypass the popup blocker
+ * within a short "trusted user activation" window right after a real
+ * click, and ssoSilent's hidden-iframe round trip (several seconds before
+ * it fails) blows straight through that window — confirmed as the actual
+ * cause of the timed_out -> interaction_in_progress -> popup_window_error
+ * chain seen when ssoSilent was awaited inside this same click handler.
+ * getMsalInstance()/getLoginHint() are cheap here because trySilentSignIn
+ * has normally already resolved and cached both by the time the user
+ * clicks; if it hasn't (a very fast click), this still works, just with a
+ * small risk of the same activation-window issue on that one click.
  *
- * Takes an optional progress callback so the caller can surface each step
- * (rather than one opaque await) — useful while debugging exactly where a
- * sign-in attempt is stuck, since a hung popup and a hung MSAL init look
- * identical from the outside otherwise.
+ * Takes an optional progress callback so the caller can surface each step.
  */
 export async function signIn(onProgress?: (step: string) => void): Promise<SignedInUser> {
-  onProgress?.("Initializing MSAL...");
+  onProgress?.("Opening sign-in popup...");
   const instance = await getMsalInstance();
   const loginHint = await getLoginHint();
 
@@ -95,40 +131,20 @@ export async function signIn(onProgress?: (step: string) => void): Promise<Signe
   };
 
   try {
-    onProgress?.("Trying silent sign-in...");
-    const result = await instance.ssoSilent(request);
+    const result = await instance.acquireTokenPopup(request);
     return toSignedInUser(result);
   } catch (error) {
-    // Falls back to a popup for *any* ssoSilent failure, not just
-    // InteractionRequiredAuthError — ssoSilent works via a hidden iframe,
-    // which needs the same storage/cookie access a real top-level page
-    // gets; inside Office-on-web the task pane is already an iframe, so a
-    // second, nested hidden iframe can end up storage-partitioned and just
-    // hang until MSAL's own timeout fires (confirmed: "timed_out", not
-    // InteractionRequiredAuthError, so the old narrower check never
-    // reached this fallback at all). A popup opens as its own top-level
-    // window with normal storage access, so it isn't subject to the same
-    // nested-iframe restriction.
-    onProgress?.("Silent sign-in didn't complete — opening popup...");
-    try {
-      const result = await instance.acquireTokenPopup(request);
+    // A backgrounded trySilentSignIn() that's still in flight (or one that
+    // timed out without its cleanup running — a known msal-browser gap,
+    // confirmed against node_modules source) can leave MSAL's own
+    // "interaction in progress" lock set, which would otherwise reject
+    // this popup outright. Retry once with overrideInteractionInProgress —
+    // a documented public PopupRequest option for exactly this case.
+    if (error instanceof BrowserAuthError && error.errorCode === "interaction_in_progress") {
+      onProgress?.("Clearing a stuck sign-in state and retrying...");
+      const result = await instance.acquireTokenPopup({ ...request, overrideInteractionInProgress: true });
       return toSignedInUser(result);
-    } catch (popupError) {
-      // A ssoSilent call that times out (rather than cleanly rejecting)
-      // can leave MSAL's own "interaction in progress" lock set — a known
-      // msal-browser gap, confirmed against node_modules source
-      // (BrowserConstants/ClientApplication): acquireTokenPopup's finally
-      // block is what normally clears that lock, but ssoSilent's timeout
-      // path never reaches it. That stuck lock then rejects the very next
-      // interactive call (this popup) with interaction_in_progress. Retry
-      // once with overrideInteractionInProgress — a documented public
-      // PopupRequest option for exactly this case, not an internal hack.
-      if (popupError instanceof BrowserAuthError && popupError.errorCode === "interaction_in_progress") {
-        onProgress?.("Clearing a stuck sign-in state and retrying...");
-        const result = await instance.acquireTokenPopup({ ...request, overrideInteractionInProgress: true });
-        return toSignedInUser(result);
-      }
-      throw popupError;
     }
+    throw error;
   }
 }

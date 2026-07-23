@@ -331,6 +331,20 @@ Office.onReady((info) => {
 
   // Checked in the background, only after everything above is already
   // wired and interactive — see fetchWithTimeout's comment for why this
-  // must never be awaited directly in the startup path above.
-  getSessionUser().then(applySessionState);
+  // must never be awaited directly in the startup path above. If there's
+  // no existing backend session cookie, also try a passive MSAL restore
+  // (ssoSilent, no popup) — this is what lets a returning user skip the
+  // Sign In button entirely, and it's also what primes Auth's cached MSAL
+  // instance/login hint so a later click on Sign In can go straight to
+  // acquireTokenPopup without awaiting anything first (see msal.ts's
+  // signIn() comment for why that ordering matters for the popup blocker).
+  getSessionUser().then(async (user) => {
+    applySessionState(user);
+    if (user) return;
+    const silentUser = await Auth.trySilentSignIn();
+    if (silentUser?.email) {
+      await establishSession(silentUser.idToken);
+      applySessionState(await getSessionUser());
+    }
+  });
 });
