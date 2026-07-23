@@ -198,7 +198,15 @@ function renderSignInPage() {
     <p id="status">Not signed in.</p>
     <button id="btnSignIn">Sign In</button>
     <script src="/vendor/msal-browser.min.js"></script>
+    <script src="/vendor/msal-redirect-bridge.min.js"></script>
     <script>
+      // loginPopup()'s opener window waits on a BroadcastChannel for the
+      // auth response — this relays it there. Runs on every /admin load;
+      // a no-op (rejects, ignored) on a normal visit with no pending auth
+      // payload in the URL, and is what actually completes the flow when
+      // this page is the popup that Microsoft just redirected back to.
+      msalRedirectBridge.broadcastResponseToMainFrame().catch(() => {});
+
       const statusEl = document.getElementById("status");
       const msalInstance = new msal.PublicClientApplication({
         auth: {

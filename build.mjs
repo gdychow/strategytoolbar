@@ -50,8 +50,17 @@ async function copyStaticAssets() {
   // repo) so it always matches package.json's pinned @azure/msal-browser
   // version — used by /admin's standalone browser sign-in page, which
   // deliberately isn't part of the esbuild bundle (see server.js).
+  // msal-redirect-bridge is a separate sub-package (not re-exported by
+  // msal-browser itself) that must run on the page the popup lands on:
+  // loginPopup()'s opener waits on a BroadcastChannel for the response,
+  // and this bridge script is what actually reads the redirect URL's auth
+  // payload and posts it there — without it the opener waits forever.
   await mkdir("dist/vendor", { recursive: true });
   await cp("node_modules/@azure/msal-browser/lib/msal-browser.min.js", "dist/vendor/msal-browser.min.js");
+  await cp(
+    "node_modules/@azure/msal-browser/lib/redirect-bridge/msal-redirect-bridge.min.js",
+    "dist/vendor/msal-redirect-bridge.min.js"
+  );
   console.log("Copied taskpane.html (with build stamp)/css, assets/, vendor/, and manifest.xml into dist/");
 }
 
