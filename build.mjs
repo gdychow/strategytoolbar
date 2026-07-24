@@ -6,15 +6,20 @@ import { execSync } from "node:child_process";
 const watch = process.argv.includes("--watch");
 const prod = process.argv.includes("--prod");
 
-const options = {
-  entryPoints: ["src/taskpane/taskpane.ts"],
+const sharedOptions = {
   bundle: true,
-  outfile: "dist/taskpane.js",
   target: "es2019",
   sourcemap: !prod,
   minify: prod,
   logLevel: "info",
 };
+const options = { ...sharedOptions, entryPoints: ["src/taskpane/taskpane.ts"], outfile: "dist/taskpane.js" };
+// Phase 5: the gallery dialog. A separate bundle, not a second entry in
+// the same esbuild.build() call — esbuild rejects a single `outfile` with
+// multiple entry points, and keeping two independent build() calls is
+// simpler than switching to `outdir` (which would rename taskpane.js's
+// output path and touch every reference to it) for one extra small page.
+const galleryOptions = { ...sharedOptions, entryPoints: ["src/gallery/gallery.ts"], outfile: "dist/gallery.js" };
 
 /**
  * Prefers GIT_COMMIT from the environment (set as a Docker build ARG, since
@@ -44,6 +49,9 @@ async function copyStaticAssets() {
     html.replace("__BUILD_INFO__", buildStamp).replaceAll("__CACHE_BUST__", commit)
   );
   await cp("src/taskpane/taskpane.css", "dist/taskpane.css");
+  const galleryHtml = await readFile("src/gallery/gallery.html", "utf8");
+  await writeFile("dist/gallery.html", galleryHtml.replaceAll("__CACHE_BUST__", commit));
+  await cp("src/gallery/gallery.css", "dist/gallery.css");
   await cp("assets", "dist/assets", { recursive: true });
   await cp(prod ? "manifest.prod.xml" : "manifest.xml", "dist/manifest.xml");
   // Vendored fresh from node_modules on every build (not committed to the
@@ -66,10 +74,13 @@ async function copyStaticAssets() {
 
 if (watch) {
   const ctx = await esbuild.context(options);
+  const galleryCtx = await esbuild.context(galleryOptions);
   await ctx.watch();
+  await galleryCtx.watch();
   await copyStaticAssets();
   console.log("Watching for changes...");
 } else {
   await esbuild.build(options);
+  await esbuild.build(galleryOptions);
   await copyStaticAssets();
 }

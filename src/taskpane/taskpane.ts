@@ -247,6 +247,21 @@ Office.onReady((info) => {
   );
 
   // Content Library
+  // Temporary (Phase 5 skeleton) — just opens the gallery dialog to check
+  // whether it shares this task pane's session cookie. The dialog reports
+  // the answer directly on-screen; nothing is wired to messageParent yet.
+  document.getElementById("btnBrowseLibraryTest")?.addEventListener("click", () => {
+    Office.context.ui.displayDialogAsync(
+      `${window.location.origin}/gallery.html?v=${Date.now()}`,
+      { height: 80, width: 70 },
+      (result) => {
+        if (result.status === Office.AsyncResultStatus.Failed) {
+          notify(`Failed to open dialog: ${result.error.message}`, "error");
+        }
+      }
+    );
+  });
+
   document.getElementById("librarySelect")?.addEventListener("change", withErrorHandling(loadLibrary));
   bindButton("btnLibraryFinish", async () => {
     if (!currentFileInsertHandle) return;
