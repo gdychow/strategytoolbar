@@ -194,12 +194,19 @@ def classify_shape_tree(shape) -> str:
     el = shape._element
     if has_cust_geom(el) or has_picture(el) or has_other_graphic_frame(el) or has_custom_bullet_char(el):
         return "file"
+    if shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
+        # extract_reconstruct_spec never reads presetGeometry for a text
+        # box (it builds it via addTextBox, not addGeometricShape), so its
+        # prstGeom - if any - doesn't matter here.
+        return "reconstruct"
+    # Any other shape needs a prstGeom with a confirmed, mapped preset -
+    # covers both "no prstGeom at all" (e.g. a connector shape) and "a
+    # prst we don't have a verified enum value for" (see
+    # PRST_TO_GEOMETRIC_SHAPE_TYPE's comment for why an unmapped preset
+    # falls back to file mode rather than guessing).
     prst_el = el.find(".//" + qn("a:prstGeom"))
-    if prst_el is not None and prst_el.get("prst") not in PRST_TO_GEOMETRIC_SHAPE_TYPE:
-        # A geometric shape (not a plain text box, which has no prstGeom at
-        # all) whose preset isn't a confirmed, mapped enum value - see
-        # PRST_TO_GEOMETRIC_SHAPE_TYPE's comment for why this falls back
-        # to file mode rather than guessing.
+    prst = prst_el.get("prst") if prst_el is not None else None
+    if prst not in PRST_TO_GEOMETRIC_SHAPE_TYPE:
         return "file"
     return "reconstruct"
 
