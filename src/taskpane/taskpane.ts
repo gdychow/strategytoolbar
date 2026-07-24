@@ -84,15 +84,14 @@ interface SessionUser {
 let currentFileInsertHandle: Library.FileInsertHandle | null = null;
 
 function showLibraryFinishRow(show: boolean): void {
-  const grid = document.getElementById("libraryGrid");
   const finishRow = document.getElementById("libraryFinishRow");
-  const select = document.getElementById("librarySelect") as HTMLSelectElement | null;
-  if (grid) (grid as HTMLElement).style.display = show ? "none" : "grid";
+  const browseBtn = document.getElementById("btnBrowseLibrary") as HTMLButtonElement | null;
   if (finishRow) (finishRow as HTMLElement).style.display = show ? "block" : "none";
-  if (select) select.disabled = show;
+  if (browseBtn) browseBtn.disabled = show;
 }
 
-async function handleLibraryItemClick(item: Library.CatalogItem): Promise<void> {
+/** Called once the gallery dialog reports back which item the user picked (see the displayDialogAsync wiring below) — same insert engine as before, just triggered from the dialog instead of an inline grid click. */
+async function insertPickedItem(item: Library.CatalogItem): Promise<void> {
   const handle = await Library.insertCatalogItem(item);
   if (handle) {
     currentFileInsertHandle = handle;
@@ -103,46 +102,7 @@ async function handleLibraryItemClick(item: Library.CatalogItem): Promise<void> 
   }
 }
 
-function renderLibraryGrid(items: Library.CatalogItem[]): void {
-  const grid = document.getElementById("libraryGrid");
-  if (!grid) return;
-  grid.innerHTML = "";
-
-  for (const item of items) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "library-item";
-
-    if (item.thumbnailUrl) {
-      const img = document.createElement("img");
-      img.src = item.thumbnailUrl;
-      img.alt = item.title;
-      button.appendChild(img);
-    } else {
-      const placeholder = document.createElement("span");
-      placeholder.className = "library-item-placeholder";
-      button.appendChild(placeholder);
-    }
-
-    const label = document.createElement("span");
-    label.textContent = item.title;
-    button.appendChild(label);
-
-    button.addEventListener("click", withErrorHandling(() => handleLibraryItemClick(item)));
-    grid.appendChild(button);
-  }
-}
-
-async function loadLibrary(): Promise<void> {
-  const select = document.getElementById("librarySelect") as HTMLSelectElement | null;
-  // Temporary: this inline grid is being replaced by the gallery dialog
-  // (Phase 5) — minimal fix to keep it compiling/working against the new
-  // { groups, items } response shape in the meantime, not a real feature.
-  const { items } = await Library.fetchCatalog(select?.value ?? "text");
-  renderLibraryGrid(items);
-}
-
-/** Gates and (re)populates the Content Library section whenever sign-in state changes. */
+/** Gates the Content Library section whenever sign-in state changes. The gallery dialog loads its own data lazily on open, so there's nothing to pre-fetch here. */
 function refreshLibrarySection(user: SessionUser | null): void {
   const signedIn = !!user;
   const supported = Library.isLibraryInsertSupported();
@@ -151,12 +111,7 @@ function refreshLibrarySection(user: SessionUser | null): void {
     signedIn && supported,
     signedIn ? "Requires a newer PowerPoint build (PowerPointApi 1.2) than this one has." : "Sign in above to browse the content library."
   );
-
-  if (signedIn && supported) {
-    loadLibrary().catch((err) => notify(`Error: ${err instanceof Error ? err.message : String(err)}`, "error"));
-  } else {
-    const grid = document.getElementById("libraryGrid");
-    if (grid) grid.innerHTML = "";
+  if (!signedIn || !supported) {
     showLibraryFinishRow(false);
     currentFileInsertHandle = null;
   }
@@ -246,23 +201,40 @@ Office.onReady((info) => {
     "Nested App Authentication isn't supported on this PowerPoint build."
   );
 
-  // Content Library
-  // Temporary (Phase 5 skeleton) — just opens the gallery dialog to check
-  // whether it shares this task pane's session cookie. The dialog reports
-  // the answer directly on-screen; nothing is wired to messageParent yet.
-  document.getElementById("btnBrowseLibraryTest")?.addEventListener("click", () => {
+  // Content Library — the dialog is a pure browse/search/select surface
+  // (confirmed: a page opened via displayDialogAsync can only call
+  // messageParent and requirements.isSetSupported, nothing PowerPoint-
+  // specific), so all it ever sends back is which item was picked; this
+  // task pane does the actual insert via the same Library.insertCatalogItem
+  // used everywhere else in this app.
+  document.getElementById("btnBrowseLibrary")?.addEventListener("click", () => {
     Office.context.ui.displayDialogAsync(
       `${window.location.origin}/gallery.html?v=${Date.now()}`,
       { height: 80, width: 70 },
       (result) => {
         if (result.status === Office.AsyncResultStatus.Failed) {
-          notify(`Failed to open dialog: ${result.error.message}`, "error");
+          notify(`Failed to open the library: ${result.error.message}`, "error");
+          return;
         }
+        const dialog = result.value;
+        dialog.addEventHandler(Office.EventType.DialogMessageReceived, (args) => {
+          if (!("message" in args)) return; // the other possible event is DialogEventReceived (closed/unloaded) — nothing to do here
+          dialog.close();
+          let item: Library.CatalogItem;
+          try {
+            item = JSON.parse(args.message);
+          } catch (err) {
+            notify(`Couldn't read the selected item: ${err instanceof Error ? err.message : String(err)}`, "error");
+            return;
+          }
+          insertPickedItem(item).catch((err) =>
+            notify(`Error: ${err instanceof Error ? err.message : String(err)}`, "error")
+          );
+        });
       }
     );
   });
 
-  document.getElementById("librarySelect")?.addEventListener("change", withErrorHandling(loadLibrary));
   bindButton("btnLibraryFinish", async () => {
     if (!currentFileInsertHandle) return;
     await Library.finishFileInsert(currentFileInsertHandle);

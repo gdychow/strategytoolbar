@@ -7,7 +7,19 @@
   <link rel="stylesheet" href="/gallery.css?v=__CACHE_BUST__" />
 </head>
 <body>
-  <div id="status">Loading…</div>
+  <div id="tabs" class="gallery-tabs"></div>
+  <div class="gallery-search-row">
+    <input type="search" id="searchInput" placeholder="Search title or tags…" autocomplete="off" />
+  </div>
+  <div id="status" class="gallery-status"></div>
+  <div class="gallery-main">
+    <div id="galleryGrid" class="gallery-body"></div>
+    <div id="previewPanel" class="preview-panel" style="display: none;">
+      <img id="previewImg" alt="" />
+      <h3 id="previewTitle"></h3>
+      <button id="btnInsert" type="button">Insert</button>
+    </div>
+  </div>
   <script src="/gallery.js?v=__CACHE_BUST__"></script>
 </body>
 </html>

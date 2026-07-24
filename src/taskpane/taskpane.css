@@ -161,47 +161,6 @@ button:disabled {
   color: #1a7a3c;
 }
 
-.library-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.library-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px;
-  font-size: 11px;
-  text-align: center;
-  white-space: normal;
-}
-
-.library-item img {
-  /* No fixed aspect-ratio here on purpose: generated thumbnails (see
-     scripts/slice-catalog-source.py) are now cropped to each item's real
-     content, so their natural aspect ratio varies per item (a wide chart
-     legend vs. a small square icon). Forcing a 16:9 box here would
-     letterbox/pillarbox that crop with white bars, recreating the exact
-     whitespace problem the crop was built to remove. max-height keeps any
-     unusually tall crop from dominating the grid. */
-  width: 100%;
-  max-height: 140px;
-  object-fit: contain;
-  background: #fff;
-  border: 1px solid #c8c8c8;
-  border-radius: 4px;
-}
-
-.library-item-placeholder {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border: 1px solid #c8c8c8;
-  border-radius: 4px;
-  background: #f5f5f5;
-}
-
 .library-finish-row {
   background: #eef1f5;
   border-radius: 4px;
