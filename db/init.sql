@@ -54,3 +54,42 @@ CREATE TABLE IF NOT EXISTS catalog_items (
 );
 CREATE INDEX IF NOT EXISTS idx_catalog_items_category_shared
   ON catalog_items (category, sort_order) WHERE owner_oid IS NULL;
+
+-- Tier 3 Phase 5: admin-defined, admin-ordered sub-groupings within one
+-- category (e.g. "Pyramids" inside Diagrams) — deliberately NOT derived
+-- from tags below, since a group needs exactly one value and an explicit
+-- order, which a free multi-value tag doesn't naturally give you.
+CREATE TABLE IF NOT EXISTS catalog_groups (
+  id SERIAL PRIMARY KEY,
+  category TEXT NOT NULL CHECK (
+    category IN ('text', 'objects', 'shapes', 'stamps', 'tables', 'symbols', 'diagrams')
+  ),
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (category, name)
+);
+
+-- An item's group must belong to the same category as the item itself -
+-- enforced at the application layer (server.js), not here, since a plain
+-- CHECK can't reference another table. If an admin edit changes an item's
+-- category, the server resets group_id to NULL in that same update rather
+-- than leaving a group reference from the old category dangling.
+-- ON DELETE SET NULL: deleting a group is a simple admin action that
+-- shouldn't require first reassigning every item in it - they just fall
+-- back to ungrouped (the gallery's "Other" bucket) automatically.
+ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES catalog_groups (id) ON DELETE SET NULL;
+
+-- Fixed-ish vocabulary, multiple per item, but admins can add new ones
+-- from the /admin item-edit form (with a client-side near-match
+-- confirmation step - see server.js - to discourage near-duplicates like
+-- "arrow" vs "arrows"; not enforced here beyond plain uniqueness).
+CREATE TABLE IF NOT EXISTS tags (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS catalog_item_tags (
+  item_id INTEGER NOT NULL REFERENCES catalog_items (id) ON DELETE CASCADE,
+  tag_id INTEGER NOT NULL REFERENCES tags (id) ON DELETE CASCADE,
+  PRIMARY KEY (item_id, tag_id)
+);

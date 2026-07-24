@@ -15,6 +15,13 @@ const {
   updateCatalogItem,
   updateCatalogItemThumbnail,
   deleteCatalogItem,
+  listGroupsForCategory,
+  getGroup,
+  createGroup,
+  updateGroup,
+  deleteGroup,
+  listAllTagNames,
+  setItemTags,
 } = require("./server/db");
 const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken } = require("./server/auth");
 const { THUMBNAILS_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath } = require("./server/catalog");
@@ -37,6 +44,12 @@ const ASSET_VERSION = Date.now();
 
 const app = express();
 app.use(express.json());
+// Needed for the plain (non-multipart) forms on /admin/groups — the
+// catalog item edit form uses multipart/form-data (it has a file input,
+// parsed by multer instead), but groups have no file upload, so their
+// forms default to application/x-www-form-urlencoded, which nothing was
+// parsing before this.
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 // Volume-backed thumbnails take precedence over the image-baked copy under
 // dist/ — registered first so express.static's fallthrough-on-miss (it
@@ -140,18 +153,32 @@ app.post("/api/auth/signout", (req, res) => {
 // insert from it — it's "shared", not "admin-only to read". source_file
 // itself is never client-supplied: the client only ever sends a numeric
 // item ID, and the server looks up which file (if any) that row points at.
+//
+// Response is { groups, items }, not a bare item array (Phase 5) — the
+// gallery dialog needs the category's groups in their own admin-defined
+// order to render group headers correctly, which can't be reliably
+// inferred just from the first-occurrence order of group names within
+// the already sort_order-sorted item list (a group's items don't have to
+// be contiguous in that ordering).
 app.get("/api/catalog/:category", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
-  const items = await listSharedCatalogItems(req.params.category);
-  res.json(
-    items.map((item) => ({
+  const [items, groups] = await Promise.all([
+    listSharedCatalogItems(req.params.category),
+    listGroupsForCategory(req.params.category),
+  ]);
+  res.json({
+    groups: groups.map((g) => ({ id: g.id, name: g.name, sortOrder: g.sort_order })),
+    items: items.map((item) => ({
       id: item.id,
       title: item.title,
       insertMode: item.insert_mode,
       reconstructSpec: item.reconstruct_spec,
       thumbnailUrl: item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}?v=${ASSET_VERSION}` : null,
-    }))
-  );
+      groupId: item.group_id,
+      groupName: item.group_name,
+      tags: item.tags,
+    })),
+  });
 });
 
 app.get("/api/catalog/file/:itemId", async (req, res) => {
@@ -263,7 +290,13 @@ app.get("/admin", async (req, res) => {
   if (!req.user) return res.send(renderSignInPage());
   if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
 
-  const items = await listAllCatalogItems();
+  const [items, tagNames, groupsByCategory] = await Promise.all([
+    listAllCatalogItems(),
+    listAllTagNames(),
+    Promise.all(CATALOG_CATEGORIES.map((c) => listGroupsForCategory(c))).then((lists) =>
+      Object.fromEntries(CATALOG_CATEGORIES.map((c, i) => [c, lists[i]]))
+    ),
+  ]);
   const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
   const rows = items
     .map((item) => {
@@ -271,12 +304,19 @@ app.get("/admin", async (req, res) => {
       const categoryOptions = CATALOG_CATEGORIES.map(
         (c) => `<option value="${c}"${c === item.category ? " selected" : ""}>${c}</option>`
       ).join("");
+      const groupOptions =
+        `<option value="">(none)</option>` +
+        groupsByCategory[item.category]
+          .map((g) => `<option value="${g.id}"${g.id === item.group_id ? " selected" : ""}>${escapeHtml(g.name)}</option>`)
+          .join("");
       return `
-        <form id="edit-${item.id}" method="POST" action="/admin/catalog/${item.id}" enctype="multipart/form-data"></form>
+        <form id="edit-${item.id}" class="catalog-item-form" method="POST" action="/admin/catalog/${item.id}" enctype="multipart/form-data"></form>
         <tr>
           <td><input form="edit-${item.id}" name="title" value="${escapeHtml(item.title)}" size="30"></td>
           <td><select form="edit-${item.id}" name="category">${categoryOptions}</select></td>
           <td>${escapeHtml(item.insert_mode)}</td>
+          <td><select form="edit-${item.id}" name="groupId">${groupOptions}</select></td>
+          <td><input form="edit-${item.id}" name="tags" class="tags-input" value="${escapeHtml((item.tags || []).join(", "))}" size="20"></td>
           <td><input form="edit-${item.id}" name="sortOrder" type="number" value="${item.sort_order}" style="width: 60px;"></td>
           <td>
             ${thumbUrl ? `<img src="${thumbUrl}" width="60" alt="">` : "(none)"}
@@ -291,14 +331,67 @@ app.get("/admin", async (req, res) => {
         </tr>`;
     })
     .join("");
+  const groupNavLinks = CATALOG_CATEGORIES.map(
+    (c) => `<a href="/admin/groups?category=${c}">${c}</a>`
+  ).join(" · ");
   res.send(`<!doctype html><html><body>
     <h1>Welcome, admin</h1>
     <p>Signed in as ${escapeHtml(req.user.email)}.</p>
     ${errorMsg ? `<p style="color: red;">${escapeHtml(errorMsg)}</p>` : ""}
+    <p>Manage groups: ${groupNavLinks}</p>
     <table border="1" cellpadding="4">
-      <tr><th>Title</th><th>Category</th><th>Insert mode</th><th>Sort order</th><th>Thumbnail</th><th></th><th></th></tr>
+      <tr><th>Title</th><th>Category</th><th>Insert mode</th><th>Group</th><th>Tags</th><th>Sort order</th><th>Thumbnail</th><th></th><th></th></tr>
       ${rows}
     </table>
+    <script>
+      // Client-side typo-catching only, not a security boundary — the
+      // server get-or-creates whatever tag names it's sent regardless
+      // (see POST /admin/catalog/:id). This just makes an admin pause
+      // before accidentally creating "arrows" next to an existing
+      // "arrow". KNOWN_TAGS is embedded at render time rather than
+      // fetched separately — the whole vocabulary is small (tens to a
+      // couple hundred entries across ~230 items).
+      const KNOWN_TAGS = ${JSON.stringify(tagNames)};
+
+      function levenshtein(a, b) {
+        const dp = [];
+        for (let i = 0; i <= a.length; i++) dp.push([i]);
+        for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+        for (let i = 1; i <= a.length; i++) {
+          for (let j = 1; j <= b.length; j++) {
+            dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+          }
+        }
+        return dp[a.length][b.length];
+      }
+
+      function nearMatches(tag) {
+        const lower = tag.toLowerCase();
+        const threshold = Math.max(2, Math.floor(lower.length * 0.3));
+        return KNOWN_TAGS.filter((k) => k.toLowerCase() !== lower && levenshtein(lower, k.toLowerCase()) <= threshold);
+      }
+
+      document.querySelectorAll(".catalog-item-form").forEach((form) => {
+        form.addEventListener("submit", (e) => {
+          const tagsInput = document.querySelector('input.tags-input[form="' + form.id + '"]');
+          if (!tagsInput) return;
+          const known = new Set(KNOWN_TAGS.map((t) => t.toLowerCase()));
+          const entered = tagsInput.value.split(",").map((t) => t.trim()).filter(Boolean);
+          for (const tag of entered) {
+            if (known.has(tag.toLowerCase())) continue;
+            const suggestions = nearMatches(tag);
+            const msg = suggestions.length
+              ? '"' + tag + '" isn\\'t an existing tag. Did you mean: ' + suggestions.join(", ") + '? Click OK to create "' + tag + '" as a new tag anyway, or Cancel to fix it.'
+              : 'Create new tag "' + tag + '"?';
+            if (!confirm(msg)) {
+              e.preventDefault();
+              tagsInput.focus();
+              return;
+            }
+          }
+        });
+      });
+    </script>
   </body></html>`);
 });
 
@@ -309,17 +402,24 @@ app.post("/admin/catalog/:id", requireAdmin, upload.single("thumbnail"), async (
   const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
   const category = req.body.category;
   const sortOrder = Number(req.body.sortOrder);
+  const groupId = req.body.groupId ? Number(req.body.groupId) : null;
+  const tags = typeof req.body.tags === "string" ? req.body.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
   if (!title) return res.redirect(303, "/admin?error=" + encodeURIComponent("Title can't be empty."));
   if (!CATALOG_CATEGORIES.includes(category)) return res.redirect(303, "/admin?error=" + encodeURIComponent("Invalid category."));
   if (!Number.isInteger(sortOrder) || sortOrder < 0) {
     return res.redirect(303, "/admin?error=" + encodeURIComponent("Sort order must be a non-negative integer."));
   }
+  if (groupId !== null && (!Number.isInteger(groupId) || groupId <= 0)) {
+    return res.redirect(303, "/admin?error=" + encodeURIComponent("Invalid group."));
+  }
 
   const existing = await getCatalogItem(id);
   if (!existing) return res.redirect(303, "/admin?error=" + encodeURIComponent("Item not found."));
 
-  const updated = await updateCatalogItem({ id, title, category, sortOrder });
+  const updated = await updateCatalogItem({ id, title, category, sortOrder, groupId });
   if (!updated) return res.redirect(303, "/admin?error=" + encodeURIComponent("Item not found."));
+
+  await setItemTags(id, tags);
 
   if (req.file) {
     const ext = MIME_TO_EXT[req.file.mimetype];
@@ -347,6 +447,95 @@ app.post("/admin/catalog/:id/delete", requireAdmin, async (req, res) => {
   }
 
   res.redirect(303, "/admin");
+});
+
+// Phase 5: admin-defined, admin-ordered sub-groupings within one category
+// (e.g. "Pyramids" inside Diagrams), separate from the free-form tags
+// above — a group is a single value with an explicit order, which tags
+// deliberately don't try to be. One category's groups per page, matching
+// the pattern of everything else in /admin being a plain per-row form.
+app.get("/admin/groups", requireAdmin, async (req, res) => {
+  const category = req.query.category;
+  if (!CATALOG_CATEGORIES.includes(category)) {
+    return res.status(400).send("Unknown category.");
+  }
+  const groups = await listGroupsForCategory(category);
+  const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
+  const rows = groups
+    .map(
+      (g) => `
+        <tr>
+          <form id="edit-group-${g.id}" method="POST" action="/admin/groups/${g.id}"></form>
+          <td><input form="edit-group-${g.id}" name="name" value="${escapeHtml(g.name)}"></td>
+          <td><input form="edit-group-${g.id}" name="sortOrder" type="number" value="${g.sort_order}" style="width: 60px;"></td>
+          <td><button form="edit-group-${g.id}" type="submit">Save</button></td>
+          <td>
+            <form method="POST" action="/admin/groups/${g.id}/delete" onsubmit="return confirm('Delete this group? Items in it become ungrouped.')">
+              <button type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>`
+    )
+    .join("");
+  res.send(`<!doctype html><html><body>
+    <h1>Groups: ${escapeHtml(category)}</h1>
+    <p><a href="/admin">&larr; Back to catalog</a></p>
+    ${errorMsg ? `<p style="color: red;">${escapeHtml(errorMsg)}</p>` : ""}
+    <table border="1" cellpadding="4">
+      <tr><th>Name</th><th>Sort order</th><th></th><th></th></tr>
+      ${rows}
+    </table>
+    <h2>Add group</h2>
+    <form method="POST" action="/admin/groups">
+      <input type="hidden" name="category" value="${escapeHtml(category)}">
+      <input name="name" placeholder="Group name" required>
+      <input name="sortOrder" type="number" value="0" style="width: 60px;">
+      <button type="submit">Add</button>
+    </form>
+  </body></html>`);
+});
+
+app.post("/admin/groups", requireAdmin, async (req, res) => {
+  const category = req.body.category;
+  const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+  const sortOrder = Number(req.body.sortOrder) || 0;
+  if (!CATALOG_CATEGORIES.includes(category)) return res.status(400).send("Unknown category.");
+  if (!name) {
+    return res.redirect(303, `/admin/groups?category=${category}&error=` + encodeURIComponent("Group name can't be empty."));
+  }
+  try {
+    await createGroup({ category, name, sortOrder });
+  } catch (err) {
+    return res.redirect(
+      303,
+      `/admin/groups?category=${category}&error=` + encodeURIComponent(`A group named "${name}" already exists in this category.`)
+    );
+  }
+  res.redirect(303, `/admin/groups?category=${category}`);
+});
+
+app.post("/admin/groups/:id", requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+  const sortOrder = Number(req.body.sortOrder) || 0;
+  // Category isn't submitted from this form (it's not editable — see
+  // updateGroup's comment) — read it back from the row itself so we know
+  // which category's page to redirect to.
+  const existing = await getGroup(id);
+  const category = existing?.category ?? CATALOG_CATEGORIES[0];
+  if (!name) {
+    return res.redirect(303, `/admin/groups?category=${category}&error=` + encodeURIComponent("Group name can't be empty."));
+  }
+  await updateGroup({ id, name, sortOrder });
+  res.redirect(303, `/admin/groups?category=${category}`);
+});
+
+app.post("/admin/groups/:id/delete", requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  const existing = await getGroup(id);
+  const category = existing?.category ?? CATALOG_CATEGORIES[0];
+  await deleteGroup(id);
+  res.redirect(303, `/admin/groups?category=${category}`);
 });
 
 // Catches multer's file-size/type rejections (fileFilter's cb(new Error(...)))

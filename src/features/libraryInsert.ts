@@ -54,6 +54,20 @@ export interface CatalogItem {
   insertMode: "reconstruct" | "file";
   reconstructSpec: ReconstructSpec | null;
   thumbnailUrl: string | null;
+  groupId: number | null;
+  groupName: string | null;
+  tags: string[];
+}
+
+export interface CatalogGroup {
+  id: number;
+  name: string;
+  sortOrder: number;
+}
+
+export interface CatalogResponse {
+  groups: CatalogGroup[];
+  items: CatalogItem[];
 }
 
 export interface FileInsertHandle {
@@ -66,7 +80,12 @@ export function isLibraryInsertSupported(): boolean {
   return Office.context.requirements.isSetSupported("PowerPointApi", "1.2");
 }
 
-export async function fetchCatalog(category: string): Promise<CatalogItem[]> {
+/**
+ * Response is { groups, items }, not a bare item array (Phase 5) — the
+ * gallery dialog needs the category's admin-defined groups in their own
+ * order to render group headers correctly.
+ */
+export async function fetchCatalog(category: string): Promise<CatalogResponse> {
   const res = await fetch(`/api/catalog/${category}`);
   if (!res.ok) throw new Error(`Failed to load the "${category}" library (${res.status}).`);
   return res.json();

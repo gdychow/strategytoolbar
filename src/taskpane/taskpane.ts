@@ -135,7 +135,10 @@ function renderLibraryGrid(items: Library.CatalogItem[]): void {
 
 async function loadLibrary(): Promise<void> {
   const select = document.getElementById("librarySelect") as HTMLSelectElement | null;
-  const items = await Library.fetchCatalog(select?.value ?? "text");
+  // Temporary: this inline grid is being replaced by the gallery dialog
+  // (Phase 5) — minimal fix to keep it compiling/working against the new
+  // { groups, items } response shape in the meantime, not a real feature.
+  const { items } = await Library.fetchCatalog(select?.value ?? "text");
   renderLibraryGrid(items);
 }
 
