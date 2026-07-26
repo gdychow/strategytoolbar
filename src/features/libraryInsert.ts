@@ -286,16 +286,47 @@ export async function insertReconstructedItem(spec: ReconstructSpec): Promise<vo
 // presentation.getSelectedTextRangeOrNullObject() pattern already proven in
 // otherTweaks.ts's setBulletsVisible. Setting .text on a zero-length
 // selection (a bare cursor) inserts there; on a real selection it replaces
-// it — both match ordinary typing behaviour. The VBA original's other two
-// branches (a shape selected but not in text-edit mode; nothing selected at
-// all, which created a brand-new text box) are deliberately not ported —
-// they collapse into one clear error instead.
+// it — both match ordinary typing behaviour.
+//
+// With nothing selected at all, the VBA original's ppSelectionNone branch
+// dropped the character into its own small, centered text box rather than
+// erroring — ported here the same way (a shape-selected-but-not-in-text-
+// edit-mode branch also existed in VBA but isn't ported; that case still
+// falls through to the same text-box fallback rather than a dedicated
+// third path, since PowerPoint JS has no way to distinguish "a shape is
+// selected" from "nothing is selected" via getSelectedTextRangeOrNullObject
+// alone).
+async function insertUnicodeCharAsTextBox(context: PowerPoint.RequestContext, char: string): Promise<void> {
+  const slide = await getTargetSlide(context);
+  const pageSetup = context.presentation.pageSetup;
+  pageSetup.load("slideWidth,slideHeight");
+  await context.sync();
+
+  const width = 50;
+  const height = 50;
+  const shape = slide.shapes.addTextBox(char, {
+    left: (pageSetup.slideWidth - width) / 2,
+    top: (pageSetup.slideHeight - height) / 2,
+    width,
+    height,
+  });
+  shape.textFrame.wordWrap = false;
+  shape.textFrame.leftMargin = 0;
+  shape.textFrame.rightMargin = 0;
+  shape.textFrame.topMargin = 0;
+  shape.textFrame.bottomMargin = 0;
+  shape.textFrame.verticalAlignment = PowerPoint.TextVerticalAlignment.middleCentered;
+  shape.textFrame.textRange.font.size = 16;
+  await context.sync();
+}
+
 export async function insertUnicodeChar(char: string): Promise<void> {
   await PowerPoint.run(async (context) => {
     const textRange = context.presentation.getSelectedTextRangeOrNullObject();
     await context.sync();
     if (textRange.isNullObject) {
-      throw new Error("Place the cursor in some text, or select a text box, first.");
+      await insertUnicodeCharAsTextBox(context, char);
+      return;
     }
     textRange.text = char;
     await context.sync();
