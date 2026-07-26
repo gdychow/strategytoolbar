@@ -1,0 +1,1405 @@
+{
+  "category": "flags",
+  "items": [
+    {
+      "title": "Egypt",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-001.pptx",
+      "thumbnail": "flags/flags-001.png",
+      "sortOrder": 1
+    },
+    {
+      "title": "Algeria",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-002.pptx",
+      "thumbnail": "flags/flags-002.png",
+      "sortOrder": 2
+    },
+    {
+      "title": "Angola",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-003.pptx",
+      "thumbnail": "flags/flags-003.png",
+      "sortOrder": 3
+    },
+    {
+      "title": "Equatorial Guinea",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-004.pptx",
+      "thumbnail": "flags/flags-004.png",
+      "sortOrder": 4
+    },
+    {
+      "title": "Ethiopia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-005.pptx",
+      "thumbnail": "flags/flags-005.png",
+      "sortOrder": 5
+    },
+    {
+      "title": "Benin",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-006.pptx",
+      "thumbnail": "flags/flags-006.png",
+      "sortOrder": 6
+    },
+    {
+      "title": "Botswana",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-007.pptx",
+      "thumbnail": "flags/flags-007.png",
+      "sortOrder": 7
+    },
+    {
+      "title": "Burkina Faso",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-008.pptx",
+      "thumbnail": "flags/flags-008.png",
+      "sortOrder": 8
+    },
+    {
+      "title": "Burundi",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-009.pptx",
+      "thumbnail": "flags/flags-009.png",
+      "sortOrder": 9
+    },
+    {
+      "title": "Democratic Republic of the Congo",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-010.pptx",
+      "thumbnail": "flags/flags-010.png",
+      "sortOrder": 10
+    },
+    {
+      "title": "Djibouti",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-011.pptx",
+      "thumbnail": "flags/flags-011.png",
+      "sortOrder": 11
+    },
+    {
+      "title": "Cote d'Ivoire",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-012.pptx",
+      "thumbnail": "flags/flags-012.png",
+      "sortOrder": 12
+    },
+    {
+      "title": "Eritrea",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-013.pptx",
+      "thumbnail": "flags/flags-013.png",
+      "sortOrder": 13
+    },
+    {
+      "title": "Gabon",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-014.pptx",
+      "thumbnail": "flags/flags-014.png",
+      "sortOrder": 14
+    },
+    {
+      "title": "Gambia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-015.pptx",
+      "thumbnail": "flags/flags-015.png",
+      "sortOrder": 15
+    },
+    {
+      "title": "Ghana",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-016.pptx",
+      "thumbnail": "flags/flags-016.png",
+      "sortOrder": 16
+    },
+    {
+      "title": "Guinea",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-017.pptx",
+      "thumbnail": "flags/flags-017.png",
+      "sortOrder": 17
+    },
+    {
+      "title": "Guinea-Bissau",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-018.pptx",
+      "thumbnail": "flags/flags-018.png",
+      "sortOrder": 18
+    },
+    {
+      "title": "Cameroon",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-019.pptx",
+      "thumbnail": "flags/flags-019.png",
+      "sortOrder": 19
+    },
+    {
+      "title": "Cape Verde",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-020.pptx",
+      "thumbnail": "flags/flags-020.png",
+      "sortOrder": 20
+    },
+    {
+      "title": "Kenya",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-021.pptx",
+      "thumbnail": "flags/flags-021.png",
+      "sortOrder": 21
+    },
+    {
+      "title": "The Comoros",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-022.pptx",
+      "thumbnail": "flags/flags-022.png",
+      "sortOrder": 22
+    },
+    {
+      "title": "Lesotho",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-023.pptx",
+      "thumbnail": "flags/flags-023.png",
+      "sortOrder": 23
+    },
+    {
+      "title": "Liberia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-024.pptx",
+      "thumbnail": "flags/flags-024.png",
+      "sortOrder": 24
+    },
+    {
+      "title": "Libya",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-025.pptx",
+      "thumbnail": "flags/flags-025.png",
+      "sortOrder": 25
+    },
+    {
+      "title": "Madagascar",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-026.pptx",
+      "thumbnail": "flags/flags-026.png",
+      "sortOrder": 26
+    },
+    {
+      "title": "Malawi",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-027.pptx",
+      "thumbnail": "flags/flags-027.png",
+      "sortOrder": 27
+    },
+    {
+      "title": "Mali",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-028.pptx",
+      "thumbnail": "flags/flags-028.png",
+      "sortOrder": 28
+    },
+    {
+      "title": "Morocco",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-029.pptx",
+      "thumbnail": "flags/flags-029.png",
+      "sortOrder": 29
+    },
+    {
+      "title": "Mauritania",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-030.pptx",
+      "thumbnail": "flags/flags-030.png",
+      "sortOrder": 30
+    },
+    {
+      "title": "Mauritius",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-031.pptx",
+      "thumbnail": "flags/flags-031.png",
+      "sortOrder": 31
+    },
+    {
+      "title": "Mozambique",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-032.pptx",
+      "thumbnail": "flags/flags-032.png",
+      "sortOrder": 32
+    },
+    {
+      "title": "Namibia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-033.pptx",
+      "thumbnail": "flags/flags-033.png",
+      "sortOrder": 33
+    },
+    {
+      "title": "Niger",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-034.pptx",
+      "thumbnail": "flags/flags-034.png",
+      "sortOrder": 34
+    },
+    {
+      "title": "Nigeria",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-035.pptx",
+      "thumbnail": "flags/flags-035.png",
+      "sortOrder": 35
+    },
+    {
+      "title": "Republic of the Congo",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-036.pptx",
+      "thumbnail": "flags/flags-036.png",
+      "sortOrder": 36
+    },
+    {
+      "title": "Rwanda",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-037.pptx",
+      "thumbnail": "flags/flags-037.png",
+      "sortOrder": 37
+    },
+    {
+      "title": "Zambia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-038.pptx",
+      "thumbnail": "flags/flags-038.png",
+      "sortOrder": 38
+    },
+    {
+      "title": "Sao Tome and Principe",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-039.pptx",
+      "thumbnail": "flags/flags-039.png",
+      "sortOrder": 39
+    },
+    {
+      "title": "Senegal",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-040.pptx",
+      "thumbnail": "flags/flags-040.png",
+      "sortOrder": 40
+    },
+    {
+      "title": "The Seychelles",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-041.pptx",
+      "thumbnail": "flags/flags-041.png",
+      "sortOrder": 41
+    },
+    {
+      "title": "Sierra Leone",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-042.pptx",
+      "thumbnail": "flags/flags-042.png",
+      "sortOrder": 42
+    },
+    {
+      "title": "Zimbabwe",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-043.pptx",
+      "thumbnail": "flags/flags-043.png",
+      "sortOrder": 43
+    },
+    {
+      "title": "Somalia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-044.pptx",
+      "thumbnail": "flags/flags-044.png",
+      "sortOrder": 44
+    },
+    {
+      "title": "South Africa",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-045.pptx",
+      "thumbnail": "flags/flags-045.png",
+      "sortOrder": 45
+    },
+    {
+      "title": "Tanzania",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-046.pptx",
+      "thumbnail": "flags/flags-046.png",
+      "sortOrder": 46
+    },
+    {
+      "title": "Togo",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-047.pptx",
+      "thumbnail": "flags/flags-047.png",
+      "sortOrder": 47
+    },
+    {
+      "title": "Chad",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-048.pptx",
+      "thumbnail": "flags/flags-048.png",
+      "sortOrder": 48
+    },
+    {
+      "title": "Tunisia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-049.pptx",
+      "thumbnail": "flags/flags-049.png",
+      "sortOrder": 49
+    },
+    {
+      "title": "Uganda",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-050.pptx",
+      "thumbnail": "flags/flags-050.png",
+      "sortOrder": 50
+    },
+    {
+      "title": "Central African Republic",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-051.pptx",
+      "thumbnail": "flags/flags-051.png",
+      "sortOrder": 51
+    },
+    {
+      "title": "Sudan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-052.pptx",
+      "thumbnail": "flags/flags-052.png",
+      "sortOrder": 52
+    },
+    {
+      "title": "Swaziland",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-053.pptx",
+      "thumbnail": "flags/flags-053.png",
+      "sortOrder": 53
+    },
+    {
+      "title": "African Union",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-054.pptx",
+      "thumbnail": "flags/flags-054.png",
+      "sortOrder": 54
+    },
+    {
+      "title": "Afghanistan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-055.pptx",
+      "thumbnail": "flags/flags-055.png",
+      "sortOrder": 55
+    },
+    {
+      "title": "Armenia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-056.pptx",
+      "thumbnail": "flags/flags-056.png",
+      "sortOrder": 56
+    },
+    {
+      "title": "Azerbaijan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-057.pptx",
+      "thumbnail": "flags/flags-057.png",
+      "sortOrder": 57
+    },
+    {
+      "title": "Bahrain",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-058.pptx",
+      "thumbnail": "flags/flags-058.png",
+      "sortOrder": 58
+    },
+    {
+      "title": "Bangladesh",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-059.pptx",
+      "thumbnail": "flags/flags-059.png",
+      "sortOrder": 59
+    },
+    {
+      "title": "Bhutan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-060.pptx",
+      "thumbnail": "flags/flags-060.png",
+      "sortOrder": 60
+    },
+    {
+      "title": "Brunei",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-061.pptx",
+      "thumbnail": "flags/flags-061.png",
+      "sortOrder": 61
+    },
+    {
+      "title": "China",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-062.pptx",
+      "thumbnail": "flags/flags-062.png",
+      "sortOrder": 62
+    },
+    {
+      "title": "Georgian Republic",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-063.pptx",
+      "thumbnail": "flags/flags-063.png",
+      "sortOrder": 63
+    },
+    {
+      "title": "India",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-064.pptx",
+      "thumbnail": "flags/flags-064.png",
+      "sortOrder": 64
+    },
+    {
+      "title": "HK SAR",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-065.pptx",
+      "thumbnail": "flags/flags-065.png",
+      "sortOrder": 65
+    },
+    {
+      "title": "Indonesia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-066.pptx",
+      "thumbnail": "flags/flags-066.png",
+      "sortOrder": 66
+    },
+    {
+      "title": "Iraq",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-067.pptx",
+      "thumbnail": "flags/flags-067.png",
+      "sortOrder": 67
+    },
+    {
+      "title": "Iran",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-068.pptx",
+      "thumbnail": "flags/flags-068.png",
+      "sortOrder": 68
+    },
+    {
+      "title": "Israel",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-069.pptx",
+      "thumbnail": "flags/flags-069.png",
+      "sortOrder": 69
+    },
+    {
+      "title": "Jordan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-070.pptx",
+      "thumbnail": "flags/flags-070.png",
+      "sortOrder": 70
+    },
+    {
+      "title": "Cambodia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-071.pptx",
+      "thumbnail": "flags/flags-071.png",
+      "sortOrder": 71
+    },
+    {
+      "title": "Kazakhstan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-072.pptx",
+      "thumbnail": "flags/flags-072.png",
+      "sortOrder": 72
+    },
+    {
+      "title": "Qatar",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-073.pptx",
+      "thumbnail": "flags/flags-073.png",
+      "sortOrder": 73
+    },
+    {
+      "title": "Kyrgyzstan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-074.pptx",
+      "thumbnail": "flags/flags-074.png",
+      "sortOrder": 74
+    },
+    {
+      "title": "Kuwait",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-075.pptx",
+      "thumbnail": "flags/flags-075.png",
+      "sortOrder": 75
+    },
+    {
+      "title": "Laos",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-076.pptx",
+      "thumbnail": "flags/flags-076.png",
+      "sortOrder": 76
+    },
+    {
+      "title": "Lebanon",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-077.pptx",
+      "thumbnail": "flags/flags-077.png",
+      "sortOrder": 77
+    },
+    {
+      "title": "Malaysia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-078.pptx",
+      "thumbnail": "flags/flags-078.png",
+      "sortOrder": 78
+    },
+    {
+      "title": "Maledives",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-079.pptx",
+      "thumbnail": "flags/flags-079.png",
+      "sortOrder": 79
+    },
+    {
+      "title": "Mongolia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-080.pptx",
+      "thumbnail": "flags/flags-080.png",
+      "sortOrder": 80
+    },
+    {
+      "title": "Myanmar",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-081.pptx",
+      "thumbnail": "flags/flags-081.png",
+      "sortOrder": 81
+    },
+    {
+      "title": "Nepal",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-082.pptx",
+      "thumbnail": "flags/flags-082.png",
+      "sortOrder": 82
+    },
+    {
+      "title": "North Korea",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-083.pptx",
+      "thumbnail": "flags/flags-083.png",
+      "sortOrder": 83
+    },
+    {
+      "title": "Japan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-084.pptx",
+      "thumbnail": "flags/flags-084.png",
+      "sortOrder": 84
+    },
+    {
+      "title": "Oman",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-085.pptx",
+      "thumbnail": "flags/flags-085.png",
+      "sortOrder": 85
+    },
+    {
+      "title": "Pakistan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-086.pptx",
+      "thumbnail": "flags/flags-086.png",
+      "sortOrder": 86
+    },
+    {
+      "title": "Philippines",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-087.pptx",
+      "thumbnail": "flags/flags-087.png",
+      "sortOrder": 87
+    },
+    {
+      "title": "Russia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-088.pptx",
+      "thumbnail": "flags/flags-088.png",
+      "sortOrder": 88
+    },
+    {
+      "title": "Saudi Arabia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-089.pptx",
+      "thumbnail": "flags/flags-089.png",
+      "sortOrder": 89
+    },
+    {
+      "title": "Singapore",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-090.pptx",
+      "thumbnail": "flags/flags-090.png",
+      "sortOrder": 90
+    },
+    {
+      "title": "Sri Lanka",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-091.pptx",
+      "thumbnail": "flags/flags-091.png",
+      "sortOrder": 91
+    },
+    {
+      "title": "South Korea",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-092.pptx",
+      "thumbnail": "flags/flags-092.png",
+      "sortOrder": 92
+    },
+    {
+      "title": "Syria",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-093.pptx",
+      "thumbnail": "flags/flags-093.png",
+      "sortOrder": 93
+    },
+    {
+      "title": "Tadzhikistan\nTajikistan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-094.pptx",
+      "thumbnail": "flags/flags-094.png",
+      "sortOrder": 94
+    },
+    {
+      "title": "Taiwan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-095.pptx",
+      "thumbnail": "flags/flags-095.png",
+      "sortOrder": 95
+    },
+    {
+      "title": "Thailand",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-096.pptx",
+      "thumbnail": "flags/flags-096.png",
+      "sortOrder": 96
+    },
+    {
+      "title": "Timor-Leste",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-097.pptx",
+      "thumbnail": "flags/flags-097.png",
+      "sortOrder": 97
+    },
+    {
+      "title": "Turkey",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-098.pptx",
+      "thumbnail": "flags/flags-098.png",
+      "sortOrder": 98
+    },
+    {
+      "title": "Turkmenistan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-099.pptx",
+      "thumbnail": "flags/flags-099.png",
+      "sortOrder": 99
+    },
+    {
+      "title": "Uzbekistan",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-100.pptx",
+      "thumbnail": "flags/flags-100.png",
+      "sortOrder": 100
+    },
+    {
+      "title": "United Arab Emirates",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-101.pptx",
+      "thumbnail": "flags/flags-101.png",
+      "sortOrder": 101
+    },
+    {
+      "title": "Vietnam\nViet Nam",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-102.pptx",
+      "thumbnail": "flags/flags-102.png",
+      "sortOrder": 102
+    },
+    {
+      "title": "Yemen",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-103.pptx",
+      "thumbnail": "flags/flags-103.png",
+      "sortOrder": 103
+    },
+    {
+      "title": "Australia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-104.pptx",
+      "thumbnail": "flags/flags-104.png",
+      "sortOrder": 104
+    },
+    {
+      "title": "Fiji",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-105.pptx",
+      "thumbnail": "flags/flags-105.png",
+      "sortOrder": 105
+    },
+    {
+      "title": "Kiribati",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-106.pptx",
+      "thumbnail": "flags/flags-106.png",
+      "sortOrder": 106
+    },
+    {
+      "title": "Marshall Islands",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-107.pptx",
+      "thumbnail": "flags/flags-107.png",
+      "sortOrder": 107
+    },
+    {
+      "title": "Micronesia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-108.pptx",
+      "thumbnail": "flags/flags-108.png",
+      "sortOrder": 108
+    },
+    {
+      "title": "Nauru",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-109.pptx",
+      "thumbnail": "flags/flags-109.png",
+      "sortOrder": 109
+    },
+    {
+      "title": "New Zealand",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-110.pptx",
+      "thumbnail": "flags/flags-110.png",
+      "sortOrder": 110
+    },
+    {
+      "title": "Palau",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-111.pptx",
+      "thumbnail": "flags/flags-111.png",
+      "sortOrder": 111
+    },
+    {
+      "title": "Papua New Guinea",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-112.pptx",
+      "thumbnail": "flags/flags-112.png",
+      "sortOrder": 112
+    },
+    {
+      "title": "Solomon Islands",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-113.pptx",
+      "thumbnail": "flags/flags-113.png",
+      "sortOrder": 113
+    },
+    {
+      "title": "Samoa",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-114.pptx",
+      "thumbnail": "flags/flags-114.png",
+      "sortOrder": 114
+    },
+    {
+      "title": "Tonga",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-115.pptx",
+      "thumbnail": "flags/flags-115.png",
+      "sortOrder": 115
+    },
+    {
+      "title": "Tuvalu",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-116.pptx",
+      "thumbnail": "flags/flags-116.png",
+      "sortOrder": 116
+    },
+    {
+      "title": "Vanuatu",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-117.pptx",
+      "thumbnail": "flags/flags-117.png",
+      "sortOrder": 117
+    },
+    {
+      "title": "Albania",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-118.pptx",
+      "thumbnail": "flags/flags-118.png",
+      "sortOrder": 118
+    },
+    {
+      "title": "Andorra",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-119.pptx",
+      "thumbnail": "flags/flags-119.png",
+      "sortOrder": 119
+    },
+    {
+      "title": "Belgium",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-120.pptx",
+      "thumbnail": "flags/flags-120.png",
+      "sortOrder": 120
+    },
+    {
+      "title": "Bosnia-Herzegovina",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-121.pptx",
+      "thumbnail": "flags/flags-121.png",
+      "sortOrder": 121
+    },
+    {
+      "title": "Bulgaria",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-122.pptx",
+      "thumbnail": "flags/flags-122.png",
+      "sortOrder": 122
+    },
+    {
+      "title": "Denmark",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-123.pptx",
+      "thumbnail": "flags/flags-123.png",
+      "sortOrder": 123
+    },
+    {
+      "title": "Germany",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-124.pptx",
+      "thumbnail": "flags/flags-124.png",
+      "sortOrder": 124
+    },
+    {
+      "title": "Estonia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-125.pptx",
+      "thumbnail": "flags/flags-125.png",
+      "sortOrder": 125
+    },
+    {
+      "title": "Finland",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-126.pptx",
+      "thumbnail": "flags/flags-126.png",
+      "sortOrder": 126
+    },
+    {
+      "title": "France",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-127.pptx",
+      "thumbnail": "flags/flags-127.png",
+      "sortOrder": 127
+    },
+    {
+      "title": "Greece",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-128.pptx",
+      "thumbnail": "flags/flags-128.png",
+      "sortOrder": 128
+    },
+    {
+      "title": "Great Britain",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-129.pptx",
+      "thumbnail": "flags/flags-129.png",
+      "sortOrder": 129
+    },
+    {
+      "title": "Ireland",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-130.pptx",
+      "thumbnail": "flags/flags-130.png",
+      "sortOrder": 130
+    },
+    {
+      "title": "Iceland",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-131.pptx",
+      "thumbnail": "flags/flags-131.png",
+      "sortOrder": 131
+    },
+    {
+      "title": "Italy",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-132.pptx",
+      "thumbnail": "flags/flags-132.png",
+      "sortOrder": 132
+    },
+    {
+      "title": "Croatia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-133.pptx",
+      "thumbnail": "flags/flags-133.png",
+      "sortOrder": 133
+    },
+    {
+      "title": "Latvia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-134.pptx",
+      "thumbnail": "flags/flags-134.png",
+      "sortOrder": 134
+    },
+    {
+      "title": "Liechtenstein",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-135.pptx",
+      "thumbnail": "flags/flags-135.png",
+      "sortOrder": 135
+    },
+    {
+      "title": "Lithuania",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-136.pptx",
+      "thumbnail": "flags/flags-136.png",
+      "sortOrder": 136
+    },
+    {
+      "title": "Luxembourg",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-137.pptx",
+      "thumbnail": "flags/flags-137.png",
+      "sortOrder": 137
+    },
+    {
+      "title": "Malta",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-138.pptx",
+      "thumbnail": "flags/flags-138.png",
+      "sortOrder": 138
+    },
+    {
+      "title": "Macedonia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-139.pptx",
+      "thumbnail": "flags/flags-139.png",
+      "sortOrder": 139
+    },
+    {
+      "title": "Moldova",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-140.pptx",
+      "thumbnail": "flags/flags-140.png",
+      "sortOrder": 140
+    },
+    {
+      "title": "Monaco",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-141.pptx",
+      "thumbnail": "flags/flags-141.png",
+      "sortOrder": 141
+    },
+    {
+      "title": "Norway",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-142.pptx",
+      "thumbnail": "flags/flags-142.png",
+      "sortOrder": 142
+    },
+    {
+      "title": "Austria",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-143.pptx",
+      "thumbnail": "flags/flags-143.png",
+      "sortOrder": 143
+    },
+    {
+      "title": "Poland",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-144.pptx",
+      "thumbnail": "flags/flags-144.png",
+      "sortOrder": 144
+    },
+    {
+      "title": "The Netherlands",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-145.pptx",
+      "thumbnail": "flags/flags-145.png",
+      "sortOrder": 145
+    },
+    {
+      "title": "Montenegro",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-146.pptx",
+      "thumbnail": "flags/flags-146.png",
+      "sortOrder": 146
+    },
+    {
+      "title": "Northern Ireland",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-147.pptx",
+      "thumbnail": "flags/flags-147.png",
+      "sortOrder": 147
+    },
+    {
+      "title": "Russia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-148.pptx",
+      "thumbnail": "flags/flags-148.png",
+      "sortOrder": 148
+    },
+    {
+      "title": "San Marino",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-149.pptx",
+      "thumbnail": "flags/flags-149.png",
+      "sortOrder": 149
+    },
+    {
+      "title": "Sweden",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-150.pptx",
+      "thumbnail": "flags/flags-150.png",
+      "sortOrder": 150
+    },
+    {
+      "title": "Switzerland",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-151.pptx",
+      "thumbnail": "flags/flags-151.png",
+      "sortOrder": 151
+    },
+    {
+      "title": "Slovakia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-152.pptx",
+      "thumbnail": "flags/flags-152.png",
+      "sortOrder": 152
+    },
+    {
+      "title": "Slovenia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-153.pptx",
+      "thumbnail": "flags/flags-153.png",
+      "sortOrder": 153
+    },
+    {
+      "title": "Spain",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-154.pptx",
+      "thumbnail": "flags/flags-154.png",
+      "sortOrder": 154
+    },
+    {
+      "title": "Czech Republic",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-155.pptx",
+      "thumbnail": "flags/flags-155.png",
+      "sortOrder": 155
+    },
+    {
+      "title": "Turkey",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-156.pptx",
+      "thumbnail": "flags/flags-156.png",
+      "sortOrder": 156
+    },
+    {
+      "title": "Ukraine",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-157.pptx",
+      "thumbnail": "flags/flags-157.png",
+      "sortOrder": 157
+    },
+    {
+      "title": "Hungary",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-158.pptx",
+      "thumbnail": "flags/flags-158.png",
+      "sortOrder": 158
+    },
+    {
+      "title": "Vatican City",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-159.pptx",
+      "thumbnail": "flags/flags-159.png",
+      "sortOrder": 159
+    },
+    {
+      "title": "Romania",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-160.pptx",
+      "thumbnail": "flags/flags-160.png",
+      "sortOrder": 160
+    },
+    {
+      "title": "Serbia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-161.pptx",
+      "thumbnail": "flags/flags-161.png",
+      "sortOrder": 161
+    },
+    {
+      "title": "Portugal",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-162.pptx",
+      "thumbnail": "flags/flags-162.png",
+      "sortOrder": 162
+    },
+    {
+      "title": "European Union",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-163.pptx",
+      "thumbnail": "flags/flags-163.png",
+      "sortOrder": 163
+    },
+    {
+      "title": "Cyprus",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-164.pptx",
+      "thumbnail": "flags/flags-164.png",
+      "sortOrder": 164
+    },
+    {
+      "title": "Belarus",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-165.pptx",
+      "thumbnail": "flags/flags-165.png",
+      "sortOrder": 165
+    },
+    {
+      "title": "Bahamas",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-166.pptx",
+      "thumbnail": "flags/flags-166.png",
+      "sortOrder": 166
+    },
+    {
+      "title": "Antigua & Barbuda",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-167.pptx",
+      "thumbnail": "flags/flags-167.png",
+      "sortOrder": 167
+    },
+    {
+      "title": "Barbados",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-168.pptx",
+      "thumbnail": "flags/flags-168.png",
+      "sortOrder": 168
+    },
+    {
+      "title": "Belize",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-169.pptx",
+      "thumbnail": "flags/flags-169.png",
+      "sortOrder": 169
+    },
+    {
+      "title": "Cuba",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-170.pptx",
+      "thumbnail": "flags/flags-170.png",
+      "sortOrder": 170
+    },
+    {
+      "title": "Costa Rica",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-171.pptx",
+      "thumbnail": "flags/flags-171.png",
+      "sortOrder": 171
+    },
+    {
+      "title": "Grenada",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-172.pptx",
+      "thumbnail": "flags/flags-172.png",
+      "sortOrder": 172
+    },
+    {
+      "title": "Guatemala",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-173.pptx",
+      "thumbnail": "flags/flags-173.png",
+      "sortOrder": 173
+    },
+    {
+      "title": "Haiti",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-174.pptx",
+      "thumbnail": "flags/flags-174.png",
+      "sortOrder": 174
+    },
+    {
+      "title": "Honduras",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-175.pptx",
+      "thumbnail": "flags/flags-175.png",
+      "sortOrder": 175
+    },
+    {
+      "title": "Gutemala",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-176.pptx",
+      "thumbnail": "flags/flags-176.png",
+      "sortOrder": 176
+    },
+    {
+      "title": "Jamaica",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-177.pptx",
+      "thumbnail": "flags/flags-177.png",
+      "sortOrder": 177
+    },
+    {
+      "title": "Canada",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-178.pptx",
+      "thumbnail": "flags/flags-178.png",
+      "sortOrder": 178
+    },
+    {
+      "title": "Dominican Republic",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-179.pptx",
+      "thumbnail": "flags/flags-179.png",
+      "sortOrder": 179
+    },
+    {
+      "title": "Dominica",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-180.pptx",
+      "thumbnail": "flags/flags-180.png",
+      "sortOrder": 180
+    },
+    {
+      "title": "Mexico",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-181.pptx",
+      "thumbnail": "flags/flags-181.png",
+      "sortOrder": 181
+    },
+    {
+      "title": "Nicaragua",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-182.pptx",
+      "thumbnail": "flags/flags-182.png",
+      "sortOrder": 182
+    },
+    {
+      "title": "Panama",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-183.pptx",
+      "thumbnail": "flags/flags-183.png",
+      "sortOrder": 183
+    },
+    {
+      "title": "St. Kitts & Nevis",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-184.pptx",
+      "thumbnail": "flags/flags-184.png",
+      "sortOrder": 184
+    },
+    {
+      "title": "St. Lucia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-185.pptx",
+      "thumbnail": "flags/flags-185.png",
+      "sortOrder": 185
+    },
+    {
+      "title": "Trinidad & Tobago",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-186.pptx",
+      "thumbnail": "flags/flags-186.png",
+      "sortOrder": 186
+    },
+    {
+      "title": "USA",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-187.pptx",
+      "thumbnail": "flags/flags-187.png",
+      "sortOrder": 187
+    },
+    {
+      "title": "Saint Vincent and the Grenadines",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-188.pptx",
+      "thumbnail": "flags/flags-188.png",
+      "sortOrder": 188
+    },
+    {
+      "title": "Argentina",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-189.pptx",
+      "thumbnail": "flags/flags-189.png",
+      "sortOrder": 189
+    },
+    {
+      "title": "Bolivia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-190.pptx",
+      "thumbnail": "flags/flags-190.png",
+      "sortOrder": 190
+    },
+    {
+      "title": "Brazil",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-191.pptx",
+      "thumbnail": "flags/flags-191.png",
+      "sortOrder": 191
+    },
+    {
+      "title": "Chile",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-192.pptx",
+      "thumbnail": "flags/flags-192.png",
+      "sortOrder": 192
+    },
+    {
+      "title": "Ecuador",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-193.pptx",
+      "thumbnail": "flags/flags-193.png",
+      "sortOrder": 193
+    },
+    {
+      "title": "Guyana",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-194.pptx",
+      "thumbnail": "flags/flags-194.png",
+      "sortOrder": 194
+    },
+    {
+      "title": "Colombia",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-195.pptx",
+      "thumbnail": "flags/flags-195.png",
+      "sortOrder": 195
+    },
+    {
+      "title": "Paraguay",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-196.pptx",
+      "thumbnail": "flags/flags-196.png",
+      "sortOrder": 196
+    },
+    {
+      "title": "Peru",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-197.pptx",
+      "thumbnail": "flags/flags-197.png",
+      "sortOrder": 197
+    },
+    {
+      "title": "Suriname",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-198.pptx",
+      "thumbnail": "flags/flags-198.png",
+      "sortOrder": 198
+    },
+    {
+      "title": "Uruguay",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-199.pptx",
+      "thumbnail": "flags/flags-199.png",
+      "sortOrder": 199
+    },
+    {
+      "title": "Venezuela",
+      "insertMode": "file",
+      "sourceFile": "flags/flags-200.pptx",
+      "thumbnail": "flags/flags-200.png",
+      "sortOrder": 200
+    }
+  ]
+}

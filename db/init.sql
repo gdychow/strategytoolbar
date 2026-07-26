@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS catalog_items (
   owner_oid TEXT,
   owner_tid TEXT,
   category TEXT NOT NULL CHECK (
-    category IN ('text', 'objects', 'shapes', 'stamps', 'tables', 'symbols', 'diagrams')
+    category IN ('text', 'objects', 'shapes', 'stamps', 'tables', 'symbols', 'diagrams', 'maps', 'clipart', 'frameworks', 'flags')
   ),
   title TEXT NOT NULL,
   insert_mode TEXT NOT NULL CHECK (insert_mode IN ('reconstruct', 'file', 'unicode-char')),
@@ -64,7 +64,7 @@ CREATE INDEX IF NOT EXISTS idx_catalog_items_category_shared
 CREATE TABLE IF NOT EXISTS catalog_groups (
   id SERIAL PRIMARY KEY,
   category TEXT NOT NULL CHECK (
-    category IN ('text', 'objects', 'shapes', 'stamps', 'tables', 'symbols', 'diagrams')
+    category IN ('text', 'objects', 'shapes', 'stamps', 'tables', 'symbols', 'diagrams', 'maps', 'clipart', 'frameworks', 'flags')
   ),
   name TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,

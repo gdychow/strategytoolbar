@@ -1,0 +1,943 @@
+{
+  "category": "frameworks",
+  "items": [
+    {
+      "title": "Frameworks",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-001.pptx",
+      "thumbnail": "frameworks/frameworks-001.png",
+      "sortOrder": 1
+    },
+    {
+      "title": "Contents",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-002.pptx",
+      "thumbnail": "frameworks/frameworks-002.png",
+      "sortOrder": 2
+    },
+    {
+      "title": "Contents",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-003.pptx",
+      "thumbnail": "frameworks/frameworks-003.png",
+      "sortOrder": 3
+    },
+    {
+      "title": "Black box \u2013 a simple way to start defining the situation",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-004.pptx",
+      "thumbnail": "frameworks/frameworks-004.png",
+      "sortOrder": 4
+    },
+    {
+      "title": "IS \u2013 IS NOT tool is a simple way to get people to start talking",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-005.pptx",
+      "thumbnail": "frameworks/frameworks-005.png",
+      "sortOrder": 5
+    },
+    {
+      "title": "Hypothesis driven approach (HDA) technique support structuring a problem to prevent \u201cboiling the ocean\u201d",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-006.pptx",
+      "thumbnail": "frameworks/frameworks-006.png",
+      "sortOrder": 6
+    },
+    {
+      "title": "The stakeholder map is a source for many other tools and activities",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-007.pptx",
+      "thumbnail": "frameworks/frameworks-007.png",
+      "sortOrder": 7
+    },
+    {
+      "title": "The Silo depicts the isolated islands of your organisation landscape of your client",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-008.pptx",
+      "thumbnail": "frameworks/frameworks-008.png",
+      "sortOrder": 8
+    },
+    {
+      "title": "5 W \u2013 a question and information gathering technique that helps you to get to the bottom of things",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-009.pptx",
+      "thumbnail": "frameworks/frameworks-009.png",
+      "sortOrder": 9
+    },
+    {
+      "title": "Brain storming \u2013 card storming \u2013 6-3-5",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-010.pptx",
+      "thumbnail": "frameworks/frameworks-010.png",
+      "sortOrder": 10
+    },
+    {
+      "title": "Like Merlin the magician, use this tool to think the unthinkable \u2013 in any direction",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-011.pptx",
+      "thumbnail": "frameworks/frameworks-011.png",
+      "sortOrder": 11
+    },
+    {
+      "title": "The conceptual modelling tool allows you to innovate and conceptually create solutions",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-012.pptx",
+      "thumbnail": "frameworks/frameworks-012.png",
+      "sortOrder": 12
+    },
+    {
+      "title": "How to evaluate the resulting ideas \u2013 this is a rather a checklist. Keep it for when you need it.",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-013.pptx",
+      "thumbnail": "frameworks/frameworks-013.png",
+      "sortOrder": 13
+    },
+    {
+      "title": "DeBono\u2019s 6 hats are not only a great creativity tool, but can also be used for project team evaluations",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-014.pptx",
+      "thumbnail": "frameworks/frameworks-014.png",
+      "sortOrder": 14
+    },
+    {
+      "title": "Affinity \u2013 how to group ideas and information",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-015.pptx",
+      "thumbnail": "frameworks/frameworks-015.png",
+      "sortOrder": 15
+    },
+    {
+      "title": "Goal catalogue",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-016.pptx",
+      "thumbnail": "frameworks/frameworks-016.png",
+      "sortOrder": 16
+    },
+    {
+      "title": "Defined outcomes \u2013 an powerful (and unorthodox) way to define goals",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-017.pptx",
+      "thumbnail": "frameworks/frameworks-017.png",
+      "sortOrder": 17
+    },
+    {
+      "title": "The Goal hierarchy is not just only powerful to solve a case study, but also to challenge goal-related assumptions",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-018.pptx",
+      "thumbnail": "frameworks/frameworks-018.png",
+      "sortOrder": 18
+    },
+    {
+      "title": "As all aspects are co-dependent and inter-related, you should not investigate, analyse or change them in isolation",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-019.pptx",
+      "thumbnail": "frameworks/frameworks-019.png",
+      "sortOrder": 19
+    },
+    {
+      "title": "The PEST framework is a useful tool for performing macro-environmental analysis",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-020.pptx",
+      "thumbnail": "frameworks/frameworks-020.png",
+      "sortOrder": 20
+    },
+    {
+      "title": "Porter\u2019s Five Forces is used to determine an industry\u2019s attractiveness and its long term profitability potential (1/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-021.pptx",
+      "thumbnail": "frameworks/frameworks-021.png",
+      "sortOrder": 21
+    },
+    {
+      "title": "Porter\u2019s Five Forces is used to determine an industry\u2019s attractiveness and its long term profitability potential (2/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-022.pptx",
+      "thumbnail": "frameworks/frameworks-022.png",
+      "sortOrder": 22
+    },
+    {
+      "title": "Porter\u2019s Generic Strategies framework determines the position of a firm in its respective industry",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-023.pptx",
+      "thumbnail": "frameworks/frameworks-023.png",
+      "sortOrder": 23
+    },
+    {
+      "title": "Growth Share Matrix is a widely used product portfolio tool (1/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-024.pptx",
+      "thumbnail": "frameworks/frameworks-024.png",
+      "sortOrder": 24
+    },
+    {
+      "title": "Growth Share Matrix is a widely used product portfolio tool (2/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-025.pptx",
+      "thumbnail": "frameworks/frameworks-025.png",
+      "sortOrder": 25
+    },
+    {
+      "title": "The SWOT Analysis is an integral part of any strategic planning process",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-026.pptx",
+      "thumbnail": "frameworks/frameworks-026.png",
+      "sortOrder": 26
+    },
+    {
+      "title": "Practical Application of the SWOT Analysis (TOWS)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-027.pptx",
+      "thumbnail": "frameworks/frameworks-027.png",
+      "sortOrder": 27
+    },
+    {
+      "title": "SWOT/TOWS: Typical questions to ask",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-028.pptx",
+      "thumbnail": "frameworks/frameworks-028.png",
+      "sortOrder": 28
+    },
+    {
+      "title": "TOWS is very useful in developing alternative strategies",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-029.pptx",
+      "thumbnail": "frameworks/frameworks-029.png",
+      "sortOrder": 29
+    },
+    {
+      "title": "You develop the actual, final strategic option in the fourth step",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-030.pptx",
+      "thumbnail": "frameworks/frameworks-030.png",
+      "sortOrder": 30
+    },
+    {
+      "title": "Vision and mission statements set the tone for the company strategic plan",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-031.pptx",
+      "thumbnail": "frameworks/frameworks-031.png",
+      "sortOrder": 31
+    },
+    {
+      "title": "A vision statement needs to be aspiring and believable while at the same time appropriate to guide long-term decision-making",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-032.pptx",
+      "thumbnail": "frameworks/frameworks-032.png",
+      "sortOrder": 32
+    },
+    {
+      "title": "A mission statement describes the organization\u2019s direction and should be consistent with its values, goals, and objectives",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-033.pptx",
+      "thumbnail": "frameworks/frameworks-033.png",
+      "sortOrder": 33
+    },
+    {
+      "title": "Strategic Planning follows a structured process starting with the analysis of the external and internal environments (1/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-034.pptx",
+      "thumbnail": "frameworks/frameworks-034.png",
+      "sortOrder": 34
+    },
+    {
+      "title": "Strategic Planning follows a structured process starting with the analysis of the external and internal environments (2/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-035.pptx",
+      "thumbnail": "frameworks/frameworks-035.png",
+      "sortOrder": 35
+    },
+    {
+      "title": "Mergers and Acquisitions are pursued by firms driven by a variety of reasons",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-036.pptx",
+      "thumbnail": "frameworks/frameworks-036.png",
+      "sortOrder": 36
+    },
+    {
+      "title": "Strategic framework: Pricing strategy based on market lifecycle",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-037.pptx",
+      "thumbnail": "frameworks/frameworks-037.png",
+      "sortOrder": 37
+    },
+    {
+      "title": "2x2 and 3x3 Matrices are the most common frameworks used in strategy consulting (1/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-038.pptx",
+      "thumbnail": "frameworks/frameworks-038.png",
+      "sortOrder": 38
+    },
+    {
+      "title": "2x2 and 3x3 Matrices are the most common frameworks used in strategy consulting (2/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-039.pptx",
+      "thumbnail": "frameworks/frameworks-039.png",
+      "sortOrder": 39
+    },
+    {
+      "title": "Business matrix \u2013 the \u2018famous\u2019 ones, but with alternative axis can give you a new perspective and insight",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-040.pptx",
+      "thumbnail": "frameworks/frameworks-040.png",
+      "sortOrder": 40
+    },
+    {
+      "title": "Product/market mix with a powerful refinement",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-041.pptx",
+      "thumbnail": "frameworks/frameworks-041.png",
+      "sortOrder": 41
+    },
+    {
+      "title": "The below strategy measures and strategy types are the \u2018lego blocks\u2019 for your strategy \u2013 now combine both to develop the strategy options",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-042.pptx",
+      "thumbnail": "frameworks/frameworks-042.png",
+      "sortOrder": 42
+    },
+    {
+      "title": "Strategy matrix \u2013 almost a mechanic way to create strategic development options",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-043.pptx",
+      "thumbnail": "frameworks/frameworks-043.png",
+      "sortOrder": 43
+    },
+    {
+      "title": "Ansoff\u2019s Box categorizes a firm\u2019s growth opportunities along two dimensions: Products and Markets",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-044.pptx",
+      "thumbnail": "frameworks/frameworks-044.png",
+      "sortOrder": 44
+    },
+    {
+      "title": "Ansoff\u2019s box proposes a useful framework for detecting growth opportunities",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-045.pptx",
+      "thumbnail": "frameworks/frameworks-045.png",
+      "sortOrder": 45
+    },
+    {
+      "title": "The GE Model is an effective framework for assessing a firm\u2019s strategic business units (1/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-046.pptx",
+      "thumbnail": "frameworks/frameworks-046.png",
+      "sortOrder": 46
+    },
+    {
+      "title": "Strategic framework: 2 x 2 matrix \u2013 operating models",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-047.pptx",
+      "thumbnail": "frameworks/frameworks-047.png",
+      "sortOrder": 47
+    },
+    {
+      "title": "Strategic framework: 2 x 2 matrix \u2013 other",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-048.pptx",
+      "thumbnail": "frameworks/frameworks-048.png",
+      "sortOrder": 48
+    },
+    {
+      "title": "The Three Cs framework is a useful tool for analyzing the environment in which a firm operates",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-049.pptx",
+      "thumbnail": "frameworks/frameworks-049.png",
+      "sortOrder": 49
+    },
+    {
+      "title": "The GE Model is an effective framework for assessing a firm\u2019s strategic business units",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-050.pptx",
+      "thumbnail": "frameworks/frameworks-050.png",
+      "sortOrder": 50
+    },
+    {
+      "title": "STP is a 3 step approach that aims at defining an attractive value proposition to target customers",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-051.pptx",
+      "thumbnail": "frameworks/frameworks-051.png",
+      "sortOrder": 51
+    },
+    {
+      "title": "Different methods and levels of customer segmentation could be followed, depending on available data and objectives",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-052.pptx",
+      "thumbnail": "frameworks/frameworks-052.png",
+      "sortOrder": 52
+    },
+    {
+      "title": "Strategic framework: 4 P",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-053.pptx",
+      "thumbnail": "frameworks/frameworks-053.png",
+      "sortOrder": 53
+    },
+    {
+      "title": "The Four Ps are the key components of a firm\u2019s marketing mix",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-054.pptx",
+      "thumbnail": "frameworks/frameworks-054.png",
+      "sortOrder": 54
+    },
+    {
+      "title": "Elements of a pricing strategy",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-055.pptx",
+      "thumbnail": "frameworks/frameworks-055.png",
+      "sortOrder": 55
+    },
+    {
+      "title": "Demand Elasticity is the degree to which the demand for a certain product reacts to changes in its price",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-056.pptx",
+      "thumbnail": "frameworks/frameworks-056.png",
+      "sortOrder": 56
+    },
+    {
+      "title": "The Product Life Cycle model details the stages that a product evolves through from introduction to decline",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-057.pptx",
+      "thumbnail": "frameworks/frameworks-057.png",
+      "sortOrder": 57
+    },
+    {
+      "title": "The marketing mix should vary with each stage of the product life cycle",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-058.pptx",
+      "thumbnail": "frameworks/frameworks-058.png",
+      "sortOrder": 58
+    },
+    {
+      "title": "Demand Elasticity is the degree to which the demand for a certain product reacts to changes in its price",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-059.pptx",
+      "thumbnail": "frameworks/frameworks-059.png",
+      "sortOrder": 59
+    },
+    {
+      "title": "Regression Analysis is a statistical tool used to measure the interdependence of two or more variables",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-060.pptx",
+      "thumbnail": "frameworks/frameworks-060.png",
+      "sortOrder": 60
+    },
+    {
+      "title": "Plotting the dependent against the independent variable provides a quick diagnostic of the strength of their relationship",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-061.pptx",
+      "thumbnail": "frameworks/frameworks-061.png",
+      "sortOrder": 61
+    },
+    {
+      "title": "A software package, or simply Excel, could be used to run the regression analysis",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-062.pptx",
+      "thumbnail": "frameworks/frameworks-062.png",
+      "sortOrder": 62
+    },
+    {
+      "title": "Strategic framework: Continuous improvement",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-063.pptx",
+      "thumbnail": "frameworks/frameworks-063.png",
+      "sortOrder": 63
+    },
+    {
+      "title": "Organisational forms of structure",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-064.pptx",
+      "thumbnail": "frameworks/frameworks-064.png",
+      "sortOrder": 64
+    },
+    {
+      "title": "The Organizational DNA framework is a tool for company diagnosis",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-065.pptx",
+      "thumbnail": "frameworks/frameworks-065.png",
+      "sortOrder": 65
+    },
+    {
+      "title": "The seven organization profiles represent distinct personalities",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-066.pptx",
+      "thumbnail": "frameworks/frameworks-066.png",
+      "sortOrder": 66
+    },
+    {
+      "title": "Strategic framework: Baselining",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-067.pptx",
+      "thumbnail": "frameworks/frameworks-067.png",
+      "sortOrder": 67
+    },
+    {
+      "title": "Strategic framework: Strategic plan components",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-068.pptx",
+      "thumbnail": "frameworks/frameworks-068.png",
+      "sortOrder": 68
+    },
+    {
+      "title": "Strategic framework: Different innovation models",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-069.pptx",
+      "thumbnail": "frameworks/frameworks-069.png",
+      "sortOrder": 69
+    },
+    {
+      "title": "Contents",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-070.pptx",
+      "thumbnail": "frameworks/frameworks-070.png",
+      "sortOrder": 70
+    },
+    {
+      "title": "Operating model design is defined along six key dimensions",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-071.pptx",
+      "thumbnail": "frameworks/frameworks-071.png",
+      "sortOrder": 71
+    },
+    {
+      "title": "An organization structure could be developed along a number of options",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-072.pptx",
+      "thumbnail": "frameworks/frameworks-072.png",
+      "sortOrder": 72
+    },
+    {
+      "title": "Corporate Governance is the mechanism by which shareholders assure that their interests are being met and satisfied",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-073.pptx",
+      "thumbnail": "frameworks/frameworks-073.png",
+      "sortOrder": 73
+    },
+    {
+      "title": "An effective authority matrix allows decision making agility while maintaining sufficient control and risk management",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-074.pptx",
+      "thumbnail": "frameworks/frameworks-074.png",
+      "sortOrder": 74
+    },
+    {
+      "title": "Interactions among departments and levels of management could be defined using a decisions rights framework",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-075.pptx",
+      "thumbnail": "frameworks/frameworks-075.png",
+      "sortOrder": 75
+    },
+    {
+      "title": "Business processes could be mapped at multiple levels depending on the required objectives",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-076.pptx",
+      "thumbnail": "frameworks/frameworks-076.png",
+      "sortOrder": 76
+    },
+    {
+      "title": "A structured approach could be followed for Manpower Planning",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-077.pptx",
+      "thumbnail": "frameworks/frameworks-077.png",
+      "sortOrder": 77
+    },
+    {
+      "title": "ISSR is a mutually exclusive, collectively exhaustive way of thinking about what drives cost",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-078.pptx",
+      "thumbnail": "frameworks/frameworks-078.png",
+      "sortOrder": 78
+    },
+    {
+      "title": "Example of Evaluating the Drivers of Cost with ISSR",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-079.pptx",
+      "thumbnail": "frameworks/frameworks-079.png",
+      "sortOrder": 79
+    },
+    {
+      "title": "Contents",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-080.pptx",
+      "thumbnail": "frameworks/frameworks-080.png",
+      "sortOrder": 80
+    },
+    {
+      "title": "Value Chain analysis is a useful tool for identifying the sources of a firm\u2019s competitive advantage (1/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-081.pptx",
+      "thumbnail": "frameworks/frameworks-081.png",
+      "sortOrder": 81
+    },
+    {
+      "title": "Value Chain analysis is a useful tool for identifying the sources of a firm\u2019s competitive advantage (2/2)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-082.pptx",
+      "thumbnail": "frameworks/frameworks-082.png",
+      "sortOrder": 82
+    },
+    {
+      "title": "Value chain: Mobile voice and data services",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-083.pptx",
+      "thumbnail": "frameworks/frameworks-083.png",
+      "sortOrder": 83
+    },
+    {
+      "title": "Value chain: Energy",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-084.pptx",
+      "thumbnail": "frameworks/frameworks-084.png",
+      "sortOrder": 84
+    },
+    {
+      "title": "Value chain: Airline example",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-085.pptx",
+      "thumbnail": "frameworks/frameworks-085.png",
+      "sortOrder": 85
+    },
+    {
+      "title": "Contents",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-086.pptx",
+      "thumbnail": "frameworks/frameworks-086.png",
+      "sortOrder": 86
+    },
+    {
+      "title": "Architectures: Standards-based, platform/architectural design - 1",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-087.pptx",
+      "thumbnail": "frameworks/frameworks-087.png",
+      "sortOrder": 87
+    },
+    {
+      "title": "Architectures: Standards-based, platform/architectural design - 2",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-088.pptx",
+      "thumbnail": "frameworks/frameworks-088.png",
+      "sortOrder": 88
+    },
+    {
+      "title": "Architectures: Standards-based, platform/architectural design - 3",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-089.pptx",
+      "thumbnail": "frameworks/frameworks-089.png",
+      "sortOrder": 89
+    },
+    {
+      "title": "Architectures: Other",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-090.pptx",
+      "thumbnail": "frameworks/frameworks-090.png",
+      "sortOrder": 90
+    },
+    {
+      "title": "Architectures: Other",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-091.pptx",
+      "thumbnail": "frameworks/frameworks-091.png",
+      "sortOrder": 91
+    },
+    {
+      "title": "Contents",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-092.pptx",
+      "thumbnail": "frameworks/frameworks-092.png",
+      "sortOrder": 92
+    },
+    {
+      "title": "Path/evolution: Defining brand equities",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-093.pptx",
+      "thumbnail": "frameworks/frameworks-093.png",
+      "sortOrder": 93
+    },
+    {
+      "title": "Path/evolution: Company evolution",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-094.pptx",
+      "thumbnail": "frameworks/frameworks-094.png",
+      "sortOrder": 94
+    },
+    {
+      "title": "Path/evolution: Change Management",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-095.pptx",
+      "thumbnail": "frameworks/frameworks-095.png",
+      "sortOrder": 95
+    },
+    {
+      "title": "Path/evolution: Change Management",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-096.pptx",
+      "thumbnail": "frameworks/frameworks-096.png",
+      "sortOrder": 96
+    },
+    {
+      "title": "Path/evolution: developing strategy and masterplan",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-097.pptx",
+      "thumbnail": "frameworks/frameworks-097.png",
+      "sortOrder": 97
+    },
+    {
+      "title": "Path/evolution: Focus areas of process flows",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-098.pptx",
+      "thumbnail": "frameworks/frameworks-098.png",
+      "sortOrder": 98
+    },
+    {
+      "title": "Path/evolution: Implementation roadmap",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-099.pptx",
+      "thumbnail": "frameworks/frameworks-099.png",
+      "sortOrder": 99
+    },
+    {
+      "title": "Contents",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-100.pptx",
+      "thumbnail": "frameworks/frameworks-100.png",
+      "sortOrder": 100
+    },
+    {
+      "title": "Program/Team Management: Team calendar",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-101.pptx",
+      "thumbnail": "frameworks/frameworks-101.png",
+      "sortOrder": 101
+    },
+    {
+      "title": "A Program Management Office is an effective structure for managing large scale programs",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-102.pptx",
+      "thumbnail": "frameworks/frameworks-102.png",
+      "sortOrder": 102
+    },
+    {
+      "title": "A PMO structure helps maintain good progress reporting, issue management, decision making and communication",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-103.pptx",
+      "thumbnail": "frameworks/frameworks-103.png",
+      "sortOrder": 103
+    },
+    {
+      "title": "The project goals and the company goals must be aligned",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-104.pptx",
+      "thumbnail": "frameworks/frameworks-104.png",
+      "sortOrder": 104
+    },
+    {
+      "title": "The Charter is the simplest and most powerful communication, contracting and goal setting tool. A \u2018must-have\u2019 \u2013 \u2018must-use\u2019 tool",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-105.pptx",
+      "thumbnail": "frameworks/frameworks-105.png",
+      "sortOrder": 105
+    },
+    {
+      "title": "Use those check questions as a quality assurance for your goal setting activities",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-106.pptx",
+      "thumbnail": "frameworks/frameworks-106.png",
+      "sortOrder": 106
+    },
+    {
+      "title": "Project governance and management is the vital \u2018glue\u2019 to keep the implementation and delivery together",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-107.pptx",
+      "thumbnail": "frameworks/frameworks-107.png",
+      "sortOrder": 107
+    },
+    {
+      "title": "Roadmap \u2013 sometimes called Program of Work (POW) \u2013 is something I wish the corporate would use more frequently",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-108.pptx",
+      "thumbnail": "frameworks/frameworks-108.png",
+      "sortOrder": 108
+    },
+    {
+      "title": "Work break down structure",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-109.pptx",
+      "thumbnail": "frameworks/frameworks-109.png",
+      "sortOrder": 109
+    },
+    {
+      "title": "Gantt chart \u2013 taken straight from the PowerPoint toolkit",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-110.pptx",
+      "thumbnail": "frameworks/frameworks-110.png",
+      "sortOrder": 110
+    },
+    {
+      "title": "Accountability matrix \u2013 to manage the team and the organisation (CIDA)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-111.pptx",
+      "thumbnail": "frameworks/frameworks-111.png",
+      "sortOrder": 111
+    },
+    {
+      "title": "Perspectives3 \u2013 because you are dealing with human beings, so understand all dimensions of it",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-112.pptx",
+      "thumbnail": "frameworks/frameworks-112.png",
+      "sortOrder": 112
+    },
+    {
+      "title": "Change management cycle",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-113.pptx",
+      "thumbnail": "frameworks/frameworks-113.png",
+      "sortOrder": 113
+    },
+    {
+      "title": "The onion layer model illustrates the three levels of interaction you should be aware of",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-114.pptx",
+      "thumbnail": "frameworks/frameworks-114.png",
+      "sortOrder": 114
+    },
+    {
+      "title": "Balanced Scorecard is a popular performance management system that has evolved as a strategic planning system",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-115.pptx",
+      "thumbnail": "frameworks/frameworks-115.png",
+      "sortOrder": 115
+    },
+    {
+      "title": "Program/Team Management: PMO Update Report (PPT table)",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-116.pptx",
+      "thumbnail": "frameworks/frameworks-116.png",
+      "sortOrder": 116
+    },
+    {
+      "title": "Program/Team Management: Project roles and responsibilities",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-117.pptx",
+      "thumbnail": "frameworks/frameworks-117.png",
+      "sortOrder": 117
+    },
+    {
+      "title": "Program/Team Management: Interview Guide",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-118.pptx",
+      "thumbnail": "frameworks/frameworks-118.png",
+      "sortOrder": 118
+    },
+    {
+      "title": "Program/Team Management: Project Approach",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-119.pptx",
+      "thumbnail": "frameworks/frameworks-119.png",
+      "sortOrder": 119
+    },
+    {
+      "title": "Project portfolio",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-120.pptx",
+      "thumbnail": "frameworks/frameworks-120.png",
+      "sortOrder": 120
+    },
+    {
+      "title": "Contents",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-121.pptx",
+      "thumbnail": "frameworks/frameworks-121.png",
+      "sortOrder": 121
+    },
+    {
+      "title": "Portfolio comparison framework",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-122.pptx",
+      "thumbnail": "frameworks/frameworks-122.png",
+      "sortOrder": 122
+    },
+    {
+      "title": "Customer Portfolio Management",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-123.pptx",
+      "thumbnail": "frameworks/frameworks-123.png",
+      "sortOrder": 123
+    },
+    {
+      "title": "Demand Portfolio Management",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-124.pptx",
+      "thumbnail": "frameworks/frameworks-124.png",
+      "sortOrder": 124
+    },
+    {
+      "title": "Contents",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-125.pptx",
+      "thumbnail": "frameworks/frameworks-125.png",
+      "sortOrder": 125
+    },
+    {
+      "title": "Decision making trap",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-126.pptx",
+      "thumbnail": "frameworks/frameworks-126.png",
+      "sortOrder": 126
+    },
+    {
+      "title": "Decision making process steps",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-127.pptx",
+      "thumbnail": "frameworks/frameworks-127.png",
+      "sortOrder": 127
+    },
+    {
+      "title": "Decision tree",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-128.pptx",
+      "thumbnail": "frameworks/frameworks-128.png",
+      "sortOrder": 128
+    },
+    {
+      "title": "Argument balance",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-129.pptx",
+      "thumbnail": "frameworks/frameworks-129.png",
+      "sortOrder": 129
+    },
+    {
+      "title": "The Polarities tool allows for a insightful comparison and decision making",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-130.pptx",
+      "thumbnail": "frameworks/frameworks-130.png",
+      "sortOrder": 130
+    },
+    {
+      "title": "Utility analysis \u2013 useful not just when you want to buy a house",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-131.pptx",
+      "thumbnail": "frameworks/frameworks-131.png",
+      "sortOrder": 131
+    },
+    {
+      "title": "Prioritisation matrix",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-132.pptx",
+      "thumbnail": "frameworks/frameworks-132.png",
+      "sortOrder": 132
+    },
+    {
+      "title": "Risk analysis \u2013 evaluate if it is necessary to really assess the risks.\u000bElse, manage the issues when they occur",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-133.pptx",
+      "thumbnail": "frameworks/frameworks-133.png",
+      "sortOrder": 133
+    },
+    {
+      "title": "Risk analysis \u2013 understand when to action",
+      "insertMode": "file",
+      "sourceFile": "frameworks/frameworks-134.pptx",
+      "thumbnail": "frameworks/frameworks-134.png",
+      "sortOrder": 134
+    }
+  ]
+}

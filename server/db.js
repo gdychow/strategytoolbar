@@ -133,6 +133,24 @@ async function deleteGroup(id) {
   return result.rows[0] ?? null;
 }
 
+/**
+ * Looks up a group by (category, name), creating it if it doesn't exist -
+ * mirrors getOrCreateTag's upsert pattern, keyed off catalog_groups' own
+ * UNIQUE (category, name) constraint. Used by scripts/seed-catalog.js so a
+ * seed file can assign items straight into a named group (e.g. Phase 7's
+ * Maps category, auto-grouped by source file) without a separate /admin
+ * step to create those groups first.
+ */
+async function getOrCreateGroupIdForCategory(category, name, sortOrder) {
+  const result = await pool.query(
+    `INSERT INTO catalog_groups (category, name, sort_order) VALUES ($1, $2, $3)
+     ON CONFLICT (category, name) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id`,
+    [category, name, sortOrder ?? 0]
+  );
+  return result.rows[0].id;
+}
+
 /** Looks up a tag by exact (case-insensitive) name, creating it if it doesn't exist yet. Used when saving an item's tags from /admin — the client already ran a near-match confirmation pass, so this just get-or-creates the name it was given, no further fuzzy matching server-side. */
 async function getOrCreateTag(name) {
   const result = await pool.query(
@@ -181,10 +199,10 @@ async function deleteCatalogItemsByCategory(category) {
 }
 
 /** Inserts one shared catalog item. Used only by scripts/seed-catalog.js, always after a same-category deleteCatalogItemsByCategory(). */
-async function insertCatalogItem({ category, title, insertMode, sourceFile, reconstructSpec, unicodeChar, thumbnailPath, sortOrder }) {
+async function insertCatalogItem({ category, title, insertMode, sourceFile, reconstructSpec, unicodeChar, thumbnailPath, sortOrder, groupId }) {
   const result = await pool.query(
-    `INSERT INTO catalog_items (category, title, insert_mode, source_file, reconstruct_spec, unicode_char, thumbnail_path, sort_order)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO catalog_items (category, title, insert_mode, source_file, reconstruct_spec, unicode_char, thumbnail_path, sort_order, group_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id`,
     [
       category,
@@ -195,6 +213,7 @@ async function insertCatalogItem({ category, title, insertMode, sourceFile, reco
       unicodeChar ?? null,
       thumbnailPath ?? null,
       sortOrder ?? 0,
+      groupId ?? null,
     ]
   );
   return result.rows[0];
@@ -264,6 +283,7 @@ module.exports = {
   createGroup,
   updateGroup,
   deleteGroup,
+  getOrCreateGroupIdForCategory,
   getOrCreateTag,
   listAllTagNames,
   setItemTags,

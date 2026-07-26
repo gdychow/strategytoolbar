@@ -13,7 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const { pool, deleteCatalogItemsByCategory, insertCatalogItem } = require("../server/db");
+const { pool, deleteCatalogItemsByCategory, insertCatalogItem, getOrCreateGroupIdForCategory } = require("../server/db");
 
 async function main() {
   const seedPath = process.argv[2];
@@ -23,6 +23,20 @@ async function main() {
   }
 
   const { category, items } = JSON.parse(fs.readFileSync(path.resolve(seedPath), "utf8"));
+
+  // Optional per-item groupName (e.g. Phase 7's Maps category, auto-grouped
+  // by source file) - resolved to a group id once per distinct name here,
+  // in first-appearance order (so e.g. "World Maps" from the first source
+  // file seeded lands before "3D Globes" from the last), rather than
+  // requiring the groups to already exist via /admin first.
+  const groupNameToId = new Map();
+  let nextGroupSortOrder = 0;
+  for (const item of items) {
+    if (item.groupName && !groupNameToId.has(item.groupName)) {
+      nextGroupSortOrder += 1;
+      groupNameToId.set(item.groupName, await getOrCreateGroupIdForCategory(category, item.groupName, nextGroupSortOrder));
+    }
+  }
 
   await deleteCatalogItemsByCategory(category);
   for (const item of items) {
@@ -35,6 +49,7 @@ async function main() {
       unicodeChar: item.unicodeChar,
       thumbnailPath: item.thumbnail,
       sortOrder: item.sortOrder,
+      groupId: item.groupName ? groupNameToId.get(item.groupName) : null,
     });
   }
   console.log(`Seeded ${items.length} item(s) into category "${category}".`);

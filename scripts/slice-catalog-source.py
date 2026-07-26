@@ -59,12 +59,19 @@ from pathlib import Path
 
 from PIL import Image
 from pptx import Presentation
-from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.enum.shapes import MSO_SHAPE_TYPE, PP_PLACEHOLDER
 from pptx.oxml.ns import qn
 from pptx.util import Emu
 
 THINK_CELL_MARKER = "think-cell"
 EMU_PER_POINT = 12700
+# Every category built so far targets this width. Some older boilerplate
+# decks (Maps, ClipArt, Frameworks, Flags) are 720x540pt (4:3) instead -
+# confirmed their height already matches exactly (540pt), so centering
+# only ever needs a horizontal shift, never rescaling. See
+# TARGET_SLIDE_WIDTH_PT's use in main()/slice_single_slide/
+# extract_reconstruct_spec.
+TARGET_SLIDE_WIDTH_PT = 960.0
 # Whole-slide render resolution fed into the content-bbox crop below - much
 # higher than the ~320px final thumbnail size, since a small shape crops
 # down to a small fraction of this; too low a render size and small items
@@ -283,11 +290,11 @@ def extract_text_spec(shape):
     return paragraphs
 
 
-def extract_reconstruct_spec(shape):
+def extract_reconstruct_spec(shape, x_offset_pt: float = 0.0):
     is_text_box = shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX
     spec = {
         "kind": "textBox" if is_text_box else "geometricShape",
-        "left": emu_to_pt(shape.left),
+        "left": round(emu_to_pt(shape.left) + x_offset_pt, 2),
         "top": emu_to_pt(shape.top),
         "width": emu_to_pt(shape.width),
         "height": emu_to_pt(shape.height),
@@ -315,6 +322,28 @@ def extract_reconstruct_spec(shape):
     return spec
 
 
+def extract_title_from_placeholder(shapes):
+    """
+    Prefers a real Title/Center-Title placeholder's own text over the
+    generic multi-shape text-hint heuristic below. Text/Objects/Shapes/etc.
+    have no such placeholder (hence the hint heuristic existing at all),
+    but Maps/ClipArt/Frameworks/Flags do - confirmed by inspecting real
+    slides directly - so this gives a real name ("Abu Dhabi Island",
+    "Africa A-G") instead of a rough concatenation of whatever text happens
+    to be on the slide. Returns None (falls back to the hint) when no
+    title placeholder is present.
+    """
+    for shape in shapes:
+        if not shape.is_placeholder:
+            continue
+        ph_type = shape.placeholder_format.type
+        if ph_type in (PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE) and shape.has_text_frame:
+            text = shape.text_frame.text.strip()
+            if text:
+                return text
+    return None
+
+
 def extract_text_hint(shape) -> str:
     if not shape.has_text_frame:
         return ""
@@ -326,8 +355,22 @@ def extract_text_hint(shape) -> str:
     return " / ".join(t for t in texts if t)[:80]
 
 
-def slice_single_slide(source_path: Path, slide_index: int, dest_path: Path) -> None:
-    """Duplicates the source presentation, keeps only slide_index, strips the think-cell placeholder, saves to dest_path."""
+def slice_single_slide(
+    source_path: Path, slide_index: int, dest_path: Path, x_offset_pt: float = 0.0, target_width_pt: float = None
+) -> None:
+    """
+    Duplicates the source presentation, keeps only slide_index, strips the
+    think-cell placeholder, saves to dest_path. x_offset_pt/target_width_pt
+    are only passed for 'file'-mode items from a non-16x9 source (see
+    TARGET_SLIDE_WIDTH_PT) - shifts every remaining shape right by
+    x_offset_pt and resizes the presentation itself to target_width_pt, so
+    the packaged single-slide file is already correctly centered for a
+    16x9 destination rather than relying on insertSlidesFromBase64's own
+    (unverified) handling of a slide-size mismatch. Left at their defaults
+    (no-op) for the scratch thumbnail-only slice of a 'reconstruct'-mode
+    item, since that render only needs to match the *original* slide's own
+    coordinate space that compute_content_bbox_pt already uses.
+    """
     prs = Presentation(str(source_path))
     slide_id_list = prs.slides._sldIdLst
     slide_id_elements = list(slide_id_list)
@@ -342,6 +385,13 @@ def slice_single_slide(source_path: Path, slide_index: int, dest_path: Path) -> 
     for shape in list(remaining_slide.shapes):
         if is_think_cell_placeholder(shape):
             shape._element.getparent().remove(shape._element)
+
+    if x_offset_pt:
+        offset_emu = round(x_offset_pt * EMU_PER_POINT)
+        for shape in remaining_slide.shapes:
+            shape.left = shape.left + offset_emu
+    if target_width_pt is not None:
+        prs.slide_width = round(target_width_pt * EMU_PER_POINT)
 
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(dest_path))
@@ -402,19 +452,46 @@ def generate_thumbnail(slide_pptx_path: Path, dest_path: Path, content_bbox_pt, 
 
 
 def main():
-    if len(sys.argv) < 3:
+    args = sys.argv[1:]
+    # --group is only used for Maps (four separate source files - MapsI-IV -
+    # feeding into one "maps" category): tags every item this invocation
+    # produces with that group name, and - since the seed file will already
+    # exist from an earlier MapsX run - appends to it (continuing sortOrder/
+    # filename numbering from its current max) instead of overwriting.
+    # Every other, single-invocation category never passes this, so it
+    # keeps today's exact behavior (fresh overwrite, no group).
+    group_name = None
+    if "--group" in args:
+        idx = args.index("--group")
+        group_name = args[idx + 1]
+        del args[idx : idx + 2]
+
+    if len(args) < 2:
         print(__doc__)
         sys.exit(1)
 
-    source_path = Path(sys.argv[1])
-    category = sys.argv[2]
-    output_root = Path(sys.argv[3]) if len(sys.argv) > 3 else Path("data/catalog")
+    source_path = Path(args[0])
+    category = args[1]
+    output_root = Path(args[2]) if len(args) > 2 else Path("data/catalog")
     category_dir = output_root / category
     thumbnails_dir = output_root / "thumbnails" / category
 
     prs = Presentation(str(source_path))
     slide_width_pt, slide_height_pt = emu_to_pt(prs.slide_width), emu_to_pt(prs.slide_height)
+    # 0.0 for already-16x9 sources (every category before this one) - only
+    # the older 4:3 decks (Maps/ClipArt/Frameworks/Flags) get a real shift.
+    x_offset_pt = round((TARGET_SLIDE_WIDTH_PT - slide_width_pt) / 2, 2)
+
+    seed_path = Path("db/seed") / f"catalog-{category}.json"
+    existing_items = []
+    starting_number = 0
+    if group_name is not None and seed_path.exists():
+        existing = json.loads(seed_path.read_text())
+        existing_items = existing.get("items", [])
+        starting_number = max((item.get("sortOrder", 0) for item in existing_items), default=0)
+
     items = []
+    running_item_count = 0
 
     with tempfile.TemporaryDirectory() as scratch:
         scratch_dir = Path(scratch)
@@ -425,60 +502,75 @@ def main():
                 print(f"slide {index + 1}: no real content shape found, skipping", file=sys.stderr)
                 continue
 
+            # Append-mode numbering must continue across separate
+            # invocations (MapsI/II/III/IV each restart their own slide
+            # index at 1, which would otherwise collide); every other
+            # category keeps today's exact per-slide-index numbering.
+            if group_name is not None:
+                running_item_count += 1
+                item_number = starting_number + running_item_count
+            else:
+                item_number = index + 1
+
             mode = "reconstruct" if all(classify_shape_tree(s) == "reconstruct" for s in real_shapes) else "file"
-            text_hint = " | ".join(filter(None, (extract_text_hint(s) for s in real_shapes)))
-            title = text_hint if text_hint else f"{category.capitalize()} #{index + 1}"
-            slide_filename = f"{category}-{index + 1:03d}.pptx"
+            title = extract_title_from_placeholder(real_shapes)
+            if not title:
+                text_hint = " | ".join(filter(None, (extract_text_hint(s) for s in real_shapes)))
+                title = text_hint if text_hint else f"{category.capitalize()} #{item_number}"
+            slide_filename = f"{category}-{item_number:03d}.pptx"
 
             # Every item gets sliced to a single-slide .pptx, regardless of
             # mode - for 'file' items this is the real, permanent catalog
             # content; for 'reconstruct' items it's a scratch file that
             # exists only long enough to render a faithful thumbnail from
-            # (the real content is the reconstructSpec JSON below).
+            # (the real content is the reconstructSpec JSON below). Only
+            # 'file' items get the 4:3->16x9 offset/resize - the scratch
+            # slice's thumbnail render doesn't need it (see
+            # slice_single_slide's docstring).
             if mode == "file":
                 slide_pptx_path = category_dir / slide_filename
+                slice_single_slide(source_path, index, slide_pptx_path, x_offset_pt, TARGET_SLIDE_WIDTH_PT)
             else:
                 slide_pptx_path = scratch_dir / slide_filename
-            slice_single_slide(source_path, index, slide_pptx_path)
+                slice_single_slide(source_path, index, slide_pptx_path)
 
             content_bbox_pt = compute_content_bbox_pt(real_shapes, slide_width_pt, slide_height_pt)
-            thumbnail_filename = f"{category}-{index + 1:03d}.png"
+            thumbnail_filename = f"{category}-{item_number:03d}.png"
             has_thumbnail = generate_thumbnail(
                 slide_pptx_path, thumbnails_dir / thumbnail_filename, content_bbox_pt, slide_width_pt, slide_height_pt
             )
             thumbnail_rel = f"{category}/{thumbnail_filename}" if has_thumbnail else None
 
             if mode == "file":
-                items.append(
-                    {
-                        "title": title,
-                        "insertMode": "file",
-                        "sourceFile": f"{category}/{slide_filename}",
-                        "thumbnail": thumbnail_rel,
-                        "sortOrder": index + 1,
-                    }
-                )
+                item = {
+                    "title": title,
+                    "insertMode": "file",
+                    "sourceFile": f"{category}/{slide_filename}",
+                    "thumbnail": thumbnail_rel,
+                    "sortOrder": item_number,
+                }
             else:
                 if len(real_shapes) == 1:
-                    spec = extract_reconstruct_spec(real_shapes[0])
+                    spec = extract_reconstruct_spec(real_shapes[0], x_offset_pt)
                 else:
-                    spec = {"kind": "group", "shapes": [extract_reconstruct_spec(s) for s in real_shapes]}
-                items.append(
-                    {
-                        "title": title,
-                        "insertMode": "reconstruct",
-                        "reconstructSpec": spec,
-                        "thumbnail": thumbnail_rel,
-                        "sortOrder": index + 1,
-                    }
-                )
+                    spec = {"kind": "group", "shapes": [extract_reconstruct_spec(s, x_offset_pt) for s in real_shapes]}
+                item = {
+                    "title": title,
+                    "insertMode": "reconstruct",
+                    "reconstructSpec": spec,
+                    "thumbnail": thumbnail_rel,
+                    "sortOrder": item_number,
+                }
+            if group_name is not None:
+                item["groupName"] = group_name
+            items.append(item)
 
-    seed_path = Path("db/seed") / f"catalog-{category}.json"
     seed_path.parent.mkdir(parents=True, exist_ok=True)
-    seed_path.write_text(json.dumps({"category": category, "items": items}, indent=2) + "\n")
+    all_items = existing_items + items
+    seed_path.write_text(json.dumps({"category": category, "items": all_items}, indent=2) + "\n")
 
     file_mode_count = sum(1 for i in items if i["insertMode"] == "file")
-    print(f"Wrote {len(items)} item(s) to {seed_path}", file=sys.stderr)
+    print(f"Wrote {len(items)} item(s) ({len(all_items)} total in file) to {seed_path}", file=sys.stderr)
     if file_mode_count:
         print(f"Sliced {file_mode_count} 'file'-mode .pptx file(s) into: {category_dir}", file=sys.stderr)
     print(f"Generated thumbnails into: {thumbnails_dir}", file=sys.stderr)

@@ -27,6 +27,10 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: "tables", label: "Tables" },
   { value: "diagrams", label: "Diagrams" },
   { value: "symbols", label: "Symbols" },
+  { value: "maps", label: "Maps" },
+  { value: "clipart", label: "Clip Art" },
+  { value: "frameworks", label: "Frameworks" },
+  { value: "flags", label: "Flags" },
 ];
 
 const cache = new Map<string, CatalogResponse>();

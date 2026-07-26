@@ -14,7 +14,7 @@ fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
 // Hand-kept in sync with db/init.sql's catalog_items.category CHECK
 // constraint — validated here before any DB write, so a bad value gets a
 // clean 400 instead of a raw constraint-violation error page.
-const CATALOG_CATEGORIES = ["text", "objects", "shapes", "stamps", "tables", "symbols", "diagrams"];
+const CATALOG_CATEGORIES = ["text", "objects", "shapes", "stamps", "tables", "symbols", "diagrams", "maps", "clipart", "frameworks", "flags"];
 
 /**
  * Resolves a catalog item's source_file (as stored in the DB, e.g.
