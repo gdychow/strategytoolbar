@@ -33,7 +33,7 @@
           "color": null,
           "widthPt": null
         },
-        "text": [
+        "paragraphs": [
           {
             "level": 0,
             "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
@@ -63,7 +63,7 @@
           "color": null,
           "widthPt": null
         },
-        "text": [
+        "paragraphs": [
           {
             "level": 0,
             "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
@@ -100,7 +100,7 @@
           "color": "#000000",
           "widthPt": 0.75
         },
-        "text": [
+        "paragraphs": [
           {
             "level": 0,
             "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
@@ -137,7 +137,7 @@
           "color": null,
           "widthPt": null
         },
-        "text": [
+        "paragraphs": [
           {
             "level": 0,
             "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
@@ -167,7 +167,7 @@
           "color": null,
           "widthPt": null
         },
-        "text": [
+        "paragraphs": [
           {
             "level": 0,
             "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
@@ -197,7 +197,7 @@
           "color": null,
           "widthPt": null
         },
-        "text": [
+        "paragraphs": [
           {
             "level": 0,
             "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
@@ -221,7 +221,7 @@
         "rotation": 0.0,
         "fill": null,
         "line": null,
-        "text": null,
+        "paragraphs": null,
         "presetGeometry": "Triangle"
       },
       "thumbnail": "shapes/shapes-011.png",

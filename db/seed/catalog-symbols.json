@@ -16,7 +16,7 @@
           "color": null,
           "widthPt": 0.75
         },
-        "text": [
+        "paragraphs": [
           {
             "level": 0,
             "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
@@ -64,7 +64,7 @@
           "color": null,
           "widthPt": 0.75
         },
-        "text": [
+        "paragraphs": [
           {
             "level": 0,
             "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
