@@ -51,8 +51,9 @@ export type ReconstructSpec = ShapeSpec | { kind: "group"; shapes: ShapeSpec[] }
 export interface CatalogItem {
   id: number;
   title: string;
-  insertMode: "reconstruct" | "file";
+  insertMode: "reconstruct" | "file" | "unicode-char";
   reconstructSpec: ReconstructSpec | null;
+  unicodeChar: string | null;
   thumbnailUrl: string | null;
   groupId: number | null;
   groupName: string | null;
@@ -275,10 +276,41 @@ export async function insertReconstructedItem(spec: ReconstructSpec): Promise<vo
   });
 }
 
+// ---------------------------------------------------------------------------
+// 'unicode-char' mode — insert a single character into the current text
+// selection/cursor position. Ported from the VBA original's InsertChar,
+// which called TextRange.InsertSymbol on the active selection; PowerPoint
+// JS has no equivalent method (PowerPoint.TextRange's real surface is
+// start/length/text/getSubstring/getParentTextFrame — confirmed against
+// @types/office-js), so this uses the same
+// presentation.getSelectedTextRangeOrNullObject() pattern already proven in
+// otherTweaks.ts's setBulletsVisible. Setting .text on a zero-length
+// selection (a bare cursor) inserts there; on a real selection it replaces
+// it — both match ordinary typing behaviour. The VBA original's other two
+// branches (a shape selected but not in text-edit mode; nothing selected at
+// all, which created a brand-new text box) are deliberately not ported —
+// they collapse into one clear error instead.
+export async function insertUnicodeChar(char: string): Promise<void> {
+  await PowerPoint.run(async (context) => {
+    const textRange = context.presentation.getSelectedTextRangeOrNullObject();
+    await context.sync();
+    if (textRange.isNullObject) {
+      throw new Error("Place the cursor in some text, or select a text box, first.");
+    }
+    textRange.text = char;
+    await context.sync();
+  });
+}
+
 export async function insertCatalogItem(item: CatalogItem): Promise<FileInsertHandle | null> {
   if (item.insertMode === "reconstruct") {
     if (!item.reconstructSpec) throw new Error(`"${item.title}" is missing its reconstruction data.`);
     await insertReconstructedItem(item.reconstructSpec);
+    return null;
+  }
+  if (item.insertMode === "unicode-char") {
+    if (!item.unicodeChar) throw new Error(`"${item.title}" is missing its character data.`);
+    await insertUnicodeChar(item.unicodeChar);
     return null;
   }
   return insertFileItem(item.id);

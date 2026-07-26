@@ -1,0 +1,494 @@
+{
+  "category": "symbols",
+  "items": [
+    {
+      "title": "Symbols #1",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 324.09,
+        "top": 114.09,
+        "width": 311.81,
+        "height": 311.81,
+        "rotation": 0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": []
+          }
+        ],
+        "presetGeometry": "Ellipse"
+      },
+      "thumbnail": "symbols/symbols-001.png",
+      "sortOrder": 1
+    },
+    {
+      "title": "Symbols #2",
+      "insertMode": "file",
+      "sourceFile": "symbols/symbols-002.pptx",
+      "thumbnail": "symbols/symbols-002.png",
+      "sortOrder": 2
+    },
+    {
+      "title": "Symbols #3",
+      "insertMode": "file",
+      "sourceFile": "symbols/symbols-003.pptx",
+      "thumbnail": "symbols/symbols-003.png",
+      "sortOrder": 3
+    },
+    {
+      "title": "Symbols #4",
+      "insertMode": "file",
+      "sourceFile": "symbols/symbols-004.pptx",
+      "thumbnail": "symbols/symbols-004.png",
+      "sortOrder": 4
+    },
+    {
+      "title": "Symbols #5",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 324.09,
+        "top": 114.09,
+        "width": 311.81,
+        "height": 311.81,
+        "rotation": 0,
+        "fill": null,
+        "line": {
+          "color": null,
+          "widthPt": 0.75
+        },
+        "text": [
+          {
+            "level": 0,
+            "bullet": "(inherited - verify against shape's lstStyle or slide layout)",
+            "runs": []
+          }
+        ],
+        "presetGeometry": "Ellipse"
+      },
+      "thumbnail": "symbols/symbols-005.png",
+      "sortOrder": 5
+    },
+    {
+      "title": "Symbols #6",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 390.9,
+        "top": 180.9,
+        "width": 178.19,
+        "height": 178.19,
+        "rotation": 0,
+        "fill": null,
+        "line": null,
+        "text": null,
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "symbols/symbols-006.png",
+      "sortOrder": 6
+    },
+    {
+      "title": "Symbols #7",
+      "insertMode": "reconstruct",
+      "reconstructSpec": {
+        "kind": "geometricShape",
+        "left": 411.7,
+        "top": 201.7,
+        "width": 136.6,
+        "height": 136.6,
+        "rotation": 0,
+        "fill": null,
+        "line": null,
+        "text": null,
+        "presetGeometry": "Rectangle"
+      },
+      "thumbnail": "symbols/symbols-007.png",
+      "sortOrder": 7
+    },
+    {
+      "title": "Does Not Equal",
+      "insertMode": "unicode-char",
+      "unicodeChar": "≠",
+      "thumbnail": null,
+      "sortOrder": 8
+    },
+    {
+      "title": "Almost Equal",
+      "insertMode": "unicode-char",
+      "unicodeChar": "≈",
+      "thumbnail": null,
+      "sortOrder": 9
+    },
+    {
+      "title": "Greater Than or Equal",
+      "insertMode": "unicode-char",
+      "unicodeChar": "≥",
+      "thumbnail": null,
+      "sortOrder": 10
+    },
+    {
+      "title": "Less Than or Equal",
+      "insertMode": "unicode-char",
+      "unicodeChar": "≤",
+      "thumbnail": null,
+      "sortOrder": 11
+    },
+    {
+      "title": "Plus Minus",
+      "insertMode": "unicode-char",
+      "unicodeChar": "±",
+      "thumbnail": null,
+      "sortOrder": 12
+    },
+    {
+      "title": "Division",
+      "insertMode": "unicode-char",
+      "unicodeChar": "÷",
+      "thumbnail": null,
+      "sortOrder": 13
+    },
+    {
+      "title": "Multiplication",
+      "insertMode": "unicode-char",
+      "unicodeChar": "×",
+      "thumbnail": null,
+      "sortOrder": 14
+    },
+    {
+      "title": "Empty Set",
+      "insertMode": "unicode-char",
+      "unicodeChar": "Ø",
+      "thumbnail": null,
+      "sortOrder": 15
+    },
+    {
+      "title": "Infinity",
+      "insertMode": "unicode-char",
+      "unicodeChar": "∞",
+      "thumbnail": null,
+      "sortOrder": 16
+    },
+    {
+      "title": "Delta",
+      "insertMode": "unicode-char",
+      "unicodeChar": "∆",
+      "thumbnail": null,
+      "sortOrder": 17
+    },
+    {
+      "title": "Sigma",
+      "insertMode": "unicode-char",
+      "unicodeChar": "∑",
+      "thumbnail": null,
+      "sortOrder": 18
+    },
+    {
+      "title": "One Fourth",
+      "insertMode": "unicode-char",
+      "unicodeChar": "¼",
+      "thumbnail": null,
+      "sortOrder": 19
+    },
+    {
+      "title": "One Half",
+      "insertMode": "unicode-char",
+      "unicodeChar": "½",
+      "thumbnail": null,
+      "sortOrder": 20
+    },
+    {
+      "title": "Three Fourths",
+      "insertMode": "unicode-char",
+      "unicodeChar": "¾",
+      "thumbnail": null,
+      "sortOrder": 21
+    },
+    {
+      "title": "Degree",
+      "insertMode": "unicode-char",
+      "unicodeChar": "°",
+      "thumbnail": null,
+      "sortOrder": 22
+    },
+    {
+      "title": "Per Thousand",
+      "insertMode": "unicode-char",
+      "unicodeChar": "‰",
+      "thumbnail": null,
+      "sortOrder": 23
+    },
+    {
+      "title": "En Dash",
+      "insertMode": "unicode-char",
+      "unicodeChar": "–",
+      "thumbnail": null,
+      "sortOrder": 24
+    },
+    {
+      "title": "Em Dash",
+      "insertMode": "unicode-char",
+      "unicodeChar": "—",
+      "thumbnail": null,
+      "sortOrder": 25
+    },
+    {
+      "title": "Vertical Line",
+      "insertMode": "unicode-char",
+      "unicodeChar": "⃒",
+      "thumbnail": null,
+      "sortOrder": 26
+    },
+    {
+      "title": "Dot",
+      "insertMode": "unicode-char",
+      "unicodeChar": "•",
+      "thumbnail": null,
+      "sortOrder": 27
+    },
+    {
+      "title": "Copyright",
+      "insertMode": "unicode-char",
+      "unicodeChar": "©",
+      "thumbnail": null,
+      "sortOrder": 28
+    },
+    {
+      "title": "Registered Trademark",
+      "insertMode": "unicode-char",
+      "unicodeChar": "®",
+      "thumbnail": null,
+      "sortOrder": 29
+    },
+    {
+      "title": "Trademark",
+      "insertMode": "unicode-char",
+      "unicodeChar": "™",
+      "thumbnail": null,
+      "sortOrder": 30
+    },
+    {
+      "title": "Euro",
+      "insertMode": "unicode-char",
+      "unicodeChar": "€",
+      "thumbnail": null,
+      "sortOrder": 31
+    },
+    {
+      "title": "British Pound",
+      "insertMode": "unicode-char",
+      "unicodeChar": "£",
+      "thumbnail": null,
+      "sortOrder": 32
+    },
+    {
+      "title": "Yen",
+      "insertMode": "unicode-char",
+      "unicodeChar": "¥",
+      "thumbnail": null,
+      "sortOrder": 33
+    },
+    {
+      "title": "Cent",
+      "insertMode": "unicode-char",
+      "unicodeChar": "¢",
+      "thumbnail": null,
+      "sortOrder": 34
+    },
+    {
+      "title": "Arrow Twoway",
+      "insertMode": "unicode-char",
+      "unicodeChar": "↔",
+      "thumbnail": null,
+      "sortOrder": 35
+    },
+    {
+      "title": "Arrow Left",
+      "insertMode": "unicode-char",
+      "unicodeChar": "←",
+      "thumbnail": null,
+      "sortOrder": 36
+    },
+    {
+      "title": "Arrow Up",
+      "insertMode": "unicode-char",
+      "unicodeChar": "↑",
+      "thumbnail": null,
+      "sortOrder": 37
+    },
+    {
+      "title": "Arrow Right",
+      "insertMode": "unicode-char",
+      "unicodeChar": "→",
+      "thumbnail": null,
+      "sortOrder": 38
+    },
+    {
+      "title": "Arrow Down",
+      "insertMode": "unicode-char",
+      "unicodeChar": "↓",
+      "thumbnail": null,
+      "sortOrder": 39
+    },
+    {
+      "title": "Mu",
+      "insertMode": "unicode-char",
+      "unicodeChar": "µ",
+      "thumbnail": null,
+      "sortOrder": 40
+    },
+    {
+      "title": "Paragraph",
+      "insertMode": "unicode-char",
+      "unicodeChar": "¶",
+      "thumbnail": null,
+      "sortOrder": 41
+    },
+    {
+      "title": "Omega",
+      "insertMode": "unicode-char",
+      "unicodeChar": "Ω",
+      "thumbnail": null,
+      "sortOrder": 42
+    },
+    {
+      "title": "Pi",
+      "insertMode": "unicode-char",
+      "unicodeChar": "π",
+      "thumbnail": null,
+      "sortOrder": 43
+    },
+    {
+      "title": "Ellipsis",
+      "insertMode": "unicode-char",
+      "unicodeChar": "…",
+      "thumbnail": null,
+      "sortOrder": 44
+    },
+    {
+      "title": "Left Quotation",
+      "insertMode": "unicode-char",
+      "unicodeChar": "«",
+      "thumbnail": null,
+      "sortOrder": 45
+    },
+    {
+      "title": "Right Quotation",
+      "insertMode": "unicode-char",
+      "unicodeChar": "»",
+      "thumbnail": null,
+      "sortOrder": 46
+    },
+    {
+      "title": "At Sign (@)",
+      "insertMode": "unicode-char",
+      "unicodeChar": "@",
+      "thumbnail": null,
+      "sortOrder": 47
+    },
+    {
+      "title": "Encircled 1",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➀",
+      "thumbnail": null,
+      "sortOrder": 48
+    },
+    {
+      "title": "Encircled 2",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➁",
+      "thumbnail": null,
+      "sortOrder": 49
+    },
+    {
+      "title": "Encircled 3",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➂",
+      "thumbnail": null,
+      "sortOrder": 50
+    },
+    {
+      "title": "Encircled 4",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➃",
+      "thumbnail": null,
+      "sortOrder": 51
+    },
+    {
+      "title": "Encircled 5",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➄",
+      "thumbnail": null,
+      "sortOrder": 52
+    },
+    {
+      "title": "Encircled 6",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➅",
+      "thumbnail": null,
+      "sortOrder": 53
+    },
+    {
+      "title": "Encircled 7",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➆",
+      "thumbnail": null,
+      "sortOrder": 54
+    },
+    {
+      "title": "Encircled 8",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➇",
+      "thumbnail": null,
+      "sortOrder": 55
+    },
+    {
+      "title": "Encircled 9",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➈",
+      "thumbnail": null,
+      "sortOrder": 56
+    },
+    {
+      "title": "Encircled 10",
+      "insertMode": "unicode-char",
+      "unicodeChar": "➉",
+      "thumbnail": null,
+      "sortOrder": 57
+    },
+    {
+      "title": "Cross",
+      "insertMode": "unicode-char",
+      "unicodeChar": "✗",
+      "thumbnail": null,
+      "sortOrder": 58
+    },
+    {
+      "title": "Checkmark",
+      "insertMode": "unicode-char",
+      "unicodeChar": "✓",
+      "thumbnail": null,
+      "sortOrder": 59
+    },
+    {
+      "title": "Chinese Yuan",
+      "insertMode": "unicode-char",
+      "unicodeChar": "元",
+      "thumbnail": null,
+      "sortOrder": 60
+    },
+    {
+      "title": "Brazilian Real",
+      "insertMode": "unicode-char",
+      "unicodeChar": "R$",
+      "thumbnail": null,
+      "sortOrder": 61
+    }
+  ]
+}

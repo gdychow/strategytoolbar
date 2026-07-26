@@ -54,7 +54,7 @@ const CATALOG_ITEM_GROUP_TAGS_SELECT = `
 /** Shared/admin catalog items in one category, in display order, with group + tags joined in. */
 async function listSharedCatalogItems(category) {
   const result = await pool.query(
-    `SELECT ci.id, ci.category, ci.title, ci.insert_mode, ci.reconstruct_spec, ci.thumbnail_path, ci.sort_order,
+    `SELECT ci.id, ci.category, ci.title, ci.insert_mode, ci.reconstruct_spec, ci.unicode_char, ci.thumbnail_path, ci.sort_order,
             ${CATALOG_ITEM_GROUP_TAGS_SELECT}
      FROM catalog_items ci
      ${CATALOG_ITEM_GROUP_TAGS_JOIN}
@@ -83,7 +83,7 @@ async function listAllCatalogItems() {
 /** A single catalog item by ID, including source_file — used to resolve the file for a 'file'-mode insert, and by /admin's edit form. */
 async function getCatalogItem(id) {
   const result = await pool.query(
-    `SELECT ci.id, ci.category, ci.title, ci.insert_mode, ci.source_file, ci.reconstruct_spec, ci.thumbnail_path, ci.sort_order,
+    `SELECT ci.id, ci.category, ci.title, ci.insert_mode, ci.source_file, ci.reconstruct_spec, ci.unicode_char, ci.thumbnail_path, ci.sort_order,
             ${CATALOG_ITEM_GROUP_TAGS_SELECT}
      FROM catalog_items ci
      ${CATALOG_ITEM_GROUP_TAGS_JOIN}
@@ -181,10 +181,10 @@ async function deleteCatalogItemsByCategory(category) {
 }
 
 /** Inserts one shared catalog item. Used only by scripts/seed-catalog.js, always after a same-category deleteCatalogItemsByCategory(). */
-async function insertCatalogItem({ category, title, insertMode, sourceFile, reconstructSpec, thumbnailPath, sortOrder }) {
+async function insertCatalogItem({ category, title, insertMode, sourceFile, reconstructSpec, unicodeChar, thumbnailPath, sortOrder }) {
   const result = await pool.query(
-    `INSERT INTO catalog_items (category, title, insert_mode, source_file, reconstruct_spec, thumbnail_path, sort_order)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO catalog_items (category, title, insert_mode, source_file, reconstruct_spec, unicode_char, thumbnail_path, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id`,
     [
       category,
@@ -192,6 +192,7 @@ async function insertCatalogItem({ category, title, insertMode, sourceFile, reco
       insertMode,
       sourceFile ?? null,
       reconstructSpec ? JSON.stringify(reconstructSpec) : null,
+      unicodeChar ?? null,
       thumbnailPath ?? null,
       sortOrder ?? 0,
     ]

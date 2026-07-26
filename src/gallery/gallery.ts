@@ -18,9 +18,7 @@
  */
 import { fetchCatalog, type CatalogItem, type CatalogResponse } from "../features/libraryInsert";
 
-// Matches what's actually seeded (see db/seed/catalog-*.json) — Symbols
-// isn't built yet (needs its own insert_mode, planned separately), so
-// it's deliberately not listed here.
+// Matches what's actually seeded (see db/seed/catalog-*.json).
 const CATEGORIES: { value: string; label: string }[] = [
   { value: "text", label: "Text" },
   { value: "objects", label: "Objects" },
@@ -28,6 +26,7 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: "stamps", label: "Stamps" },
   { value: "tables", label: "Tables" },
   { value: "diagrams", label: "Diagrams" },
+  { value: "symbols", label: "Symbols" },
 ];
 
 const cache = new Map<string, CatalogResponse>();
@@ -67,7 +66,15 @@ function showPreview(item: CatalogItem): void {
   const img = document.getElementById("previewImg") as HTMLImageElement | null;
   const title = document.getElementById("previewTitle");
   if (!panel || !img || !title) return;
-  if (item.thumbnailUrl) {
+  const existingGlyph = panel.querySelector(".preview-glyph");
+  if (existingGlyph) existingGlyph.remove();
+  if (item.unicodeChar) {
+    img.style.display = "none";
+    const glyph = document.createElement("span");
+    glyph.className = "preview-glyph";
+    glyph.textContent = item.unicodeChar;
+    panel.insertBefore(glyph, img);
+  } else if (item.thumbnailUrl) {
     img.src = item.thumbnailUrl;
     img.style.display = "";
   } else {
@@ -104,7 +111,12 @@ function renderItemCard(item: CatalogItem): HTMLElement {
   card.type = "button";
   card.className = "gallery-item" + (selectedItem?.id === item.id ? " selected" : "");
 
-  if (item.thumbnailUrl) {
+  if (item.unicodeChar) {
+    const glyph = document.createElement("span");
+    glyph.className = "gallery-item-glyph";
+    glyph.textContent = item.unicodeChar;
+    card.appendChild(glyph);
+  } else if (item.thumbnailUrl) {
     const img = document.createElement("img");
     img.src = item.thumbnailUrl;
     img.alt = item.title;

@@ -32,6 +32,7 @@ async function main() {
       insertMode: item.insertMode,
       sourceFile: item.sourceFile,
       reconstructSpec: item.reconstructSpec,
+      unicodeChar: item.unicodeChar,
       thumbnailPath: item.thumbnail,
       sortOrder: item.sortOrder,
     });

@@ -173,6 +173,7 @@ app.get("/api/catalog/:category", async (req, res) => {
       title: item.title,
       insertMode: item.insert_mode,
       reconstructSpec: item.reconstruct_spec,
+      unicodeChar: item.unicode_char,
       thumbnailUrl: item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}?v=${ASSET_VERSION}` : null,
       groupId: item.group_id,
       groupName: item.group_name,
