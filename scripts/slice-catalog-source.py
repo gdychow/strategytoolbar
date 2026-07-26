@@ -294,7 +294,14 @@ def extract_reconstruct_spec(shape):
         "rotation": shape.rotation,
         "fill": extract_fill(shape),
         "line": extract_line(shape),
-        "text": extract_text_spec(shape),
+        # Must match ShapeSpec.paragraphs in src/features/libraryInsert.ts,
+        # which is what insertReconstructedItem's applyParagraphs() actually
+        # reads - this key was previously named "text", a silent mismatch
+        # that made every script-seeded reconstruct-mode item's real text
+        # content get dropped on insert with no error (found while curating
+        # the Symbols category; confirmed against catalog-objects/stamps/
+        # diagrams.json, which shipped with the wrong key).
+        "paragraphs": extract_text_spec(shape),
     }
     if not is_text_box:
         prst_el = shape._element.find(".//" + qn("a:prstGeom"))
