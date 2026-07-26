@@ -389,7 +389,21 @@ def slice_single_slide(
     if x_offset_pt:
         offset_emu = round(x_offset_pt * EMU_PER_POINT)
         for shape in remaining_slide.shapes:
-            shape.left = shape.left + offset_emu
+            # Setting only .left on a shape that has no explicit <a:xfrm>
+            # of its own (a placeholder relying on inheriting position/
+            # size from its layout - e.g. a title) makes python-pptx write
+            # a *new* xfrm containing only <a:off>, never <a:ext> -
+            # PowerPoint then renders it at an effectively zero width
+            # instead of falling back to the inherited size (confirmed in
+            # real PowerPoint: a title's text wrapped to one character per
+            # line). Setting all four dimensions together always
+            # materializes a complete xfrm, regardless of whether the
+            # shape had one before.
+            left, top, width, height = shape.left, shape.top, shape.width, shape.height
+            shape.left = left + offset_emu
+            shape.top = top
+            shape.width = width
+            shape.height = height
     if target_width_pt is not None:
         prs.slide_width = round(target_width_pt * EMU_PER_POINT)
 
