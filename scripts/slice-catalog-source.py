@@ -87,13 +87,28 @@ def has_cust_geom(element) -> bool:
 
 
 def has_picture(element) -> bool:
-    return element.find(".//" + qn("p:pic")) is not None
+    # element.tag check needed alongside .//: a top-level (non-grouped)
+    # picture shape's own _element IS the <p:pic> node - "shape._element.find('.//p:pic')"
+    # only searches descendants, so it misses a standalone picture entirely
+    # (found via Symbols.pptx slides 6-7, each a single top-level <p:pic>
+    # with a plain prstGeom="rect" bounding box - the missed check let
+    # classify_shape_tree fall through to the prstGeom mapping and
+    # misclassify these as a reconstructable empty rectangle, silently
+    # dropping the actual image). Nested pictures (inside a group) are
+    # still correctly caught by the descendant search alone.
+    return element.tag == qn("p:pic") or element.find(".//" + qn("p:pic")) is not None
 
 
 def has_other_graphic_frame(element) -> bool:
     # Any graphicFrame other than the (already-excluded) think-cell one -
     # tables, charts, SmartArt. Not handled by the reconstruct path.
-    return element.find(".//" + qn("p:graphicFrame")) is not None
+    # Same self-vs-descendant gap as has_picture() above: a top-level
+    # graphicFrame's own _element IS the <p:graphicFrame> node, which a
+    # pure ".//" descendant search misses. Not observed to matter in
+    # practice yet (a graphicFrame has no prstGeom, so classify_shape_tree
+    # already falls through to 'file' mode via the "no mapped preset"
+    # branch either way) - fixed anyway for correctness, not defensively.
+    return element.tag == qn("p:graphicFrame") or element.find(".//" + qn("p:graphicFrame")) is not None
 
 
 def has_custom_bullet_char(element) -> bool:

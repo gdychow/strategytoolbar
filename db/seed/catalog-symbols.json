@@ -78,37 +78,15 @@
     },
     {
       "title": "Symbols #6",
-      "insertMode": "reconstruct",
-      "reconstructSpec": {
-        "kind": "geometricShape",
-        "left": 390.9,
-        "top": 180.9,
-        "width": 178.19,
-        "height": 178.19,
-        "rotation": 0,
-        "fill": null,
-        "line": null,
-        "text": null,
-        "presetGeometry": "Rectangle"
-      },
+      "insertMode": "file",
+      "sourceFile": "symbols/symbols-006.pptx",
       "thumbnail": "symbols/symbols-006.png",
       "sortOrder": 6
     },
     {
       "title": "Symbols #7",
-      "insertMode": "reconstruct",
-      "reconstructSpec": {
-        "kind": "geometricShape",
-        "left": 411.7,
-        "top": 201.7,
-        "width": 136.6,
-        "height": 136.6,
-        "rotation": 0,
-        "fill": null,
-        "line": null,
-        "text": null,
-        "presetGeometry": "Rectangle"
-      },
+      "insertMode": "file",
+      "sourceFile": "symbols/symbols-007.pptx",
       "thumbnail": "symbols/symbols-007.png",
       "sortOrder": 7
     },
