@@ -235,26 +235,6 @@ button:disabled {
   flex: none;
 }
 
-.color-picker-custom {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-#colorPickerHexInput {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 4px 6px;
-  font-size: 12px;
-  border: 1px solid #c8c8c8;
-  border-radius: 4px;
-  background: #fafafa;
-}
-
-#colorPickerApply {
-  flex: 0 0 auto;
-}
-
 .color-picker-more {
   width: 100%;
   font-size: 11px;

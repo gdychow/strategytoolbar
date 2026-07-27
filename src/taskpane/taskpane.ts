@@ -142,8 +142,6 @@ function initColorPickerPanel(): void {
   const standardSwatches = document.getElementById("colorPickerStandardSwatches");
   const customSection = document.getElementById("colorPickerCustomSection");
   const customSwatches = document.getElementById("colorPickerCustomSwatches");
-  const hexInput = document.getElementById("colorPickerHexInput") as HTMLInputElement | null;
-  const applyBtn = document.getElementById("colorPickerApply");
   const moreBtn = document.getElementById("colorPickerMore") as HTMLButtonElement | null;
   const eyedropperBtn = document.getElementById("colorPickerEyedropper") as HTMLButtonElement | null;
   if (
@@ -154,8 +152,6 @@ function initColorPickerPanel(): void {
     !standardSwatches ||
     !customSection ||
     !customSwatches ||
-    !hexInput ||
-    !applyBtn ||
     !moreBtn ||
     !eyedropperBtn
   ) {
@@ -185,15 +181,6 @@ function initColorPickerPanel(): void {
     const handler = activeNoColorHandler;
     closeColorPickerPanel();
     if (handler) withErrorHandling(handler)();
-  });
-
-  applyBtn.addEventListener("click", () => {
-    const hex = hexInput.value.trim();
-    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
-      applyPickedColor(hex);
-    } else {
-      notify("Enter a color as #RRGGBB.", "error");
-    }
   });
 
   moreBtn.addEventListener("click", () => {
@@ -285,8 +272,6 @@ function openColorPickerPanel(
   const moreBtn = document.getElementById("colorPickerMore");
   if (moreBtn) moreBtn.textContent = MORE_COLORS_LABELS[kind];
 
-  const hexInput = document.getElementById("colorPickerHexInput") as HTMLInputElement | null;
-  if (hexInput) hexInput.value = "";
   positionPanelWithinViewport(panel, caret.getBoundingClientRect());
 }
 
