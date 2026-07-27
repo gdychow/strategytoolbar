@@ -44,14 +44,12 @@
       <button type="button" id="fillColorSwatch" class="color-swatch" title="Apply fill color"></button>
       <button type="button" id="fillColorCaret" class="color-caret" aria-label="Choose fill color">▾</button>
       <input type="color" id="fillColorInput" class="color-input-hidden" tabindex="-1" />
-      <button id="btnNoFill"><img class="btn-icon" src="/assets/icons/NoFill24x24.png" alt="" /><span class="btn-label">No Fill</span></button>
     </div>
     <div class="color-row">
       <label for="lineColorSwatch">Line</label>
       <button type="button" id="lineColorSwatch" class="color-swatch" title="Apply line color"></button>
       <button type="button" id="lineColorCaret" class="color-caret" aria-label="Choose line color">▾</button>
       <input type="color" id="lineColorInput" class="color-input-hidden" tabindex="-1" />
-      <button id="btnNoLine"><img class="btn-icon" src="/assets/icons/LineNoLine.png" alt="" /><span class="btn-label">No Line</span></button>
     </div>
     <div class="color-row">
       <label for="textColorSwatch">Text</label>
@@ -170,17 +168,23 @@
     deliberately-chosen escape hatch for full-spectrum picking.
   -->
   <div id="colorPickerPanel" class="color-picker-panel" style="display: none;">
+    <button type="button" id="colorPickerNoColor" class="color-picker-no-color" style="display: none;"></button>
     <div id="colorPickerThemeSection" style="display: none;">
       <div class="color-picker-label">Theme Colors</div>
-      <div class="color-picker-theme-rows" id="colorPickerThemeSwatches"></div>
+      <div class="color-picker-theme-grid" id="colorPickerThemeSwatches"></div>
     </div>
     <div class="color-picker-label">Standard Colors</div>
     <div class="color-picker-swatches" id="colorPickerStandardSwatches"></div>
+    <div id="colorPickerCustomSection" style="display: none;">
+      <div class="color-picker-label">Custom Colors</div>
+      <div class="color-picker-swatches" id="colorPickerCustomSwatches"></div>
+    </div>
     <div class="color-picker-custom">
       <input type="text" id="colorPickerHexInput" placeholder="#RRGGBB" maxlength="7" />
       <button type="button" id="colorPickerApply">Apply</button>
     </div>
-    <button type="button" id="colorPickerMore" class="color-picker-more">More colors…</button>
+    <button type="button" id="colorPickerMore" class="color-picker-more"></button>
+    <button type="button" id="colorPickerEyedropper" class="color-picker-more" style="display: none;">Pick color from screen…</button>
   </div>
 
   <script src="/taskpane.js?v=__CACHE_BUST__"></script>

@@ -1,6 +1,8 @@
 import { bindStatusElement, notify, withErrorHandling } from "../core/ui";
+import { darken, THEME_SHADE_PERCENTS } from "../core/colorMath";
 import * as Layout from "../features/layout";
 import * as FillLineColors from "../features/fillLineColors";
+import * as CustomColors from "../features/customColors";
 import * as OtherTweaks from "../features/otherTweaks";
 import * as TableFormat from "../features/tableFormat";
 import * as Library from "../features/libraryInsert";
@@ -40,9 +42,18 @@ const STANDARD_COLOR_PALETTE = [
   "#7030A0",
 ];
 
+type ColorControlKind = "fill" | "line" | "text";
+
+const NO_COLOR_LABELS: Record<ColorControlKind, string | null> = {
+  fill: "No Fill",
+  line: "No Line",
+  text: null, // native PowerPoint's Font Color dropdown has no "No Text Color" option
+};
+
 let activeColorHandler: ((hex: string) => Promise<void>) | null = null;
 let activeColorInput: HTMLInputElement | null = null;
 let activeColorSwatch: HTMLButtonElement | null = null;
+let activeNoColorHandler: (() => Promise<void>) | null = null;
 
 function closeColorPickerPanel(): void {
   const panel = document.getElementById("colorPickerPanel");
@@ -50,6 +61,7 @@ function closeColorPickerPanel(): void {
   activeColorHandler = null;
   activeColorInput = null;
   activeColorSwatch = null;
+  activeNoColorHandler = null;
 }
 
 function applyPickedColor(hex: string): void {
@@ -63,45 +75,36 @@ function applyPickedColor(hex: string): void {
 }
 
 function renderColorSwatches(container: Element, hexes: string[]): void {
-  for (const hex of hexes) {
-    const swatchBtn = document.createElement("button");
-    swatchBtn.type = "button";
-    swatchBtn.className = "color-picker-swatch";
-    swatchBtn.style.backgroundColor = hex;
-    swatchBtn.title = hex;
-    swatchBtn.addEventListener("click", () => applyPickedColor(hex));
-    container.appendChild(swatchBtn);
-  }
+  for (const hex of hexes) addSwatch(container, hex, hex);
+}
+
+function addSwatch(container: Element, hex: string, title: string): void {
+  const swatchBtn = document.createElement("button");
+  swatchBtn.type = "button";
+  swatchBtn.className = "color-picker-swatch";
+  swatchBtn.style.backgroundColor = hex;
+  swatchBtn.title = title;
+  swatchBtn.addEventListener("click", () => applyPickedColor(hex));
+  container.appendChild(swatchBtn);
 }
 
 /**
- * Theme colors get a labeled-row layout instead of the bare grid the
- * standard palette uses — a role name (e.g. "Accent 3") next to its own
- * swatch, visible at a glance rather than hidden behind a hover tooltip.
- * Deliberately more verbose than the standard grid: which named role maps
- * to which actual color is exactly the thing worth being able to check
- * directly against what PowerPoint's own picker shows for the same file.
+ * Matches PowerPoint's own Theme Colors grid: the 10 base roles across the
+ * top row, then 5 more rows of "Darker N%" shades beneath each — 60
+ * swatches total. The role name (plus shade percent, for the shaded rows)
+ * is on the hover tooltip rather than shown inline, same as the standard
+ * palette below it.
  */
-function renderThemeColorRows(container: Element, colors: { label: string; hex: string }[]): void {
-  for (const { label, hex } of colors) {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "color-picker-theme-row";
-    row.title = hex;
-    row.addEventListener("click", () => applyPickedColor(hex));
-
-    const swatch = document.createElement("span");
-    swatch.className = "color-picker-swatch";
-    swatch.style.backgroundColor = hex;
-
-    const text = document.createElement("span");
-    text.className = "color-picker-theme-label";
-    text.textContent = `${label} (${hex})`;
-
-    row.appendChild(swatch);
-    row.appendChild(text);
-    container.appendChild(row);
+function renderThemeColorGrid(container: Element, colors: { label: string; hex: string }[]): void {
+  for (const { label, hex } of colors) addSwatch(container, hex, label);
+  for (const percent of THEME_SHADE_PERCENTS) {
+    for (const { label, hex } of colors) addSwatch(container, darken(hex, percent), `${label}, Darker ${percent}%`);
   }
+}
+
+/** Custom Colors swatches are titled with their real name (e.g. "Wiley Blue"), not their hex — that's the whole point of a named palette. */
+function renderNamedColorSwatches(container: Element, colors: { name: string; hex: string }[]): void {
+  for (const { name, hex } of colors) addSwatch(container, hex, name);
 }
 
 /**
@@ -115,24 +118,47 @@ function renderThemeColorRows(container: Element, colors: { label: string; hex: 
  * it at the screen's bottom-left. A plain in-page dropdown behaves like
  * any other positioned element instead, so it doesn't have that problem.
  *
- * Colors come from three places: the deck's own actual theme colors
- * (fetched once here, async — see FillLineColors.getThemeColors), a
- * fixed standard palette matching PowerPoint's own picker, and a hex
- * input for anything else. "More colors…" still opens the native
+ * Colors come from four places, top to bottom matching PowerPoint's own
+ * dropdown: No Fill/No Line (kind-conditional, see openColorPickerPanel),
+ * the deck's own actual theme colors plus their "Darker N%" shades
+ * (fetched once here, async — see FillLineColors.getThemeColors and
+ * renderThemeColorGrid), a fixed standard palette matching PowerPoint's
+ * own picker, the deck's named Custom Colors if the template has any (see
+ * CustomColors.getCustomColors), and a hex input for anything else.
+ * "More [Fill/Line/Text] Colors…" still opens the native
  * <input type="color"> as a last resort for full-spectrum picking — its
  * position isn't reliable (the same bug this panel exists to work around
  * everywhere else), but as a secondary, deliberately-chosen action that's
- * an acceptable trade for getting the full color spectrum back.
+ * an acceptable trade for getting the full color spectrum back. The
+ * eyedropper button is shown only on browsers that actually support the
+ * EyeDropper API (Chromium; not WebKit/Mac Office) — feature-detected
+ * once here rather than assumed.
  */
 function initColorPickerPanel(): void {
   const panel = document.getElementById("colorPickerPanel");
+  const noColorBtn = document.getElementById("colorPickerNoColor") as HTMLButtonElement | null;
   const themeSection = document.getElementById("colorPickerThemeSection");
   const themeSwatches = document.getElementById("colorPickerThemeSwatches");
   const standardSwatches = document.getElementById("colorPickerStandardSwatches");
+  const customSection = document.getElementById("colorPickerCustomSection");
+  const customSwatches = document.getElementById("colorPickerCustomSwatches");
   const hexInput = document.getElementById("colorPickerHexInput") as HTMLInputElement | null;
   const applyBtn = document.getElementById("colorPickerApply");
-  const moreBtn = document.getElementById("colorPickerMore");
-  if (!panel || !themeSection || !themeSwatches || !standardSwatches || !hexInput || !applyBtn || !moreBtn) {
+  const moreBtn = document.getElementById("colorPickerMore") as HTMLButtonElement | null;
+  const eyedropperBtn = document.getElementById("colorPickerEyedropper") as HTMLButtonElement | null;
+  if (
+    !panel ||
+    !noColorBtn ||
+    !themeSection ||
+    !themeSwatches ||
+    !standardSwatches ||
+    !customSection ||
+    !customSwatches ||
+    !hexInput ||
+    !applyBtn ||
+    !moreBtn ||
+    !eyedropperBtn
+  ) {
     console.warn("Color picker panel not found in taskpane.html");
     return;
   }
@@ -142,10 +168,24 @@ function initColorPickerPanel(): void {
   FillLineColors.getThemeColors()
     .then((colors) => {
       if (colors.length === 0) return; // unsupported PowerPoint build — leave the section hidden, not an error
-      renderThemeColorRows(themeSwatches, colors);
+      renderThemeColorGrid(themeSwatches, colors);
       themeSection.style.display = "block";
     })
     .catch((err) => console.warn("Couldn't load theme colors:", err));
+
+  CustomColors.getCustomColors()
+    .then((colors) => {
+      if (colors.length === 0) return; // unsupported build, or the template just has no custom colours defined
+      renderNamedColorSwatches(customSwatches, colors);
+      customSection.style.display = "block";
+    })
+    .catch((err) => console.warn("Couldn't load custom colors:", err));
+
+  noColorBtn.addEventListener("click", () => {
+    const handler = activeNoColorHandler;
+    closeColorPickerPanel();
+    if (handler) withErrorHandling(handler)();
+  });
 
   applyBtn.addEventListener("click", () => {
     const hex = hexInput.value.trim();
@@ -164,6 +204,18 @@ function initColorPickerPanel(): void {
       activeColorInput.click();
     }
   });
+
+  if ("EyeDropper" in window) {
+    eyedropperBtn.style.display = "block";
+    eyedropperBtn.addEventListener("click", async () => {
+      try {
+        const result = await new window.EyeDropper!().open();
+        applyPickedColor(result.sRGBHex);
+      } catch {
+        // user cancelled (Escape / clicked elsewhere) — nothing to do
+      }
+    });
+  }
 
   document.addEventListener("click", (e) => {
     if (panel.style.display === "none") return;
@@ -203,17 +255,36 @@ function positionPanelWithinViewport(panel: HTMLElement, caretRect: DOMRect): vo
   panel.style.top = `${top}px`;
 }
 
+const MORE_COLORS_LABELS: Record<ColorControlKind, string> = {
+  fill: "More Fill Colors…",
+  line: "More Line Colors…",
+  text: "More Text Colors…",
+};
+
 function openColorPickerPanel(
   caret: HTMLElement,
   input: HTMLInputElement,
   swatch: HTMLButtonElement,
-  handler: (hex: string) => Promise<void>
+  kind: ColorControlKind,
+  handler: (hex: string) => Promise<void>,
+  noColorHandler?: () => Promise<void>
 ): void {
   const panel = document.getElementById("colorPickerPanel");
   if (!panel) return;
   activeColorHandler = handler;
   activeColorInput = input;
   activeColorSwatch = swatch;
+  activeNoColorHandler = noColorHandler ?? null;
+
+  const noColorBtn = document.getElementById("colorPickerNoColor") as HTMLButtonElement | null;
+  if (noColorBtn) {
+    const label = NO_COLOR_LABELS[kind];
+    noColorBtn.style.display = label && noColorHandler ? "block" : "none";
+    noColorBtn.textContent = label ?? "";
+  }
+  const moreBtn = document.getElementById("colorPickerMore");
+  if (moreBtn) moreBtn.textContent = MORE_COLORS_LABELS[kind];
+
   const hexInput = document.getElementById("colorPickerHexInput") as HTMLInputElement | null;
   if (hexInput) hexInput.value = "";
   positionPanelWithinViewport(panel, caret.getBoundingClientRect());
@@ -225,17 +296,28 @@ function openColorPickerPanel(
  * immediately — no picker in the way, so reusing the same color across
  * several shapes is one click each time. The caret opens the shared custom
  * color picker panel (see initColorPickerPanel) to actually change the
- * color; that panel's "More colors…" button re-purposes this same hidden
- * input to reach the native OS picker for full-spectrum picking, so this
- * still needs to react when the input's value changes there (listened on
- * `input` rather than `change` — macOS's native colour panel has no
- * explicit commit action, and `change` is unreliable in WKWebView-hosted
- * Mac Office task panes, while `input` fires live as the user moves around
- * the picker). Debounced so dragging around that picker doesn't fire a
- * PowerPoint.run call per pixel — it applies once movement settles for
- * 150ms.
+ * color; that panel's "More [Fill/Line/Text] Colors…" button re-purposes
+ * this same hidden input to reach the native OS picker for full-spectrum
+ * picking, so this still needs to react when the input's value changes
+ * there (listened on `input` rather than `change` — macOS's native colour
+ * panel has no explicit commit action, and `change` is unreliable in
+ * WKWebView-hosted Mac Office task panes, while `input` fires live as the
+ * user moves around the picker). Debounced so dragging around that picker
+ * doesn't fire a PowerPoint.run call per pixel — it applies once movement
+ * settles for 150ms.
+ *
+ * `kind` drives the panel's per-control bits (see openColorPickerPanel):
+ * which "No Fill"/"No Line" label (if any) to show, and the "More ...
+ * Colors…" button's label. `noColorHandler`, when given, is what "No
+ * Fill"/"No Line" actually calls — omitted for text, which has no
+ * equivalent in PowerPoint's own Font Color dropdown.
  */
-function bindColorControl(baseId: string, handler: (hex: string) => Promise<void>): void {
+function bindColorControl(
+  baseId: string,
+  kind: ColorControlKind,
+  handler: (hex: string) => Promise<void>,
+  noColorHandler?: () => Promise<void>
+): void {
   const input = document.getElementById(`${baseId}Input`) as HTMLInputElement | null;
   const swatch = document.getElementById(`${baseId}Swatch`) as HTMLButtonElement | null;
   const caret = document.getElementById(`${baseId}Caret`) as HTMLButtonElement | null;
@@ -254,7 +336,7 @@ function bindColorControl(baseId: string, handler: (hex: string) => Promise<void
   });
 
   swatch.addEventListener("click", withErrorHandling(() => handler(input.value)));
-  caret.addEventListener("click", () => openColorPickerPanel(caret, input, swatch, handler));
+  caret.addEventListener("click", () => openColorPickerPanel(caret, input, swatch, kind, handler, noColorHandler));
 }
 
 function setSectionEnabled(sectionId: string, enabled: boolean, reason?: string): void {
@@ -546,25 +628,33 @@ Office.onReady((info) => {
   }
 
   // Fill, line & text color
-  bindColorControl("fillColor", async (hex) => {
-    await FillLineColors.fillColor(FillLineColors.hexToRgb(hex));
-    notify(`Fill set to ${hex}.`);
-  });
-  bindColorControl("lineColor", async (hex) => {
-    await FillLineColors.lineColor(FillLineColors.hexToRgb(hex));
-    notify(`Line set to ${hex}.`);
-  });
-  bindColorControl("textColor", async (hex) => {
+  bindColorControl(
+    "fillColor",
+    "fill",
+    async (hex) => {
+      await FillLineColors.fillColor(FillLineColors.hexToRgb(hex));
+      notify(`Fill set to ${hex}.`);
+    },
+    async () => {
+      await FillLineColors.noFill();
+      notify("Fill removed.");
+    }
+  );
+  bindColorControl(
+    "lineColor",
+    "line",
+    async (hex) => {
+      await FillLineColors.lineColor(FillLineColors.hexToRgb(hex));
+      notify(`Line set to ${hex}.`);
+    },
+    async () => {
+      await FillLineColors.noLine();
+      notify("Line removed.");
+    }
+  );
+  bindColorControl("textColor", "text", async (hex) => {
     await FillLineColors.textColor(FillLineColors.hexToRgb(hex));
     notify(`Text color set to ${hex}.`);
-  });
-  bindButton("btnNoFill", async () => {
-    await FillLineColors.noFill();
-    notify("Fill removed.");
-  });
-  bindButton("btnNoLine", async () => {
-    await FillLineColors.noLine();
-    notify("Line removed.");
   });
 
   // Position & size

@@ -180,12 +180,20 @@ button:disabled {
 .color-picker-panel {
   position: fixed;
   z-index: 1000;
-  width: 240px;
+  width: 258px;
   background: #fff;
   border: 1px solid #c8c8c8;
   border-radius: 6px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
   padding: 8px;
+}
+
+/* First item in the panel, matching PowerPoint's own Fill/Line dropdown — shown/labeled per control kind by openColorPickerPanel in taskpane.ts. */
+.color-picker-no-color {
+  width: 100%;
+  margin-bottom: 8px;
+  text-align: left;
+  justify-content: flex-start;
 }
 
 .color-picker-label {
@@ -203,32 +211,12 @@ button:disabled {
   margin-bottom: 8px;
 }
 
-/* One labeled row per theme color role (see renderThemeColorRows) - a role name is worth showing directly, not hiding behind a hover tooltip. */
-.color-picker-theme-rows {
-  display: flex;
-  flex-direction: column;
+/* 10 base theme roles across the top row, then 5 more rows of "Darker N%" shades beneath — matches PowerPoint's own Theme Colors grid (see renderThemeColorGrid). Role/shade is on the hover tooltip, same as every other swatch grid in this panel. */
+.color-picker-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
   gap: 2px;
   margin-bottom: 8px;
-}
-
-.color-picker-theme-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 4px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  text-align: left;
-}
-
-.color-picker-theme-row:hover {
-  background: #f0f0f0;
-}
-
-.color-picker-theme-label {
-  font-size: 11px;
-  color: #444;
 }
 
 .color-picker-swatch {
