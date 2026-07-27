@@ -15,17 +15,18 @@
   <div id="status" class="status">Loading...</div>
 
   <section id="sectionAuth">
-    <h2>Sign In (prototype)</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Sign In (prototype)</h2>
     <p class="unsupported-note"></p>
     <p id="signInStatus" class="sign-in-status">Not signed in.</p>
     <div class="btn-row">
       <button id="btnSignIn">Sign In</button>
+      <button id="btnOpenAdmin" style="display: none;">Open Admin…</button>
     </div>
     <pre id="authClaims" style="font-size: 11px; background: #f5f5f5; padding: 6px; border-radius: 4px; white-space: pre-wrap; display: none;"></pre>
   </section>
 
   <section id="sectionLibrary">
-    <h2>Content Library</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Content Library</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
       <button id="btnBrowseLibrary">Browse Library…</button>
@@ -37,20 +38,20 @@
   </section>
 
   <section id="sectionColor">
-    <h2>Fill, Line &amp; Text Color</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Fill, Line &amp; Text Color</h2>
     <div class="color-row">
       <label for="fillColorSwatch">Fill</label>
       <button type="button" id="fillColorSwatch" class="color-swatch" title="Apply fill color"></button>
       <button type="button" id="fillColorCaret" class="color-caret" aria-label="Choose fill color">▾</button>
       <input type="color" id="fillColorInput" class="color-input-hidden" tabindex="-1" />
-      <button id="btnNoFill">No Fill</button>
+      <button id="btnNoFill" title="No Fill"><img class="btn-icon" src="/assets/icons/NoFill24x24.png" alt="" /></button>
     </div>
     <div class="color-row">
       <label for="lineColorSwatch">Line</label>
       <button type="button" id="lineColorSwatch" class="color-swatch" title="Apply line color"></button>
       <button type="button" id="lineColorCaret" class="color-caret" aria-label="Choose line color">▾</button>
       <input type="color" id="lineColorInput" class="color-input-hidden" tabindex="-1" />
-      <button id="btnNoLine">No Line</button>
+      <button id="btnNoLine" title="No Line"><img class="btn-icon" src="/assets/icons/LineNoLine.png" alt="" /></button>
     </div>
     <div class="color-row">
       <label for="textColorSwatch">Text</label>
@@ -61,56 +62,56 @@
   </section>
 
   <section id="sectionPosition">
-    <h2>Position &amp; Size</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Position &amp; Size</h2>
     <div class="btn-row">
-      <button id="btnGetPosition">Get Position</button>
-      <button id="btnSetPosition">Set Position</button>
+      <button id="btnGetPosition" title="Get Position"><img class="btn-icon" src="/assets/icons/LayoutGetPosition.png" alt="" /></button>
+      <button id="btnSetPosition" title="Set Position"><img class="btn-icon" src="/assets/icons/LayoutSetPosition.png" alt="" /></button>
     </div>
     <div class="btn-row">
-      <button id="btnGetPositionBottom">Get Position (Bottom)</button>
-      <button id="btnSetPositionBottom">Set Position (Bottom)</button>
+      <button id="btnGetPositionBottom" title="Get Position (Bottom)"><img class="btn-icon" src="/assets/icons/GetPositionbottom.png" alt="" /></button>
+      <button id="btnSetPositionBottom" title="Set Position (Bottom)"><img class="btn-icon" src="/assets/icons/SetPositionbottom.png" alt="" /></button>
     </div>
     <div class="btn-row">
-      <button id="btnFixSize">Fix Size</button>
-      <button id="btnFixWidth">Fix Width</button>
-      <button id="btnFixHeight">Fix Height</button>
+      <button id="btnFixSize" title="Fix Size"><img class="btn-icon" src="/assets/icons/LayoutFixSize.png" alt="" /></button>
+      <button id="btnFixWidth" title="Fix Width"><img class="btn-icon" src="/assets/icons/LayoutFixWidth.png" alt="" /></button>
+      <button id="btnFixHeight" title="Fix Height"><img class="btn-icon" src="/assets/icons/LayoutFixHeight.png" alt="" /></button>
     </div>
     <div class="btn-row">
-      <button id="btnSwitchPositions">Switch Positions</button>
+      <button id="btnSwitchPositions" title="Switch Positions"><img class="btn-icon" src="/assets/icons/LayoutSwitch.png" alt="" /></button>
     </div>
   </section>
 
   <section id="sectionAlign">
-    <h2>Align &amp; Distribute</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Align &amp; Distribute</h2>
     <div class="btn-row">
-      <button id="btnHvAlign">Grid Align</button>
-      <button id="btnHvDistribute">Grid Distribute</button>
+      <button id="btnHvAlign" title="Grid Align"><img class="btn-icon" src="/assets/icons/LayoutHV_Align.png" alt="" /></button>
+      <button id="btnHvDistribute" title="Grid Distribute"><img class="btn-icon" src="/assets/icons/LayoutHV_Distribute.png" alt="" /></button>
     </div>
     <div class="btn-row">
       <button id="btnDistributeH">Distribute Horizontally</button>
       <button id="btnDistributeV">Distribute Vertically</button>
     </div>
     <div class="btn-row">
-      <button id="btnEdgeJoinH">Edge Join (Horizontal)</button>
-      <button id="btnEdgeJoinV">Edge Join (Vertical)</button>
+      <button id="btnEdgeJoinH" title="Edge Join (Horizontal)"><img class="btn-icon" src="/assets/icons/join_horizontal.png" alt="" /></button>
+      <button id="btnEdgeJoinV" title="Edge Join (Vertical)"><img class="btn-icon" src="/assets/icons/join_vertical.png" alt="" /></button>
     </div>
   </section>
 
   <section id="sectionCentre">
-    <h2>Centre on Slide</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Centre on Slide</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
-      <button id="btnCentreH">Centre Horizontal</button>
-      <button id="btnCentreV">Centre Vertical</button>
-      <button id="btnCentreHV">Centre Both</button>
+      <button id="btnCentreH" title="Centre Horizontal"><img class="btn-icon" src="/assets/icons/LayoutCenteronSlideHorizontal.png" alt="" /></button>
+      <button id="btnCentreV" title="Centre Vertical"><img class="btn-icon" src="/assets/icons/LayoutCenteronSlideVertical.png" alt="" /></button>
+      <button id="btnCentreHV" title="Centre Both"><img class="btn-icon" src="/assets/icons/LayoutCenteronSlide.png" alt="" /></button>
     </div>
     <div class="btn-row">
-      <button id="btnTwoUpLeft">Two-Up: Left</button>
-      <button id="btnTwoUpRight">Two-Up: Right</button>
+      <button id="btnTwoUpLeft" title="Two-Up: Left"><img class="btn-icon" src="/assets/icons/TextTwoUpTitleLeft.png" alt="" /></button>
+      <button id="btnTwoUpRight" title="Two-Up: Right"><img class="btn-icon" src="/assets/icons/TextTwoUpTitleRight.png" alt="" /></button>
     </div>
     <div class="btn-row">
-      <button id="btnHalfSlideLeft">Half-Slide: Left</button>
-      <button id="btnHalfSlideRight">Half-Slide: Right</button>
+      <button id="btnHalfSlideLeft" title="Half-Slide: Left"><img class="btn-icon" src="/assets/icons/AlignCentreLeft.png" alt="" /></button>
+      <button id="btnHalfSlideRight" title="Half-Slide: Right"><img class="btn-icon" src="/assets/icons/AlignCentreRight.png" alt="" /></button>
     </div>
     <div class="btn-row">
       <button id="btnResetMargins">Reset Template Margins</button>
@@ -118,19 +119,19 @@
   </section>
 
   <section id="sectionAngles">
-    <h2>Angle Tools</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Angle Tools</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
-      <button id="btnAlignAngles">Align Angles</button>
-      <button id="btnChevronAlign">Chevron Align</button>
+      <button id="btnAlignAngles" title="Align Angles"><img class="btn-icon" src="/assets/icons/LayoutAlignAngles.png" alt="" /></button>
+      <button id="btnChevronAlign" title="Chevron Align"><img class="btn-icon" src="/assets/icons/ChevronAlign.png" alt="" /></button>
     </div>
   </section>
 
   <section id="sectionOtherTweaks">
-    <h2>Other Tweaks</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Other Tweaks</h2>
     <div class="btn-row">
-      <button id="btnToggleWordWrap">Toggle Word Wrap</button>
-      <button id="btnToggleAutoSize">Toggle Autosize</button>
+      <button id="btnToggleWordWrap" title="Toggle Word Wrap"><img class="btn-icon" src="/assets/icons/Tweaksword_wrapon.png" alt="" /></button>
+      <button id="btnToggleAutoSize" title="Toggle Autosize"><img class="btn-icon" src="/assets/icons/TweaksAutosizeshapeon.png" alt="" /></button>
     </div>
     <div class="color-row">
       <label for="marginInput">Margin</label>
@@ -138,8 +139,8 @@
       <button id="btnSetMargins">Set Margins</button>
     </div>
     <div class="btn-row">
-      <button id="btnClearText">Clear Text</button>
-      <button id="btnPasteAsText">Paste as Text</button>
+      <button id="btnClearText" title="Clear Text"><img class="btn-icon" src="/assets/icons/TweaksClear.png" alt="" /></button>
+      <button id="btnPasteAsText" title="Paste as Text"><img class="btn-icon" src="/assets/icons/TweaksPaste_Text.png" alt="" /></button>
     </div>
     <div class="btn-row">
       <button id="btnBulletsOn">Bullets On</button>
@@ -148,11 +149,11 @@
   </section>
 
   <section id="sectionTables">
-    <h2>Table AutoFormat</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Table AutoFormat</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
-      <button id="btnTableHeaderRow">Header Row Style</button>
-      <button id="btnTableHeaderRowCol">Header Row + Column Style</button>
+      <button id="btnTableHeaderRow" title="Header Row Style"><img class="btn-icon" src="/assets/icons/TablesAddTable.png" alt="" /></button>
+      <button id="btnTableHeaderRowCol" title="Header Row + Column Style"><img class="btn-icon" src="/assets/icons/TablesAddTableOpen.png" alt="" /></button>
     </div>
   </section>
 

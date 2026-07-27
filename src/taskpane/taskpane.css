@@ -28,6 +28,27 @@ section:first-of-type h2 {
   margin-top: 4px;
 }
 
+/*
+ * Grab target for reordering sections (see taskpane.ts's
+ * initSectionReordering). Only this small handle is draggable, not the
+ * whole section — otherwise starting a drag from anywhere in the section
+ * (e.g. clicking a button) would fight with normal clicks.
+ */
+.drag-handle {
+  cursor: grab;
+  margin-right: 6px;
+  color: #999;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+section.dragging {
+  opacity: 0.4;
+}
+
 .btn-row {
   display: flex;
   gap: 6px;
@@ -88,17 +109,17 @@ section:first-of-type h2 {
 
 /*
  * Positioned (not display:none) so showPicker()/click() reliably opens the
- * native picker across engines, but pinned to the row's top-left — right
- * under the swatch/caret — via .color-row's position:relative. Without an
- * explicit top/left here the browser falls back to each element's own
- * "static position" heuristic for an absolutely-positioned flex child,
- * which was placing the (invisible) input, and therefore the OS color
- * picker anchored to it, far from the caret that opened it.
+ * native picker across engines. position:fixed rather than absolute: the
+ * native OS color picker anchors to wherever this <input> actually sits
+ * on screen at the moment showPicker()/click() fires, so taskpane.ts sets
+ * left/top here explicitly (via the caret's own getBoundingClientRect())
+ * right before opening it — a prior attempt pinned this to the *row's*
+ * top-left via position:absolute + .color-row's position:relative, which
+ * didn't reliably track the caret's actual position and still opened the
+ * picker far from it.
  */
 .color-input-hidden {
-  position: absolute;
-  top: 0;
-  left: 0;
+  position: fixed;
   width: 1px;
   height: 1px;
   padding: 0;
@@ -128,6 +149,19 @@ button:hover:not(:disabled) {
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/*
+ * Icons extracted from the original VBA toolbar's own ribbon package
+ * (Package Files/Microsoft/AddIns/StrategyPPT.ppam's customUI/images/) so
+ * these read the same way to a user who already knows that tool. Native
+ * resolution (16-24px) — not scaled up, to avoid blurring these small
+ * pixel-art icons. The button's own title= attribute is the tooltip.
+ */
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
 }
 
 .status {

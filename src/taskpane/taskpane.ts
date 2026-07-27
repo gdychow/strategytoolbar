@@ -52,6 +52,14 @@ function bindColorControl(baseId: string, handler: (hex: string) => Promise<void
 
   swatch.addEventListener("click", withErrorHandling(() => handler(input.value)));
   caret.addEventListener("click", () => {
+    // The native OS color picker anchors to this input's actual on-screen
+    // position at the moment it opens — position it at the caret's own
+    // rect (not a static CSS guess) right before opening it. See
+    // .color-input-hidden's comment in taskpane.css for why this replaced
+    // a CSS-only attempt that didn't reliably track the caret.
+    const rect = caret.getBoundingClientRect();
+    input.style.left = `${rect.left}px`;
+    input.style.top = `${rect.bottom}px`;
     if (typeof input.showPicker === "function") {
       input.showPicker();
     } else {
@@ -170,14 +178,108 @@ function updateSignInStatus(user: SessionUser | null): void {
   }
 }
 
-/** Applies a change in sign-in state everywhere it matters — the status line and the Content Library gate. */
+/** Hides the Sign In button once signed in, and shows the admin-only Open Admin link — the only two other places sign-in/role state should be reflected in the UI. */
+function updateAuthButtons(user: SessionUser | null): void {
+  const signIn = document.getElementById("btnSignIn") as HTMLButtonElement | null;
+  const openAdmin = document.getElementById("btnOpenAdmin") as HTMLButtonElement | null;
+  if (signIn) signIn.style.display = user ? "none" : "";
+  if (openAdmin) openAdmin.style.display = user?.isAdmin ? "" : "none";
+}
+
+/** Applies a change in sign-in state everywhere it matters — the status line, the auth buttons, and the Content Library gate. */
 function applySessionState(user: SessionUser | null): void {
   updateSignInStatus(user);
+  updateAuthButtons(user);
   refreshLibrarySection(user);
+}
+
+const SECTION_ORDER_STORAGE_KEY = "sectionOrder";
+
+function getSections(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>("body > section[id]"));
+}
+
+/**
+ * Re-orders the existing <section> elements to match a previously-saved
+ * order, if any — moves DOM nodes in place rather than re-rendering, so
+ * none of the rest of this file's element lookups/wiring need to change.
+ * Any section ID from a stale saved order no longer present is skipped;
+ * any *current* section missing from a stale saved order (e.g. a future
+ * new section) is appended at the end, keeping its relative position.
+ */
+function applyStoredSectionOrder(): void {
+  const raw = localStorage.getItem(SECTION_ORDER_STORAGE_KEY);
+  if (!raw) return;
+
+  let storedOrder: string[];
+  try {
+    storedOrder = JSON.parse(raw);
+  } catch {
+    return;
+  }
+
+  const sections = getSections();
+  const referenceNode = sections[sections.length - 1]?.nextSibling ?? null;
+  const byId = new Map(sections.map((s) => [s.id, s]));
+
+  const ordered = storedOrder.map((id) => byId.get(id)).filter((s): s is HTMLElement => !!s);
+  const orderedSet = new Set(ordered);
+  for (const s of sections) {
+    if (!orderedSet.has(s)) ordered.push(s);
+  }
+
+  // insertBefore moves an already-attached node rather than duplicating it,
+  // so repeating this in the desired final order builds that order in place.
+  for (const s of ordered) {
+    document.body.insertBefore(s, referenceNode);
+  }
+}
+
+/**
+ * User-customizable section order (per-user, per-machine — hence
+ * localStorage, not shared catalog data). Native HTML5 drag-and-drop, no
+ * library: only the small handle prepended to each <h2> is draggable
+ * (see .drag-handle in taskpane.css), not the whole section, so dragging
+ * never fights with clicking a button inside it.
+ */
+function initSectionReordering(): void {
+  applyStoredSectionOrder();
+
+  let draggedSection: HTMLElement | null = null;
+
+  document.querySelectorAll<HTMLElement>(".drag-handle").forEach((handle) => {
+    handle.addEventListener("dragstart", (e) => {
+      const section = handle.closest("section");
+      if (!section) return;
+      draggedSection = section as HTMLElement;
+      e.dataTransfer?.setData("text/plain", section.id);
+      section.classList.add("dragging");
+    });
+    handle.addEventListener("dragend", () => {
+      draggedSection?.classList.remove("dragging");
+      draggedSection = null;
+    });
+  });
+
+  getSections().forEach((section) => {
+    section.addEventListener("dragover", (e) => {
+      if (!draggedSection || draggedSection === section) return;
+      e.preventDefault();
+      const rect = section.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      section.parentElement?.insertBefore(draggedSection, before ? section : section.nextSibling);
+    });
+    section.addEventListener("drop", (e) => {
+      e.preventDefault();
+      localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(getSections().map((s) => s.id)));
+    });
+  });
 }
 
 Office.onReady((info) => {
   if (info.host !== Office.HostType.PowerPoint) return;
+
+  initSectionReordering();
 
   const statusEl = document.getElementById("status");
   if (statusEl) bindStatusElement(statusEl);
@@ -194,6 +296,9 @@ Office.onReady((info) => {
     await establishSession(user.idToken);
     applySessionState(await getSessionUser());
     notify(`Signed in as ${user.email}`);
+  });
+  document.getElementById("btnOpenAdmin")?.addEventListener("click", () => {
+    window.open("/admin", "_blank");
   });
   setSectionEnabled(
     "sectionAuth",
