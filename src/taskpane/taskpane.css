@@ -211,8 +211,14 @@ button:disabled {
   margin-bottom: 8px;
 }
 
-/* 10 base theme roles across the top row, then 5 more rows of "Darker N%" shades beneath — matches PowerPoint's own Theme Colors grid (see renderThemeColorGrid). Role/shade is on the hover tooltip, same as every other swatch grid in this panel. */
-.color-picker-theme-grid {
+/*
+ * Shared by Theme Colors (10 base roles + 5 "Darker N%" shade rows, see
+ * renderThemeColorGrid) and Custom Colors (see renderNamedColorSwatches) —
+ * both use PowerPoint's own 10-per-row layout, distinct from Standard
+ * Colors' 8-per-row grid above. Role/shade/name is on the hover tooltip,
+ * same as every other swatch grid in this panel.
+ */
+.color-picker-grid-10 {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   gap: 2px;

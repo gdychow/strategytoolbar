@@ -82,6 +82,12 @@ const THEME_COLOR_ROLES: { key: "Light1" | "Dark1" | "Light2" | "Dark2" | "Accen
  * WYSIWYG-correct for what's on screen, regardless of how many masters
  * the file has.
  */
+/** Normalizes whatever ThemeColorScheme.getThemeColor().value actually comes back as into a "#RRGGBB" string — defensively, since real Office hosts aren't guaranteed to match what the docs/samples imply (e.g. a value that already carries its own "#"). */
+function normalizeHex(value: string): string {
+  const trimmed = value.trim();
+  return trimmed.startsWith("#") ? trimmed.toUpperCase() : `#${trimmed.toUpperCase()}`;
+}
+
 export async function getThemeColors(): Promise<{ label: string; hex: string }[]> {
   if (!isThemeColorsSupported()) return [];
   return PowerPoint.run(async (context) => {
@@ -92,6 +98,12 @@ export async function getThemeColors(): Promise<{ label: string; hex: string }[]
     const scheme = slide.themeColorScheme;
     const results = THEME_COLOR_ROLES.map((role) => ({ role, result: scheme.getThemeColor(role.key) }));
     await context.sync();
-    return results.map(({ role, result }) => ({ label: role.label, hex: `#${result.value}` }));
+    return results.map(({ role, result }) => {
+      const hex = normalizeHex(result.value);
+      if (!/^#[0-9A-F]{6}$/.test(hex)) {
+        console.warn(`Unexpected theme color value for ${role.label} (${role.key}): "${result.value}" -> "${hex}"`);
+      }
+      return { label: role.label, hex };
+    });
   });
 }
