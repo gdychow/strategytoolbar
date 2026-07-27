@@ -75,6 +75,36 @@ function renderColorSwatches(container: Element, hexes: string[]): void {
 }
 
 /**
+ * Theme colors get a labeled-row layout instead of the bare grid the
+ * standard palette uses — a role name (e.g. "Accent 3") next to its own
+ * swatch, visible at a glance rather than hidden behind a hover tooltip.
+ * Deliberately more verbose than the standard grid: which named role maps
+ * to which actual color is exactly the thing worth being able to check
+ * directly against what PowerPoint's own picker shows for the same file.
+ */
+function renderThemeColorRows(container: Element, colors: { label: string; hex: string }[]): void {
+  for (const { label, hex } of colors) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "color-picker-theme-row";
+    row.title = hex;
+    row.addEventListener("click", () => applyPickedColor(hex));
+
+    const swatch = document.createElement("span");
+    swatch.className = "color-picker-swatch";
+    swatch.style.backgroundColor = hex;
+
+    const text = document.createElement("span");
+    text.className = "color-picker-theme-label";
+    text.textContent = `${label} (${hex})`;
+
+    row.appendChild(swatch);
+    row.appendChild(text);
+    container.appendChild(row);
+  }
+}
+
+/**
  * Builds the shared color picker panel's contents once and wires its
  * dismiss behavior (click outside, Escape). See the HTML comment above
  * #colorPickerPanel in taskpane.html for why this exists instead of the
@@ -112,13 +142,7 @@ function initColorPickerPanel(): void {
   FillLineColors.getThemeColors()
     .then((colors) => {
       if (colors.length === 0) return; // unsupported PowerPoint build — leave the section hidden, not an error
-      renderColorSwatches(
-        themeSwatches,
-        colors.map((c) => c.hex)
-      );
-      themeSwatches.querySelectorAll(".color-picker-swatch").forEach((el, i) => {
-        (el as HTMLElement).title = `${colors[i].label} (${colors[i].hex})`;
-      });
+      renderThemeColorRows(themeSwatches, colors);
       themeSection.style.display = "block";
     })
     .catch((err) => console.warn("Couldn't load theme colors:", err));

@@ -180,7 +180,7 @@ button:disabled {
 .color-picker-panel {
   position: fixed;
   z-index: 1000;
-  width: 208px;
+  width: 240px;
   background: #fff;
   border: 1px solid #c8c8c8;
   border-radius: 6px;
@@ -201,6 +201,34 @@ button:disabled {
   grid-template-columns: repeat(8, 1fr);
   gap: 4px;
   margin-bottom: 8px;
+}
+
+/* One labeled row per theme color role (see renderThemeColorRows) - a role name is worth showing directly, not hiding behind a hover tooltip. */
+.color-picker-theme-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.color-picker-theme-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.color-picker-theme-row:hover {
+  background: #f0f0f0;
+}
+
+.color-picker-theme-label {
+  font-size: 11px;
+  color: #444;
 }
 
 .color-picker-swatch {
