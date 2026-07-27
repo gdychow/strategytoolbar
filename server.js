@@ -19,6 +19,7 @@ const {
   getGroup,
   createGroup,
   updateGroup,
+  reorderGroups,
   deleteGroup,
   listAllTagNames,
   setItemTags,
@@ -219,6 +220,34 @@ function redirectWithError(res, base, message) {
   res.redirect(303, base + (base.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(message));
 }
 
+// Admin UI Phase 11: every admin edit form now submits via fetch (see the
+// saveCards/group-management inline script in GET /admin) so it can save
+// without a full page reload and report per-card success/failure — but
+// each route keeps its original redirect-based behavior too, as a
+// harmless fallback for anything that still posts here without this
+// header (there's nothing left that does, but it costs nothing to keep).
+function wantsJson(req) {
+  return req.get("Accept") === "application/json";
+}
+
+// insert_mode is informational-only on a catalog item's card (see
+// GET /admin) — never user-editable — but the raw DB value ("file" vs.
+// "reconstruct" vs. "unicode-char") means nothing to an admin without
+// context, so it's shown as a friendly label with an explanatory tooltip
+// instead. "file" mode's tooltip in particular flags a real, deliberate
+// limitation: the thumbnail file input below it only ever replaces the
+// preview image, never the underlying inserted content — replacing that
+// is tracked as its own future feature, not built here.
+const MODE_INFO = {
+  file: {
+    label: "File",
+    title:
+      "Backed by a stored file. The image below only replaces the thumbnail preview — replacing the underlying content isn't built yet.",
+  },
+  reconstruct: { label: "Reconstructed", title: "Built from stored shape properties, not a file." },
+  "unicode-char": { label: "Character", title: "A single character inserted at the cursor — no file or shape." },
+};
+
 // Shared by every /admin* page (Admin UI Phase 10) — /admin stays plain
 // server-rendered HTML with no bundler, so this is one inline <style>
 // block reused verbatim rather than a separate stylesheet file/build step.
@@ -232,11 +261,41 @@ const ADMIN_STYLE = `
   .admin-category-nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 14px 0; padding: 0; list-style: none; }
   .admin-category-nav a { padding: 6px 12px; border: 1px solid #c8c8c8; border-radius: 4px; text-decoration: none; color: #333; font-size: 13px; text-transform: capitalize; }
   .admin-category-nav a.active { background: #1a5fb4; color: #fff; border-color: #1a5fb4; }
-  .admin-group-heading { font-size: 13px; font-weight: 600; color: #444; margin: 26px 0 10px; text-transform: uppercase; letter-spacing: 0.02em; }
-  .admin-group-heading:first-of-type { margin-top: 18px; }
+
+  /* Sticky single Save bar (Admin UI Phase 11) — bleeds past body's own padding to span the full width while staying pinned during scroll. */
+  .admin-save-bar {
+    position: sticky; top: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+    margin: -16px -24px 16px; padding: 10px 24px;
+    background: #fafafa; border-bottom: 1px solid #ddd; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  }
+  #adminSaveStatus { font-size: 12px; color: #555; }
+  #adminSaveAll { padding: 6px 16px; font-size: 13px; font-weight: 600; border: 1px solid #1a5fb4; border-radius: 4px; background: #1a5fb4; color: #fff; cursor: pointer; }
+  #adminSaveAll:disabled { background: #f0f0f0; border-color: #ccc; color: #999; cursor: default; }
+
+  .admin-cluster { margin-bottom: 8px; }
+  .admin-cluster.dragging { opacity: 0.4; }
+  .admin-group-heading-row { display: flex; align-items: center; gap: 6px; margin: 26px 0 10px; }
+  .admin-cluster:first-of-type .admin-group-heading-row { margin-top: 18px; }
+  .admin-group-drag { cursor: grab; color: #999; font-size: 13px; user-select: none; line-height: 1; }
+  .admin-group-drag:active { cursor: grabbing; }
+  .admin-group-heading-input, .admin-group-heading-static {
+    font-size: 13px; font-weight: 600; color: #444; text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .admin-group-heading-input {
+    border: 1px solid transparent; background: none; padding: 2px 4px; border-radius: 3px; flex: 0 1 auto; min-width: 40px;
+  }
+  .admin-group-heading-input:hover { background: #f5f5f5; }
+  .admin-group-heading-input:focus { border-color: #c8c8c8; background: #fff; outline: none; }
+  .admin-group-heading-ungrouped { color: #888; }
+  .admin-group-delete {
+    border: none; background: none; color: #a12525; font-size: 15px; line-height: 1; cursor: pointer; padding: 0 4px;
+  }
+
   .admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
   .admin-card-wrap { position: relative; border: 1px solid #c8c8c8; border-radius: 6px; padding: 8px; background: #fff; display: flex; flex-direction: column; gap: 4px; }
   .admin-card-wrap.dragging { opacity: 0.4; }
+  .admin-card-wrap.dirty { border-color: #1a5fb4; box-shadow: inset 3px 0 0 #1a5fb4; }
   .admin-card-drag { position: absolute; top: 4px; right: 6px; cursor: grab; color: #999; font-size: 13px; user-select: none; line-height: 1; }
   .admin-card-drag:active { cursor: grabbing; }
   .admin-card { display: flex; flex-direction: column; gap: 4px; }
@@ -245,8 +304,9 @@ const ADMIN_STYLE = `
   .admin-card-title, .admin-card-tags, .admin-card select, .admin-card input[type="file"] {
     font-size: 11px; padding: 3px 5px; border: 1px solid #c8c8c8; border-radius: 3px; width: 100%; box-sizing: border-box;
   }
-  .admin-card-mode { font-size: 10px; color: #888; text-transform: uppercase; align-self: flex-start; }
-  .admin-card button, .admin-card-delete button { font-size: 11px; padding: 4px 8px; cursor: pointer; border: 1px solid #c8c8c8; border-radius: 3px; background: #fafafa; width: 100%; }
+  .admin-card-mode { font-size: 10px; color: #888; text-transform: uppercase; align-self: flex-start; cursor: help; }
+  .admin-card-error { font-size: 10px; color: #a12525; }
+  .admin-card-delete button { font-size: 11px; padding: 4px 8px; cursor: pointer; border: 1px solid #c8c8c8; border-radius: 3px; background: #fafafa; width: 100%; }
   .admin-card-delete { margin-top: -2px; }
   .admin-lightbox { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); align-items: center; justify-content: center; z-index: 2000; cursor: zoom-out; }
   .admin-lightbox img { max-width: 90vw; max-height: 90vh; }
@@ -343,21 +403,26 @@ app.get("/admin", async (req, res) => {
   // items trailing under "Ungrouped" — mirrors how the gallery
   // (src/gallery/gallery.ts) clusters the same data for end users, just
   // computed server-side here against the raw DB rows instead of the
-  // client-side /api/catalog/:category JSON.
+  // client-side /api/catalog/:category JSON. Every group gets a section
+  // even if currently empty (Admin UI Phase 11) — a newly-created group
+  // needs somewhere to be renamed/deleted/dropped into before any item
+  // has actually been saved into it.
   const clustersById = new Map(groups.map((g) => [g.id, { id: g.id, name: g.name, items: [] }]));
   const ungrouped = { id: null, name: "Ungrouped", items: [] };
   for (const item of items) {
     (clustersById.get(item.group_id) ?? ungrouped).items.push(item);
   }
-  const clusters = [...groups.map((g) => clustersById.get(g.id)), ungrouped].filter((c) => c.items.length > 0);
+  const clusters = [...groups.map((g) => clustersById.get(g.id)), ungrouped];
 
   const categoryOptions = CATALOG_CATEGORIES.map((c) => `<option value="${c}"${c === category ? " selected" : ""}>${c}</option>`).join("");
   const groupOptionsFor = (currentGroupId) =>
     `<option value="">(none)</option>` +
-    groups.map((g) => `<option value="${g.id}"${g.id === currentGroupId ? " selected" : ""}>${escapeHtml(g.name)}</option>`).join("");
+    groups.map((g) => `<option value="${g.id}"${g.id === currentGroupId ? " selected" : ""}>${escapeHtml(g.name)}</option>`).join("") +
+    `<option value="__new__">+ Add new group…</option>`;
 
   function renderCard(item) {
     const thumbUrl = item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}?v=${ASSET_VERSION}` : null;
+    const mode = MODE_INFO[item.insert_mode];
     return `
       <div class="admin-card-wrap" data-item-id="${item.id}">
         <div class="admin-card-drag" draggable="true" title="Drag to reorder">⠿</div>
@@ -371,25 +436,37 @@ app.get("/admin", async (req, res) => {
           <select name="category">${categoryOptions}</select>
           <select name="groupId">${groupOptionsFor(item.group_id)}</select>
           <input class="admin-card-tags tags-input" name="tags" placeholder="tags" value="${escapeHtml((item.tags || []).join(", "))}">
-          <span class="admin-card-mode">${escapeHtml(item.insert_mode)}</span>
-          <input name="thumbnail" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
-          <button type="submit">Save</button>
+          <span class="admin-card-mode" title="${escapeHtml(mode?.title ?? "")}">${escapeHtml(mode?.label ?? item.insert_mode)}</span>
+          <input name="thumbnail" type="file" accept="image/png,image/jpeg,image/webp,image/gif" title="Replaces the thumbnail preview image only — not the underlying inserted content.">
+          <span class="admin-card-error"></span>
         </form>
-        <form class="admin-card-delete" method="POST" action="/admin/catalog/${item.id}/delete" onsubmit="return confirm('Delete this catalog item permanently?')">
+        <form class="admin-card-delete" method="POST" action="/admin/catalog/${item.id}/delete">
           <button type="submit">Delete</button>
         </form>
       </div>`;
   }
 
-  const clusterSections = clusters
-    .map(
-      (cluster) => `
-      <h2 class="admin-group-heading">${escapeHtml(cluster.name)}</h2>
-      <div class="admin-grid" data-group-id="${cluster.id ?? ""}">
-        ${cluster.items.map(renderCard).join("")}
-      </div>`
-    )
-    .join("");
+  function renderCluster(cluster) {
+    const isReal = cluster.id !== null;
+    const headingRow = isReal
+      ? `<div class="admin-group-heading-row">
+           <span class="admin-group-drag" draggable="true" title="Drag to reorder group">⠿</span>
+           <input class="admin-group-heading-input" data-group-id="${cluster.id}" value="${escapeHtml(cluster.name)}">
+           <button type="button" class="admin-group-delete" data-group-id="${cluster.id}" title="Delete group">×</button>
+         </div>`
+      : `<div class="admin-group-heading-row admin-group-heading-ungrouped">
+           <span class="admin-group-heading-static">${escapeHtml(cluster.name)}</span>
+         </div>`;
+    return `
+      <section class="admin-cluster" data-group-id="${cluster.id ?? ""}">
+        ${headingRow}
+        <div class="admin-grid" data-group-id="${cluster.id ?? ""}">
+          ${cluster.items.map(renderCard).join("")}
+        </div>
+      </section>`;
+  }
+
+  const clusterSections = clusters.map(renderCluster).join("");
 
   const categoryNav = CATALOG_CATEGORIES.map(
     (c) => `<a href="/admin?category=${c}"${c === category ? ' class="active"' : ""}>${c}</a>`
@@ -397,12 +474,15 @@ app.get("/admin", async (req, res) => {
   const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
 
   res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
+    <div id="adminSaveBar" class="admin-save-bar">
+      <span id="adminSaveStatus">No changes</span>
+      <button id="adminSaveAll" type="button" disabled>Save</button>
+    </div>
     <h1>Welcome, admin</h1>
     <p>Signed in as ${escapeHtml(req.user.email)}.<span id="admin-reorder-status" class="admin-reorder-status"></span></p>
     ${errorMsg ? `<p class="admin-error">${escapeHtml(errorMsg)}</p>` : ""}
     <nav class="admin-category-nav">${categoryNav}</nav>
-    <p><a href="/admin/groups?category=${category}">Manage ${escapeHtml(category)} groups &rarr;</a></p>
-    ${clusterSections || "<p>No items in this category yet.</p>"}
+    <div id="adminClusters">${clusterSections}</div>
     <div id="adminLightbox" class="admin-lightbox"><img id="adminLightboxImg" alt=""></div>
     <script>
       const CURRENT_CATEGORY = ${JSON.stringify(category)};
@@ -413,7 +493,9 @@ app.get("/admin", async (req, res) => {
       // before accidentally creating "arrows" next to an existing
       // "arrow". KNOWN_TAGS is embedded at render time rather than
       // fetched separately — the whole vocabulary is small (tens to a
-      // couple hundred entries across ~230 items).
+      // couple hundred entries across ~230 items) — and grows in place as
+      // tags get confirmed within a session, so a repeat mention of the
+      // same new tag across several dirty cards only prompts once.
       const KNOWN_TAGS = ${JSON.stringify(tagNames)};
 
       function levenshtein(a, b) {
@@ -434,33 +516,164 @@ app.get("/admin", async (req, res) => {
         return KNOWN_TAGS.filter((k) => k.toLowerCase() !== lower && levenshtein(lower, k.toLowerCase()) <= threshold);
       }
 
-      document.querySelectorAll(".admin-card").forEach((form) => {
-        form.addEventListener("submit", (e) => {
+      // Checks every given form's tags field, prompting once per *unique*
+      // unknown tag across the whole batch (not once per card) — so the
+      // same typo appearing in five dirty cards doesn't fire five
+      // confirm() dialogs. Returns false (abort the whole save, nothing
+      // submitted) if any prompt is cancelled.
+      function confirmTagsForForms(forms) {
+        const known = new Set(KNOWN_TAGS.map((t) => t.toLowerCase()));
+        const unique = new Map();
+        for (const form of forms) {
           const tagsInput = form.querySelector("input.tags-input");
-          if (!tagsInput) return;
-          const known = new Set(KNOWN_TAGS.map((t) => t.toLowerCase()));
-          const entered = tagsInput.value.split(",").map((t) => t.trim()).filter(Boolean);
-          for (const tag of entered) {
-            if (known.has(tag.toLowerCase())) continue;
-            const suggestions = nearMatches(tag);
-            const msg = suggestions.length
-              ? '"' + tag + '" isn\\'t an existing tag. Did you mean: ' + suggestions.join(", ") + '? Click OK to create "' + tag + '" as a new tag anyway, or Cancel to fix it.'
-              : 'Create new tag "' + tag + '"?';
-            if (!confirm(msg)) {
-              e.preventDefault();
-              tagsInput.focus();
-              return;
-            }
+          if (!tagsInput) continue;
+          for (const tag of tagsInput.value.split(",").map((t) => t.trim()).filter(Boolean)) {
+            if (!known.has(tag.toLowerCase()) && !unique.has(tag.toLowerCase())) unique.set(tag.toLowerCase(), tag);
           }
+        }
+        for (const tag of unique.values()) {
+          const suggestions = nearMatches(tag);
+          const msg = suggestions.length
+            ? '"' + tag + '" isn\\'t an existing tag. Did you mean: ' + suggestions.join(", ") + '? Click OK to create "' + tag + '" as a new tag anyway, or Cancel to fix it.'
+            : 'Create new tag "' + tag + '"?';
+          if (!confirm(msg)) return false;
+          KNOWN_TAGS.push(tag);
+        }
+        return true;
+      }
+
+      // ---- Dirty tracking + single global Save (Admin UI Phase 11) ----
+      // Every card's own Save button is gone — editing several items no
+      // longer means saving them one at a time. groupId selects are
+      // handled separately below (see "+ Add new group…"), since a
+      // transient "__new__" selection shouldn't count as a real edit if
+      // the admin cancels the create-group prompt.
+      const dirtyIds = new Set();
+      const saveStatus = document.getElementById("adminSaveStatus");
+      const saveAllBtn = document.getElementById("adminSaveAll");
+
+      function updateSaveBar() {
+        if (dirtyIds.size === 0) {
+          saveStatus.textContent = "No changes";
+          saveAllBtn.disabled = true;
+        } else {
+          saveStatus.textContent = dirtyIds.size + " unsaved change" + (dirtyIds.size === 1 ? "" : "s");
+          saveAllBtn.disabled = false;
+        }
+      }
+      function markDirty(wrap) {
+        dirtyIds.add(Number(wrap.dataset.itemId));
+        wrap.classList.add("dirty");
+        updateSaveBar();
+      }
+      function clearDirty(wrap) {
+        dirtyIds.delete(Number(wrap.dataset.itemId));
+        wrap.classList.remove("dirty");
+        updateSaveBar();
+      }
+
+      document.querySelectorAll(".admin-card").forEach((form) => {
+        const wrap = form.closest(".admin-card-wrap");
+        form.querySelectorAll("input, select").forEach((field) => {
+          if (field.name === "groupId") return;
+          field.addEventListener("input", () => markDirty(wrap));
+          field.addEventListener("change", () => markDirty(wrap));
         });
       });
 
-      // Drag-and-drop reorder (Admin UI Phase 10) — generalizes the task
-      // pane's own single-list section-reorder pattern
+      window.addEventListener("beforeunload", (e) => {
+        if (dirtyIds.size === 0) return;
+        e.preventDefault();
+        e.returnValue = "";
+      });
+
+      async function saveCards(forms) {
+        if (forms.length === 0) return;
+        if (!confirmTagsForForms(forms)) return;
+
+        const results = await Promise.allSettled(
+          forms.map((form) =>
+            fetch(form.action, { method: "POST", body: new FormData(form), headers: { Accept: "application/json" } }).then(
+              async (res) => {
+                const body = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(body.error || "HTTP " + res.status);
+                return body;
+              }
+            )
+          )
+        );
+
+        let succeeded = 0;
+        let failed = 0;
+        forms.forEach((form, i) => {
+          const wrap = form.closest(".admin-card-wrap");
+          const errorEl = wrap.querySelector(".admin-card-error");
+          const result = results[i];
+          if (result.status === "fulfilled") {
+            succeeded++;
+            clearDirty(wrap);
+            if (errorEl) errorEl.textContent = "";
+            const fileInput = form.querySelector('input[type="file"]');
+            if (fileInput) fileInput.value = "";
+            if (result.value.thumbnailUrl) {
+              let thumb = wrap.querySelector(".admin-card-thumb");
+              if (thumb.tagName !== "IMG") {
+                const img = document.createElement("img");
+                img.className = "admin-card-thumb";
+                img.alt = "";
+                thumb.replaceWith(img);
+                thumb = img;
+              }
+              thumb.src = result.value.thumbnailUrl;
+              thumb.dataset.full = result.value.thumbnailUrl;
+            }
+          } else {
+            failed++;
+            if (errorEl) errorEl.textContent = result.reason.message;
+          }
+        });
+
+        saveStatus.textContent = failed === 0 ? "Saved " + succeeded + "." : "Saved " + succeeded + ", " + failed + " failed.";
+        setTimeout(updateSaveBar, 2500);
+      }
+
+      document.querySelectorAll(".admin-card").forEach((form) => {
+        form.addEventListener("submit", (e) => {
+          e.preventDefault();
+          saveCards([form]);
+        });
+      });
+      saveAllBtn.addEventListener("click", () => {
+        const dirtyForms = [...document.querySelectorAll(".admin-card-wrap.dirty")].map((wrap) => wrap.querySelector(".admin-card"));
+        saveCards(dirtyForms);
+      });
+
+      // ---- Delete (fetch-based — a full navigation here would also
+      // trip the beforeunload guard above if other cards are still
+      // dirty, which would be a confusing prompt for an unrelated
+      // action) ----
+      document.querySelectorAll(".admin-card-delete").forEach((form) => {
+        form.addEventListener("submit", (e) => {
+          e.preventDefault();
+          if (!confirm("Delete this catalog item permanently?")) return;
+          fetch(form.action, { method: "POST", headers: { Accept: "application/json" } })
+            .then((res) => {
+              if (!res.ok) throw new Error("HTTP " + res.status);
+              const wrap = form.closest(".admin-card-wrap");
+              dirtyIds.delete(Number(wrap.dataset.itemId));
+              updateSaveBar();
+              wrap.remove();
+            })
+            .catch((err) => alert("Couldn't delete: " + err.message));
+        });
+      });
+
+      // ---- Item drag-and-drop reorder (Admin UI Phase 10) — generalizes
+      // the task pane's own single-list section-reorder pattern
       // (initSectionReordering in src/taskpane/taskpane.ts) to multiple
       // drop containers, one per group cluster: dragging a card into a
       // *different* cluster's .admin-grid both reorders it and reassigns
-      // its group on drop. Persists immediately via fetch, no save step.
+      // its group on drop. Persists immediately via fetch, no save step. ----
       let draggedCard = null;
 
       document.querySelectorAll(".admin-card-drag").forEach((handle) => {
@@ -531,9 +744,9 @@ app.get("/admin", async (req, res) => {
         });
       });
 
-      // Lightbox — click any thumbnail to enlarge, dismiss on outside
-      // click or Escape (same pattern as the task pane's own
-      // closeColorPickerPanel in src/taskpane/taskpane.ts).
+      // ---- Lightbox — click any thumbnail to enlarge, dismiss on
+      // outside click or Escape (same pattern as the task pane's own
+      // closeColorPickerPanel in src/taskpane/taskpane.ts). ----
       const lightbox = document.getElementById("adminLightbox");
       const lightboxImg = document.getElementById("adminLightboxImg");
       document.querySelectorAll(".admin-grid").forEach((grid) => {
@@ -547,6 +760,165 @@ app.get("/admin", async (req, res) => {
       lightbox.addEventListener("click", () => (lightbox.style.display = "none"));
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") lightbox.style.display = "none";
+      });
+
+      // ---- Inline group management (Admin UI Phase 11) — replaces the
+      // old standalone /admin/groups page entirely. ----
+      function addGroupOptionEverywhere(id, name) {
+        document.querySelectorAll('select[name="groupId"]').forEach((select) => {
+          const opt = document.createElement("option");
+          opt.value = String(id);
+          opt.textContent = name;
+          select.insertBefore(opt, select.querySelector('option[value="__new__"]'));
+        });
+      }
+      function renameGroupOptionEverywhere(id, name) {
+        document.querySelectorAll('select[name="groupId"] option[value="' + id + '"]').forEach((opt) => {
+          opt.textContent = name;
+        });
+      }
+      function removeGroupOptionEverywhere(id) {
+        document.querySelectorAll('select[name="groupId"] option[value="' + id + '"]').forEach((opt) => {
+          const select = opt.parentElement;
+          const wasSelected = opt.selected;
+          opt.remove();
+          if (wasSelected) select.value = "";
+        });
+      }
+
+      // Create: the "+ Add new group…" option in any card's group select.
+      document.querySelectorAll('select[name="groupId"]').forEach((select) => {
+        select.dataset.prevValue = select.value;
+        select.addEventListener("change", () => {
+          if (select.value !== "__new__") {
+            select.dataset.prevValue = select.value;
+            markDirty(select.closest(".admin-card-wrap"));
+            return;
+          }
+          const name = (prompt("New group name:") || "").trim();
+          if (!name) {
+            select.value = select.dataset.prevValue;
+            return;
+          }
+          const sortOrder = document.querySelectorAll('.admin-cluster[data-group-id]:not([data-group-id=""])').length;
+          fetch("/admin/groups", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+            body: new URLSearchParams({ category: CURRENT_CATEGORY, name, sortOrder: String(sortOrder) }),
+          })
+            .then(async (res) => {
+              const body = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(body.error || "HTTP " + res.status);
+              return body;
+            })
+            .then((body) => {
+              addGroupOptionEverywhere(body.id, body.name);
+              select.value = String(body.id);
+              select.dataset.prevValue = select.value;
+              markDirty(select.closest(".admin-card-wrap"));
+            })
+            .catch((err) => {
+              alert("Couldn't create group: " + err.message);
+              select.value = select.dataset.prevValue;
+            });
+        });
+      });
+
+      // Rename: click a group heading, edit, blur (or Enter) to save.
+      document.querySelectorAll(".admin-group-heading-input").forEach((input) => {
+        input.dataset.original = input.value;
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") input.blur();
+        });
+        input.addEventListener("blur", () => {
+          const name = input.value.trim();
+          if (!name || name === input.dataset.original) {
+            input.value = input.dataset.original;
+            return;
+          }
+          const id = input.dataset.groupId;
+          fetch("/admin/groups/" + id, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+            body: new URLSearchParams({ name }),
+          })
+            .then(async (res) => {
+              const body = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(body.error || "HTTP " + res.status);
+            })
+            .then(() => {
+              input.dataset.original = name;
+              renameGroupOptionEverywhere(id, name);
+            })
+            .catch((err) => {
+              alert("Couldn't rename group: " + err.message);
+              input.value = input.dataset.original;
+            });
+        });
+      });
+
+      // Delete: the × button next to a group heading.
+      document.querySelectorAll(".admin-group-delete").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (!confirm("Delete this group? Items in it become ungrouped.")) return;
+          const id = button.dataset.groupId;
+          fetch("/admin/groups/" + id + "/delete", { method: "POST", headers: { Accept: "application/json" } })
+            .then((res) => {
+              if (!res.ok) throw new Error("HTTP " + res.status);
+              removeGroupOptionEverywhere(id);
+              const cluster = document.querySelector('.admin-cluster[data-group-id="' + id + '"]');
+              const ungroupedGrid = document.querySelector('.admin-grid[data-group-id=""]');
+              if (cluster && ungroupedGrid) {
+                const grid = cluster.querySelector(".admin-grid");
+                while (grid.firstChild) ungroupedGrid.appendChild(grid.firstChild);
+                cluster.remove();
+              }
+            })
+            .catch((err) => alert("Couldn't delete group: " + err.message));
+        });
+      });
+
+      // Reorder: drag a group heading. Plain 1-D vertical list among real
+      // .admin-cluster sections — the synthetic Ungrouped cluster is
+      // excluded from the draggable set and candidate list entirely, so
+      // it can never be reordered or dropped past.
+      let draggedCluster = null;
+      const clustersContainer = document.getElementById("adminClusters");
+
+      document.querySelectorAll(".admin-group-drag").forEach((handle) => {
+        handle.addEventListener("dragstart", (e) => {
+          const cluster = handle.closest(".admin-cluster");
+          if (!cluster) return;
+          draggedCluster = cluster;
+          e.dataTransfer.setData("text/plain", cluster.dataset.groupId);
+          cluster.classList.add("dragging");
+        });
+        handle.addEventListener("dragend", () => {
+          draggedCluster?.classList.remove("dragging");
+          draggedCluster = null;
+        });
+      });
+
+      clustersContainer.addEventListener("dragover", (e) => {
+        if (!draggedCluster) return;
+        e.preventDefault();
+        const candidates = [
+          ...clustersContainer.querySelectorAll('.admin-cluster[data-group-id]:not([data-group-id=""]):not(.dragging)'),
+        ];
+        const after = candidates.find((c) => e.clientY < c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2);
+        clustersContainer.insertBefore(draggedCluster, after || document.querySelector('.admin-cluster[data-group-id=""]'));
+      });
+      clustersContainer.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (!draggedCluster) return;
+        const orderedGroupIds = [
+          ...clustersContainer.querySelectorAll('.admin-cluster[data-group-id]:not([data-group-id=""])'),
+        ].map((c) => Number(c.dataset.groupId));
+        fetch("/admin/groups/reorder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category: CURRENT_CATEGORY, orderedGroupIds }),
+        }).catch((err) => alert("Couldn't save group order: " + err.message));
       });
     </script>
   </body></html>`);
@@ -578,30 +950,35 @@ app.post("/admin/catalog/reorder", requireAdmin, async (req, res) => {
 
 app.post("/admin/catalog/:id", requireAdmin, upload.single("thumbnail"), async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) return redirectWithError(res, "/admin", "Invalid item id.");
+  const json = wantsJson(req);
+  // Redirect back to whichever category's grid the edit was submitted
+  // from once it's known to be valid (redirect-mode only — the JSON path
+  // never navigates, so it has nothing to redirect to).
+  const fail = (status, message, backTo) =>
+    json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo ?? "/admin", message);
+
+  if (!Number.isInteger(id) || id <= 0) return fail(400, "Invalid item id.");
 
   const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
   const category = req.body.category;
   const groupId = req.body.groupId ? Number(req.body.groupId) : null;
   const tags = typeof req.body.tags === "string" ? req.body.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
-  // Redirect back to whichever category's grid the edit was submitted
-  // from once it's known to be valid, so saving an edit doesn't bounce
-  // the admin back to the first category's view.
   const backTo = CATALOG_CATEGORIES.includes(category) ? `/admin?category=${category}` : "/admin";
-  if (!title) return redirectWithError(res, backTo, "Title can't be empty.");
-  if (!CATALOG_CATEGORIES.includes(category)) return redirectWithError(res, "/admin", "Invalid category.");
+  if (!title) return fail(400, "Title can't be empty.", backTo);
+  if (!CATALOG_CATEGORIES.includes(category)) return fail(400, "Invalid category.");
   if (groupId !== null && (!Number.isInteger(groupId) || groupId <= 0)) {
-    return redirectWithError(res, backTo, "Invalid group.");
+    return fail(400, "Invalid group.", backTo);
   }
 
   const existing = await getCatalogItem(id);
-  if (!existing) return redirectWithError(res, backTo, "Item not found.");
+  if (!existing) return fail(404, "Item not found.", backTo);
 
   const updated = await updateCatalogItem({ id, title, category, groupId });
-  if (!updated) return redirectWithError(res, backTo, "Item not found.");
+  if (!updated) return fail(404, "Item not found.", backTo);
 
   await setItemTags(id, tags);
 
+  let finalThumbnailPath = existing.thumbnail_path;
   if (req.file) {
     const ext = MIME_TO_EXT[req.file.mimetype];
     const newThumbnailPath = `item-${id}.${ext}`;
@@ -610,114 +987,121 @@ app.post("/admin/catalog/:id", requireAdmin, upload.single("thumbnail"), async (
     if (existing.thumbnail_path && existing.thumbnail_path !== newThumbnailPath) {
       await fs.promises.unlink(path.join(THUMBNAILS_DIR, existing.thumbnail_path)).catch(() => {});
     }
+    finalThumbnailPath = newThumbnailPath;
   }
 
+  if (json) {
+    const thumbnailUrl = finalThumbnailPath ? `/assets/catalog/thumbnails/${finalThumbnailPath}?v=${ASSET_VERSION}` : null;
+    return res.json({ ok: true, thumbnailUrl });
+  }
   res.redirect(303, backTo);
 });
 
 app.post("/admin/catalog/:id/delete", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) return redirectWithError(res, "/admin", "Invalid item id.");
+  const json = wantsJson(req);
+  const fail = (status, message, backTo) =>
+    json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo ?? "/admin", message);
+
+  if (!Number.isInteger(id) || id <= 0) return fail(400, "Invalid item id.");
 
   const existing = await getCatalogItem(id);
   const backTo = existing?.category && CATALOG_CATEGORIES.includes(existing.category) ? `/admin?category=${existing.category}` : "/admin";
   const deleted = await deleteCatalogItem(id);
-  if (!deleted) return redirectWithError(res, backTo, "Item not found.");
+  if (!deleted) return fail(404, "Item not found.", backTo);
 
   if (existing?.thumbnail_path) {
     await fs.promises.unlink(path.join(THUMBNAILS_DIR, existing.thumbnail_path)).catch(() => {});
   }
 
+  if (json) return res.json({ ok: true });
   res.redirect(303, backTo);
 });
 
-// Phase 5: admin-defined, admin-ordered sub-groupings within one category
-// (e.g. "Pyramids" inside Diagrams), separate from the free-form tags
-// above — a group is a single value with an explicit order, which tags
-// deliberately don't try to be. One category's groups per page, matching
-// the pattern of everything else in /admin being a plain per-row form.
-app.get("/admin/groups", requireAdmin, async (req, res) => {
-  const category = req.query.category;
-  if (!CATALOG_CATEGORIES.includes(category)) {
-    return res.status(400).send("Unknown category.");
-  }
-  const groups = await listGroupsForCategory(category);
-  const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
-  const rows = groups
-    .map(
-      (g) => `
-        <tr>
-          <form id="edit-group-${g.id}" method="POST" action="/admin/groups/${g.id}"></form>
-          <td><input form="edit-group-${g.id}" name="name" value="${escapeHtml(g.name)}"></td>
-          <td><input form="edit-group-${g.id}" name="sortOrder" type="number" value="${g.sort_order}" style="width: 60px;"></td>
-          <td><button form="edit-group-${g.id}" type="submit">Save</button></td>
-          <td>
-            <form method="POST" action="/admin/groups/${g.id}/delete" onsubmit="return confirm('Delete this group? Items in it become ungrouped.')">
-              <button type="submit">Delete</button>
-            </form>
-          </td>
-        </tr>`
-    )
-    .join("");
-  res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
-    <h1>Groups: ${escapeHtml(category)}</h1>
-    <p><a href="/admin?category=${category}">&larr; Back to catalog</a></p>
-    ${errorMsg ? `<p class="admin-error">${escapeHtml(errorMsg)}</p>` : ""}
-    <table border="1" cellpadding="4">
-      <tr><th>Name</th><th>Sort order</th><th></th><th></th></tr>
-      ${rows}
-    </table>
-    <h2>Add group</h2>
-    <form method="POST" action="/admin/groups">
-      <input type="hidden" name="category" value="${escapeHtml(category)}">
-      <input name="name" placeholder="Group name" required>
-      <input name="sortOrder" type="number" value="0" style="width: 60px;">
-      <button type="submit">Add</button>
-    </form>
-  </body></html>`);
+// Admin UI Phase 5 introduced groups as admin-defined, admin-ordered
+// sub-groupings within one category (e.g. "Pyramids" inside Diagrams),
+// separate from the free-form tags above. Phase 11 moved all group
+// management (create/rename/delete/reorder) onto the main /admin grid
+// page itself (see GET /admin's inline script) — this old standalone
+// page is gone, kept only as a redirect for anything still linking here.
+app.get("/admin/groups", requireAdmin, (req, res) => {
+  const category = CATALOG_CATEGORIES.includes(req.query.category) ? req.query.category : CATALOG_CATEGORIES[0];
+  res.redirect(301, `/admin?category=${category}`);
 });
 
+// Reused by GET /admin's inline "+ Add new group…" dropdown option (via
+// fetch, Accept: application/json) — the redirect-based response stays as
+// a fallback for anything posting here without that header.
 app.post("/admin/groups", requireAdmin, async (req, res) => {
   const category = req.body.category;
   const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
   const sortOrder = Number(req.body.sortOrder) || 0;
-  if (!CATALOG_CATEGORIES.includes(category)) return res.status(400).send("Unknown category.");
-  if (!name) {
-    return res.redirect(303, `/admin/groups?category=${category}&error=` + encodeURIComponent("Group name can't be empty."));
-  }
+  const json = wantsJson(req);
+  const fail = (status, message) =>
+    json ? res.status(status).json({ error: message }) : redirectWithError(res, `/admin?category=${category}`, message);
+
+  if (!CATALOG_CATEGORIES.includes(category)) return fail(400, "Unknown category.");
+  if (!name) return fail(400, "Group name can't be empty.");
+
+  let created;
   try {
-    await createGroup({ category, name, sortOrder });
+    created = await createGroup({ category, name, sortOrder });
   } catch (err) {
-    return res.redirect(
-      303,
-      `/admin/groups?category=${category}&error=` + encodeURIComponent(`A group named "${name}" already exists in this category.`)
-    );
+    return fail(409, `A group named "${name}" already exists in this category.`);
   }
-  res.redirect(303, `/admin/groups?category=${category}`);
+  if (json) return res.json({ ok: true, id: created.id, name });
+  res.redirect(303, `/admin?category=${category}`);
 });
 
+// Persists dragging a group heading to a new position (GET /admin's inline
+// script). Registered *before* POST /admin/groups/:id below — same
+// Express route-ordering pitfall already caught once this session for
+// /admin/catalog/reorder vs. /admin/catalog/:id: :id would otherwise
+// swallow this as a request to rename a group literally named "reorder".
+app.post("/admin/groups/reorder", requireAdmin, async (req, res) => {
+  const { category, orderedGroupIds } = req.body ?? {};
+  if (!CATALOG_CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: "Invalid category." });
+  }
+  if (!Array.isArray(orderedGroupIds) || orderedGroupIds.length === 0 || !orderedGroupIds.every((id) => Number.isInteger(id) && id > 0)) {
+    return res.status(400).json({ error: "Invalid group list." });
+  }
+  await reorderGroups({ category, orderedGroupIds });
+  res.json({ ok: true });
+});
+
+// Reused by GET /admin's inline group-heading rename (click to edit,
+// blur/Enter to save). sortOrder is optional now that group order is set
+// by drag-and-drop (see POST /admin/groups/reorder above) — omitting it
+// leaves the group's current position untouched.
 app.post("/admin/groups/:id", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
-  const sortOrder = Number(req.body.sortOrder) || 0;
+  const sortOrder = req.body.sortOrder !== undefined ? Number(req.body.sortOrder) : null;
+  const json = wantsJson(req);
   // Category isn't submitted from this form (it's not editable — see
-  // updateGroup's comment) — read it back from the row itself so we know
-  // which category's page to redirect to.
+  // updateGroup's comment) — read it back from the row itself so the
+  // redirect-mode fallback knows which category's page to send back to.
   const existing = await getGroup(id);
   const category = existing?.category ?? CATALOG_CATEGORIES[0];
-  if (!name) {
-    return res.redirect(303, `/admin/groups?category=${category}&error=` + encodeURIComponent("Group name can't be empty."));
-  }
+  const fail = (status, message) =>
+    json ? res.status(status).json({ error: message }) : redirectWithError(res, `/admin?category=${category}`, message);
+
+  if (!name) return fail(400, "Group name can't be empty.");
+
   await updateGroup({ id, name, sortOrder });
-  res.redirect(303, `/admin/groups?category=${category}`);
+  if (json) return res.json({ ok: true });
+  res.redirect(303, `/admin?category=${category}`);
 });
 
+// Reused by GET /admin's inline group-heading delete button.
 app.post("/admin/groups/:id/delete", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const existing = await getGroup(id);
   const category = existing?.category ?? CATALOG_CATEGORIES[0];
   await deleteGroup(id);
-  res.redirect(303, `/admin/groups?category=${category}`);
+  if (wantsJson(req)) return res.json({ ok: true });
+  res.redirect(303, `/admin?category=${category}`);
 });
 
 // Catches multer's file-size/type rejections (fileFilter's cb(new Error(...)))

@@ -104,13 +104,48 @@ async function createGroup({ category, name, sortOrder }) {
   return result.rows[0];
 }
 
-/** Renames/reorders an existing group. Category is not editable here — a group moving categories would strand every item currently assigned to it, so that's a delete-and-recreate, not an edit. */
+/**
+ * Renames and/or reorders an existing group. Category is not editable
+ * here — a group moving categories would strand every item currently
+ * assigned to it, so that's a delete-and-recreate, not an edit.
+ *
+ * sortOrder is optional (pass null/undefined to leave it unchanged) —
+ * since Admin UI Phase 11, a plain rename (click the heading, edit,
+ * blur) doesn't also resubmit position; reordering is its own drag-driven
+ * action (see reorderGroups below).
+ */
 async function updateGroup({ id, name, sortOrder }) {
   const result = await pool.query(
-    `UPDATE catalog_groups SET name = $2, sort_order = $3 WHERE id = $1 RETURNING id`,
-    [id, name, sortOrder]
+    `UPDATE catalog_groups SET name = $2, sort_order = COALESCE($3, sort_order) WHERE id = $1 RETURNING id`,
+    [id, name, sortOrder ?? null]
   );
   return result.rows[0] ?? null;
+}
+
+/**
+ * Re-sequences a category's groups to match orderedGroupIds' order
+ * (0..n-1) — mirrors reorderCatalogItems' transaction shape exactly. The
+ * synthetic "Ungrouped" cluster has no backing row and is never part of
+ * orderedGroupIds; it always renders last, client-side, unconditionally.
+ */
+async function reorderGroups({ category, orderedGroupIds }) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (let i = 0; i < orderedGroupIds.length; i++) {
+      await client.query(`UPDATE catalog_groups SET sort_order = $1 WHERE id = $2 AND category = $3`, [
+        i,
+        orderedGroupIds[i],
+        category,
+      ]);
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /** Deletes a group. Referencing items fall back to ungrouped (group_id NULL) via the FK's ON DELETE SET NULL, not deleted themselves. */
@@ -302,6 +337,7 @@ module.exports = {
   getGroup,
   createGroup,
   updateGroup,
+  reorderGroups,
   deleteGroup,
   getOrCreateGroupIdForCategory,
   getOrCreateTag,
