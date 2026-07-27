@@ -10,9 +10,9 @@ const {
   waitForDatabase,
   upsertUser,
   listSharedCatalogItems,
-  listAllCatalogItems,
   getCatalogItem,
   updateCatalogItem,
+  reorderCatalogItems,
   updateCatalogItemThumbnail,
   deleteCatalogItem,
   listGroupsForCategory,
@@ -214,6 +214,46 @@ function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+/** Appends ?error=/&error= to a redirect target, correctly whichever the target already has a query string (e.g. "/admin?category=text") or not (plain "/admin"). */
+function redirectWithError(res, base, message) {
+  res.redirect(303, base + (base.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(message));
+}
+
+// Shared by every /admin* page (Admin UI Phase 10) — /admin stays plain
+// server-rendered HTML with no bundler, so this is one inline <style>
+// block reused verbatim rather than a separate stylesheet file/build step.
+const ADMIN_STYLE = `
+  body { font-family: -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 16px 24px; color: #222; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  a { color: #1a5fb4; }
+  .admin-error { color: #a12525; background: #fdeaea; padding: 8px 10px; border-radius: 4px; }
+  .admin-reorder-status { font-size: 12px; color: #1a7a3c; margin-left: 8px; }
+  .admin-category-nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 14px 0; padding: 0; list-style: none; }
+  .admin-category-nav a { padding: 6px 12px; border: 1px solid #c8c8c8; border-radius: 4px; text-decoration: none; color: #333; font-size: 13px; text-transform: capitalize; }
+  .admin-category-nav a.active { background: #1a5fb4; color: #fff; border-color: #1a5fb4; }
+  .admin-group-heading { font-size: 13px; font-weight: 600; color: #444; margin: 26px 0 10px; text-transform: uppercase; letter-spacing: 0.02em; }
+  .admin-group-heading:first-of-type { margin-top: 18px; }
+  .admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .admin-card-wrap { position: relative; border: 1px solid #c8c8c8; border-radius: 6px; padding: 8px; background: #fff; display: flex; flex-direction: column; gap: 4px; }
+  .admin-card-wrap.dragging { opacity: 0.4; }
+  .admin-card-drag { position: absolute; top: 4px; right: 6px; cursor: grab; color: #999; font-size: 13px; user-select: none; line-height: 1; }
+  .admin-card-drag:active { cursor: grabbing; }
+  .admin-card { display: flex; flex-direction: column; gap: 4px; }
+  .admin-card-thumb { width: 100%; height: 100px; object-fit: contain; background: #fafafa; border: 1px solid #eee; border-radius: 4px; cursor: zoom-in; }
+  .admin-card-thumb-empty { display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 11px; cursor: default; }
+  .admin-card-title, .admin-card-tags, .admin-card select, .admin-card input[type="file"] {
+    font-size: 11px; padding: 3px 5px; border: 1px solid #c8c8c8; border-radius: 3px; width: 100%; box-sizing: border-box;
+  }
+  .admin-card-mode { font-size: 10px; color: #888; text-transform: uppercase; align-self: flex-start; }
+  .admin-card button, .admin-card-delete button { font-size: 11px; padding: 4px 8px; cursor: pointer; border: 1px solid #c8c8c8; border-radius: 3px; background: #fafafa; width: 100%; }
+  .admin-card-delete { margin-top: -2px; }
+  .admin-lightbox { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); align-items: center; justify-content: center; z-index: 2000; cursor: zoom-out; }
+  .admin-lightbox img { max-width: 90vw; max-height: 90vh; }
+  table { border-collapse: collapse; }
+  table input, table select { font-size: 12px; padding: 3px 5px; }
+`;
+
 // Filename extension is always derived from this fixed table, never from
 // the uploaded file's own name — the path-traversal defense for thumbnail
 // uploads (see POST /admin/catalog/:id below).
@@ -291,60 +331,82 @@ app.get("/admin", async (req, res) => {
   if (!req.user) return res.send(renderSignInPage());
   if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
 
-  const [items, tagNames, groupsByCategory] = await Promise.all([
-    listAllCatalogItems(),
+  const category = CATALOG_CATEGORIES.includes(req.query.category) ? req.query.category : CATALOG_CATEGORIES[0];
+
+  const [items, groups, tagNames] = await Promise.all([
+    listSharedCatalogItems(category),
+    listGroupsForCategory(category),
     listAllTagNames(),
-    Promise.all(CATALOG_CATEGORIES.map((c) => listGroupsForCategory(c))).then((lists) =>
-      Object.fromEntries(CATALOG_CATEGORIES.map((c, i) => [c, lists[i]]))
-    ),
   ]);
-  const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
-  const rows = items
-    .map((item) => {
-      const thumbUrl = item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}?v=${ASSET_VERSION}` : null;
-      const categoryOptions = CATALOG_CATEGORIES.map(
-        (c) => `<option value="${c}"${c === item.category ? " selected" : ""}>${c}</option>`
-      ).join("");
-      const groupOptions =
-        `<option value="">(none)</option>` +
-        groupsByCategory[item.category]
-          .map((g) => `<option value="${g.id}"${g.id === item.group_id ? " selected" : ""}>${escapeHtml(g.name)}</option>`)
-          .join("");
-      return `
-        <form id="edit-${item.id}" class="catalog-item-form" method="POST" action="/admin/catalog/${item.id}" enctype="multipart/form-data"></form>
-        <tr>
-          <td><input form="edit-${item.id}" name="title" value="${escapeHtml(item.title)}" size="30"></td>
-          <td><select form="edit-${item.id}" name="category">${categoryOptions}</select></td>
-          <td>${escapeHtml(item.insert_mode)}</td>
-          <td><select form="edit-${item.id}" name="groupId">${groupOptions}</select></td>
-          <td><input form="edit-${item.id}" name="tags" class="tags-input" value="${escapeHtml((item.tags || []).join(", "))}" size="20"></td>
-          <td><input form="edit-${item.id}" name="sortOrder" type="number" value="${item.sort_order}" style="width: 60px;"></td>
-          <td>
-            ${thumbUrl ? `<img src="${thumbUrl}" width="60" alt="">` : "(none)"}
-            <input form="edit-${item.id}" name="thumbnail" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
-          </td>
-          <td><button form="edit-${item.id}" type="submit">Save</button></td>
-          <td>
-            <form method="POST" action="/admin/catalog/${item.id}/delete" onsubmit="return confirm('Delete this catalog item permanently?')">
-              <button type="submit">Delete</button>
-            </form>
-          </td>
-        </tr>`;
-    })
+
+  // Cluster items by group, in each group's own sort_order, ungrouped
+  // items trailing under "Ungrouped" — mirrors how the gallery
+  // (src/gallery/gallery.ts) clusters the same data for end users, just
+  // computed server-side here against the raw DB rows instead of the
+  // client-side /api/catalog/:category JSON.
+  const clustersById = new Map(groups.map((g) => [g.id, { id: g.id, name: g.name, items: [] }]));
+  const ungrouped = { id: null, name: "Ungrouped", items: [] };
+  for (const item of items) {
+    (clustersById.get(item.group_id) ?? ungrouped).items.push(item);
+  }
+  const clusters = [...groups.map((g) => clustersById.get(g.id)), ungrouped].filter((c) => c.items.length > 0);
+
+  const categoryOptions = CATALOG_CATEGORIES.map((c) => `<option value="${c}"${c === category ? " selected" : ""}>${c}</option>`).join("");
+  const groupOptionsFor = (currentGroupId) =>
+    `<option value="">(none)</option>` +
+    groups.map((g) => `<option value="${g.id}"${g.id === currentGroupId ? " selected" : ""}>${escapeHtml(g.name)}</option>`).join("");
+
+  function renderCard(item) {
+    const thumbUrl = item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}?v=${ASSET_VERSION}` : null;
+    return `
+      <div class="admin-card-wrap" data-item-id="${item.id}">
+        <div class="admin-card-drag" draggable="true" title="Drag to reorder">⠿</div>
+        <form class="admin-card" method="POST" action="/admin/catalog/${item.id}" enctype="multipart/form-data">
+          ${
+            thumbUrl
+              ? `<img class="admin-card-thumb" src="${thumbUrl}" data-full="${thumbUrl}" alt="">`
+              : `<div class="admin-card-thumb admin-card-thumb-empty">(none)</div>`
+          }
+          <input class="admin-card-title" name="title" value="${escapeHtml(item.title)}">
+          <select name="category">${categoryOptions}</select>
+          <select name="groupId">${groupOptionsFor(item.group_id)}</select>
+          <input class="admin-card-tags tags-input" name="tags" placeholder="tags" value="${escapeHtml((item.tags || []).join(", "))}">
+          <span class="admin-card-mode">${escapeHtml(item.insert_mode)}</span>
+          <input name="thumbnail" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+          <button type="submit">Save</button>
+        </form>
+        <form class="admin-card-delete" method="POST" action="/admin/catalog/${item.id}/delete" onsubmit="return confirm('Delete this catalog item permanently?')">
+          <button type="submit">Delete</button>
+        </form>
+      </div>`;
+  }
+
+  const clusterSections = clusters
+    .map(
+      (cluster) => `
+      <h2 class="admin-group-heading">${escapeHtml(cluster.name)}</h2>
+      <div class="admin-grid" data-group-id="${cluster.id ?? ""}">
+        ${cluster.items.map(renderCard).join("")}
+      </div>`
+    )
     .join("");
-  const groupNavLinks = CATALOG_CATEGORIES.map(
-    (c) => `<a href="/admin/groups?category=${c}">${c}</a>`
-  ).join(" · ");
-  res.send(`<!doctype html><html><body>
+
+  const categoryNav = CATALOG_CATEGORIES.map(
+    (c) => `<a href="/admin?category=${c}"${c === category ? ' class="active"' : ""}>${c}</a>`
+  ).join("");
+  const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
+
+  res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
     <h1>Welcome, admin</h1>
-    <p>Signed in as ${escapeHtml(req.user.email)}.</p>
-    ${errorMsg ? `<p style="color: red;">${escapeHtml(errorMsg)}</p>` : ""}
-    <p>Manage groups: ${groupNavLinks}</p>
-    <table border="1" cellpadding="4">
-      <tr><th>Title</th><th>Category</th><th>Insert mode</th><th>Group</th><th>Tags</th><th>Sort order</th><th>Thumbnail</th><th></th><th></th></tr>
-      ${rows}
-    </table>
+    <p>Signed in as ${escapeHtml(req.user.email)}.<span id="admin-reorder-status" class="admin-reorder-status"></span></p>
+    ${errorMsg ? `<p class="admin-error">${escapeHtml(errorMsg)}</p>` : ""}
+    <nav class="admin-category-nav">${categoryNav}</nav>
+    <p><a href="/admin/groups?category=${category}">Manage ${escapeHtml(category)} groups &rarr;</a></p>
+    ${clusterSections || "<p>No items in this category yet.</p>"}
+    <div id="adminLightbox" class="admin-lightbox"><img id="adminLightboxImg" alt=""></div>
     <script>
+      const CURRENT_CATEGORY = ${JSON.stringify(category)};
+
       // Client-side typo-catching only, not a security boundary — the
       // server get-or-creates whatever tag names it's sent regardless
       // (see POST /admin/catalog/:id). This just makes an admin pause
@@ -372,9 +434,9 @@ app.get("/admin", async (req, res) => {
         return KNOWN_TAGS.filter((k) => k.toLowerCase() !== lower && levenshtein(lower, k.toLowerCase()) <= threshold);
       }
 
-      document.querySelectorAll(".catalog-item-form").forEach((form) => {
+      document.querySelectorAll(".admin-card").forEach((form) => {
         form.addEventListener("submit", (e) => {
-          const tagsInput = document.querySelector('input.tags-input[form="' + form.id + '"]');
+          const tagsInput = form.querySelector("input.tags-input");
           if (!tagsInput) return;
           const known = new Set(KNOWN_TAGS.map((t) => t.toLowerCase()));
           const entered = tagsInput.value.split(",").map((t) => t.trim()).filter(Boolean);
@@ -392,33 +454,151 @@ app.get("/admin", async (req, res) => {
           }
         });
       });
+
+      // Drag-and-drop reorder (Admin UI Phase 10) — generalizes the task
+      // pane's own single-list section-reorder pattern
+      // (initSectionReordering in src/taskpane/taskpane.ts) to multiple
+      // drop containers, one per group cluster: dragging a card into a
+      // *different* cluster's .admin-grid both reorders it and reassigns
+      // its group on drop. Persists immediately via fetch, no save step.
+      let draggedCard = null;
+
+      document.querySelectorAll(".admin-card-drag").forEach((handle) => {
+        handle.addEventListener("dragstart", (e) => {
+          const card = handle.closest(".admin-card-wrap");
+          if (!card) return;
+          draggedCard = card;
+          e.dataTransfer.setData("text/plain", card.dataset.itemId);
+          card.classList.add("dragging");
+        });
+        handle.addEventListener("dragend", () => {
+          draggedCard?.classList.remove("dragging");
+          draggedCard = null;
+        });
+      });
+
+      // Nearest-card-center heuristic, not a strict row/column layout
+      // solve — good enough for a low-traffic internal tool where a card
+      // landing one position off just means dragging again.
+      function getDragAfterElement(container, clientX, clientY) {
+        const cards = [...container.querySelectorAll(".admin-card-wrap:not(.dragging)")];
+        let closest = null;
+        let closestDistance = Infinity;
+        for (const card of cards) {
+          const box = card.getBoundingClientRect();
+          const dx = clientX - (box.left + box.width / 2);
+          const dy = clientY - (box.top + box.height / 2);
+          const distance = dx * dx + dy * dy;
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closest = { card, after: dx > 0 };
+          }
+        }
+        if (!closest) return null;
+        return closest.after ? closest.card.nextElementSibling : closest.card;
+      }
+
+      document.querySelectorAll(".admin-grid").forEach((grid) => {
+        grid.addEventListener("dragover", (e) => {
+          if (!draggedCard) return;
+          e.preventDefault();
+          const afterElement = getDragAfterElement(grid, e.clientX, e.clientY);
+          grid.insertBefore(draggedCard, afterElement);
+        });
+        grid.addEventListener("drop", (e) => {
+          e.preventDefault();
+          if (!draggedCard) return;
+          const finalGrid = draggedCard.closest(".admin-grid");
+          const groupIdRaw = finalGrid.dataset.groupId;
+          const groupId = groupIdRaw === "" ? null : Number(groupIdRaw);
+          const orderedIds = [...finalGrid.querySelectorAll(".admin-card-wrap")].map((c) => Number(c.dataset.itemId));
+          const statusEl = document.getElementById("admin-reorder-status");
+          fetch("/admin/catalog/reorder", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ category: CURRENT_CATEGORY, groupId, orderedIds }),
+          })
+            .then((res) => {
+              if (!res.ok) throw new Error("HTTP " + res.status);
+              if (statusEl) {
+                statusEl.textContent = " Saved.";
+                setTimeout(() => (statusEl.textContent = ""), 1500);
+              }
+            })
+            .catch((err) => {
+              if (statusEl) statusEl.textContent = " Couldn't save order: " + err.message;
+            });
+        });
+      });
+
+      // Lightbox — click any thumbnail to enlarge, dismiss on outside
+      // click or Escape (same pattern as the task pane's own
+      // closeColorPickerPanel in src/taskpane/taskpane.ts).
+      const lightbox = document.getElementById("adminLightbox");
+      const lightboxImg = document.getElementById("adminLightboxImg");
+      document.querySelectorAll(".admin-grid").forEach((grid) => {
+        grid.addEventListener("click", (e) => {
+          const thumb = e.target.closest(".admin-card-thumb");
+          if (!thumb || !thumb.dataset.full) return;
+          lightboxImg.src = thumb.dataset.full;
+          lightbox.style.display = "flex";
+        });
+      });
+      lightbox.addEventListener("click", () => (lightbox.style.display = "none"));
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") lightbox.style.display = "none";
+      });
     </script>
   </body></html>`);
 });
 
+// The first JSON/fetch-based admin route — every other /admin* route is a
+// redirect-based form post, but drag-and-drop reorder (Admin UI Phase 10)
+// needs to persist on drop with no page reload. Re-sequences one
+// category+group cluster's sort_order to match orderedIds, and reassigns
+// group_id for every item in that list — covers both "reordered within
+// its own cluster" and "dragged into a different cluster" in one call.
+// Registered *before* POST /admin/catalog/:id below — Express matches
+// routes in registration order, and :id would otherwise swallow this as
+// a request to update an item literally named "reorder".
+app.post("/admin/catalog/reorder", requireAdmin, async (req, res) => {
+  const { category, groupId, orderedIds } = req.body ?? {};
+  if (!CATALOG_CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: "Invalid category." });
+  }
+  if (groupId !== null && !(Number.isInteger(groupId) && groupId > 0)) {
+    return res.status(400).json({ error: "Invalid group." });
+  }
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0 || !orderedIds.every((id) => Number.isInteger(id) && id > 0)) {
+    return res.status(400).json({ error: "Invalid item list." });
+  }
+  await reorderCatalogItems({ category, groupId, orderedIds });
+  res.json({ ok: true });
+});
+
 app.post("/admin/catalog/:id", requireAdmin, upload.single("thumbnail"), async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) return res.redirect(303, "/admin?error=" + encodeURIComponent("Invalid item id."));
+  if (!Number.isInteger(id) || id <= 0) return redirectWithError(res, "/admin", "Invalid item id.");
 
   const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
   const category = req.body.category;
-  const sortOrder = Number(req.body.sortOrder);
   const groupId = req.body.groupId ? Number(req.body.groupId) : null;
   const tags = typeof req.body.tags === "string" ? req.body.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
-  if (!title) return res.redirect(303, "/admin?error=" + encodeURIComponent("Title can't be empty."));
-  if (!CATALOG_CATEGORIES.includes(category)) return res.redirect(303, "/admin?error=" + encodeURIComponent("Invalid category."));
-  if (!Number.isInteger(sortOrder) || sortOrder < 0) {
-    return res.redirect(303, "/admin?error=" + encodeURIComponent("Sort order must be a non-negative integer."));
-  }
+  // Redirect back to whichever category's grid the edit was submitted
+  // from once it's known to be valid, so saving an edit doesn't bounce
+  // the admin back to the first category's view.
+  const backTo = CATALOG_CATEGORIES.includes(category) ? `/admin?category=${category}` : "/admin";
+  if (!title) return redirectWithError(res, backTo, "Title can't be empty.");
+  if (!CATALOG_CATEGORIES.includes(category)) return redirectWithError(res, "/admin", "Invalid category.");
   if (groupId !== null && (!Number.isInteger(groupId) || groupId <= 0)) {
-    return res.redirect(303, "/admin?error=" + encodeURIComponent("Invalid group."));
+    return redirectWithError(res, backTo, "Invalid group.");
   }
 
   const existing = await getCatalogItem(id);
-  if (!existing) return res.redirect(303, "/admin?error=" + encodeURIComponent("Item not found."));
+  if (!existing) return redirectWithError(res, backTo, "Item not found.");
 
-  const updated = await updateCatalogItem({ id, title, category, sortOrder, groupId });
-  if (!updated) return res.redirect(303, "/admin?error=" + encodeURIComponent("Item not found."));
+  const updated = await updateCatalogItem({ id, title, category, groupId });
+  if (!updated) return redirectWithError(res, backTo, "Item not found.");
 
   await setItemTags(id, tags);
 
@@ -432,22 +612,23 @@ app.post("/admin/catalog/:id", requireAdmin, upload.single("thumbnail"), async (
     }
   }
 
-  res.redirect(303, "/admin");
+  res.redirect(303, backTo);
 });
 
 app.post("/admin/catalog/:id/delete", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) return res.redirect(303, "/admin?error=" + encodeURIComponent("Invalid item id."));
+  if (!Number.isInteger(id) || id <= 0) return redirectWithError(res, "/admin", "Invalid item id.");
 
   const existing = await getCatalogItem(id);
+  const backTo = existing?.category && CATALOG_CATEGORIES.includes(existing.category) ? `/admin?category=${existing.category}` : "/admin";
   const deleted = await deleteCatalogItem(id);
-  if (!deleted) return res.redirect(303, "/admin?error=" + encodeURIComponent("Item not found."));
+  if (!deleted) return redirectWithError(res, backTo, "Item not found.");
 
   if (existing?.thumbnail_path) {
     await fs.promises.unlink(path.join(THUMBNAILS_DIR, existing.thumbnail_path)).catch(() => {});
   }
 
-  res.redirect(303, "/admin");
+  res.redirect(303, backTo);
 });
 
 // Phase 5: admin-defined, admin-ordered sub-groupings within one category
@@ -478,10 +659,10 @@ app.get("/admin/groups", requireAdmin, async (req, res) => {
         </tr>`
     )
     .join("");
-  res.send(`<!doctype html><html><body>
+  res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
     <h1>Groups: ${escapeHtml(category)}</h1>
-    <p><a href="/admin">&larr; Back to catalog</a></p>
-    ${errorMsg ? `<p style="color: red;">${escapeHtml(errorMsg)}</p>` : ""}
+    <p><a href="/admin?category=${category}">&larr; Back to catalog</a></p>
+    ${errorMsg ? `<p class="admin-error">${escapeHtml(errorMsg)}</p>` : ""}
     <table border="1" cellpadding="4">
       <tr><th>Name</th><th>Sort order</th><th></th><th></th></tr>
       ${rows}

@@ -66,20 +66,6 @@ async function listSharedCatalogItems(category) {
   return result.rows;
 }
 
-/** All shared/admin catalog items across every category — used by the /admin table. */
-async function listAllCatalogItems() {
-  const result = await pool.query(
-    `SELECT ci.id, ci.category, ci.title, ci.insert_mode, ci.thumbnail_path, ci.sort_order,
-            ${CATALOG_ITEM_GROUP_TAGS_SELECT}
-     FROM catalog_items ci
-     ${CATALOG_ITEM_GROUP_TAGS_JOIN}
-     WHERE ci.owner_oid IS NULL
-     GROUP BY ci.id, cg.name
-     ORDER BY ci.category, ci.sort_order, ci.id`
-  );
-  return result.rows;
-}
-
 /** A single catalog item by ID, including source_file — used to resolve the file for a 'file'-mode insert, and by /admin's edit form. */
 async function getCatalogItem(id) {
   const result = await pool.query(
@@ -220,11 +206,15 @@ async function insertCatalogItem({ category, title, insertMode, sourceFile, reco
 }
 
 /**
- * Updates a shared item's title/category/sort_order/group — never
+ * Updates a shared item's title/category/group — never
  * insert_mode/source_file/reconstruct_spec, which stay owned by the
  * slice+seed script pipeline. owner_oid IS NULL mirrors
- * listAllCatalogItems' scope, as defense in depth against this admin-only
- * surface ever touching a future private item.
+ * listSharedCatalogItems' scope, as defense in depth against this
+ * admin-only surface ever touching a future private item.
+ *
+ * sort_order is deliberately not settable here — drag-and-drop (see
+ * reorderCatalogItems below) is the only way to reorder items as of Admin
+ * UI Phase 10, replacing the old manual number input.
  *
  * If category is changing, group_id is forced to NULL in the same
  * statement rather than trusting the caller's groupId - a group from the
@@ -234,18 +224,48 @@ async function insertCatalogItem({ category, title, insertMode, sourceFile, reco
  * SET expressions in one UPDATE see the same pre-update row), so this is
  * a correct same-statement comparison, not a race.
  */
-async function updateCatalogItem({ id, title, category, sortOrder, groupId }) {
+async function updateCatalogItem({ id, title, category, groupId }) {
   const result = await pool.query(
     `UPDATE catalog_items
      SET title = $2,
-         group_id = CASE WHEN category = $3 THEN $5::integer ELSE NULL END,
-         category = $3,
-         sort_order = $4
+         group_id = CASE WHEN category = $3 THEN $4::integer ELSE NULL END,
+         category = $3
      WHERE id = $1 AND owner_oid IS NULL
      RETURNING id`,
-    [id, title, category, sortOrder, groupId ?? null]
+    [id, title, category, groupId ?? null]
   );
   return result.rows[0] ?? null;
+}
+
+/**
+ * Re-sequences one category+group cluster's sort_order to match
+ * orderedIds' order (0..n-1), and reassigns group_id for every item in
+ * that list — covers both "reordered within its own cluster" and
+ * "dragged into a different cluster" in one call, since the destination
+ * cluster's full membership is always what the client sends. The source
+ * cluster (if an item moved out of it) is left with a gap in its
+ * sequence, which is harmless — ordering only depends on relative order,
+ * not contiguity. `category = $4` is defense in depth against a crafted
+ * request smuggling an id from a different category into this call.
+ */
+async function reorderCatalogItems({ category, groupId, orderedIds }) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (let i = 0; i < orderedIds.length; i++) {
+      await client.query(
+        `UPDATE catalog_items SET sort_order = $1, group_id = $2
+         WHERE id = $3 AND category = $4 AND owner_oid IS NULL`,
+        [i, groupId, orderedIds[i], category]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /** Points thumbnail_path at a newly-uploaded file. Kept separate from updateCatalogItem so an edit that doesn't touch the thumbnail never overwrites it with NULL. */
@@ -271,11 +291,11 @@ module.exports = {
   waitForDatabase,
   upsertUser,
   listSharedCatalogItems,
-  listAllCatalogItems,
   getCatalogItem,
   deleteCatalogItemsByCategory,
   insertCatalogItem,
   updateCatalogItem,
+  reorderCatalogItems,
   updateCatalogItemThumbnail,
   deleteCatalogItem,
   listGroupsForCategory,
