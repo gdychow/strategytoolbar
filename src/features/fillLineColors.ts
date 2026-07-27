@@ -68,15 +68,28 @@ const THEME_COLOR_ROLES: { key: "Light1" | "Dark1" | "Light2" | "Dark2" | "Accen
 /**
  * Reads the current presentation's actual theme colors (the closest
  * Office.js equivalent to "the custom colours built into the template" -
- * see this module's header comment) off the first slide master, in the
- * same order PowerPoint's own native color picker's "Theme Colors" row
- * uses. Returns [] (not a thrown error) when unsupported, so callers can
- * just render nothing extra rather than handle a failure case.
+ * see this module's header comment), in the same order PowerPoint's own
+ * native color picker's "Theme Colors" row uses. Returns [] (not a thrown
+ * error) when unsupported, so callers can just render nothing extra
+ * rather than handle a failure case.
+ *
+ * Reads off the currently selected slide's own themeColorScheme, not
+ * slideMasters.getItemAt(0) - a presentation can have more than one slide
+ * master (e.g. a multi-layout template like the ones under
+ * Package Files/.../Templates), and master index 0 isn't guaranteed to be
+ * the one actually applied to the slide the user is looking at. The
+ * selected slide's own scheme is always the one that's actually
+ * WYSIWYG-correct for what's on screen, regardless of how many masters
+ * the file has.
  */
 export async function getThemeColors(): Promise<{ label: string; hex: string }[]> {
   if (!isThemeColorsSupported()) return [];
   return PowerPoint.run(async (context) => {
-    const scheme = context.presentation.slideMasters.getItemAt(0).themeColorScheme;
+    const selectedSlides = context.presentation.getSelectedSlides();
+    selectedSlides.load("items");
+    await context.sync();
+    const slide = selectedSlides.items.length > 0 ? selectedSlides.items[0] : context.presentation.slides.getItemAt(0);
+    const scheme = slide.themeColorScheme;
     const results = THEME_COLOR_ROLES.map((role) => ({ role, result: scheme.getThemeColor(role.key) }));
     await context.sync();
     return results.map(({ role, result }) => ({ label: role.label, hex: `#${result.value}` }));

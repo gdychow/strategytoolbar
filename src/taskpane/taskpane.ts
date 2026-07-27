@@ -152,6 +152,33 @@ function initColorPickerPanel(): void {
   });
 }
 
+/**
+ * Positions the panel at (left, top) but clamped so it never renders past
+ * the viewport's right/bottom edge — the task pane's width varies (the
+ * user can resize the PowerPoint window), and a fixed left/top computed
+ * only from the caret's position can push the panel off-screen entirely
+ * on a narrower pane. Flips above the caret instead of below it if there
+ * isn't enough room underneath, same idea as a native dropdown.
+ */
+function positionPanelWithinViewport(panel: HTMLElement, caretRect: DOMRect): void {
+  panel.style.left = "0px";
+  panel.style.top = "0px";
+  panel.style.display = "block";
+  const panelWidth = panel.offsetWidth;
+  const panelHeight = panel.offsetHeight;
+
+  let left = caretRect.left;
+  if (left + panelWidth > window.innerWidth) left = window.innerWidth - panelWidth - 8;
+  left = Math.max(8, left);
+
+  let top = caretRect.bottom + 4;
+  if (top + panelHeight > window.innerHeight) top = caretRect.top - panelHeight - 4;
+  top = Math.max(8, top);
+
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+}
+
 function openColorPickerPanel(
   caret: HTMLElement,
   input: HTMLInputElement,
@@ -160,15 +187,12 @@ function openColorPickerPanel(
 ): void {
   const panel = document.getElementById("colorPickerPanel");
   if (!panel) return;
-  const rect = caret.getBoundingClientRect();
-  panel.style.left = `${rect.left}px`;
-  panel.style.top = `${rect.bottom + 4}px`;
   activeColorHandler = handler;
   activeColorInput = input;
   activeColorSwatch = swatch;
   const hexInput = document.getElementById("colorPickerHexInput") as HTMLInputElement | null;
   if (hexInput) hexInput.value = "";
-  panel.style.display = "block";
+  positionPanelWithinViewport(panel, caret.getBoundingClientRect());
 }
 
 /**
