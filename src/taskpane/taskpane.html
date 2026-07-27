@@ -160,19 +160,27 @@
   <!--
     Shared custom color picker, opened by any color caret (see
     initColorPickerPanel/bindColorControl in taskpane.ts). Replaces the
-    native <input type="color"> picker for this — the native OS picker's
-    position isn't reliably controllable inside this WKWebView-hosted task
-    pane (confirmed after two separate positioning attempts both still
-    opened it at the screen's bottom-left, regardless of the trigger
-    element's actual position), so this is a plain in-page dropdown that
-    behaves like any other positioned element instead.
+    native <input type="color"> picker as the primary interaction — the
+    native OS picker's position isn't reliably controllable inside this
+    WKWebView-hosted task pane (confirmed after two separate positioning
+    attempts both still opened it at the screen's bottom-left, regardless
+    of the trigger element's actual position), so this is a plain in-page
+    dropdown that behaves like any other positioned element instead.
+    "More colors…" still reaches the native picker as a secondary,
+    deliberately-chosen escape hatch for full-spectrum picking.
   -->
   <div id="colorPickerPanel" class="color-picker-panel" style="display: none;">
-    <div class="color-picker-swatches"></div>
+    <div id="colorPickerThemeSection" style="display: none;">
+      <div class="color-picker-label">Theme Colors</div>
+      <div class="color-picker-swatches" id="colorPickerThemeSwatches"></div>
+    </div>
+    <div class="color-picker-label">Standard Colors</div>
+    <div class="color-picker-swatches" id="colorPickerStandardSwatches"></div>
     <div class="color-picker-custom">
       <input type="text" id="colorPickerHexInput" placeholder="#RRGGBB" maxlength="7" />
       <button type="button" id="colorPickerApply">Apply</button>
     </div>
+    <button type="button" id="colorPickerMore" class="color-picker-more">More colors…</button>
   </div>
 
   <script src="/taskpane.js?v=__CACHE_BUST__"></script>

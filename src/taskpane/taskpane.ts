@@ -16,23 +16,27 @@ function bindButton(id: string, handler: () => Promise<void>): void {
   el.addEventListener("click", withErrorHandling(handler));
 }
 
-// A fixed palette, not the native OS picker's full spectrum — matches how
-// this is actually used (pick a brand/theme color quickly), with a hex
-// input in the panel below for anything outside the palette. Mixes the
-// theme's own colors (src/config/theme.json) with a standard set, so the
-// deck's own header/axis colors are one click away.
-const COLOR_PALETTE = [
+// Grayscale + PowerPoint's own "Standard Colors" row values (same hex
+// values PowerPoint's native fill/line/text color dropdown uses), so
+// picks here look/feel like PowerPoint's own picker. This is deliberately
+// NOT the only source of colors in the panel — see getThemeColors() below
+// for the deck's actual theme colors, and the hex input for anything else.
+const STANDARD_COLOR_PALETTE = [
   "#000000",
   "#FFFFFF",
+  "#404040",
   "#808080",
-  theme.tableStyle.borderColor,
-  theme.defaultColorSwatch,
-  theme.tableStyle.headerFill,
-  theme.tableStyle.axisFill,
+  "#BFBFBF",
+  "#D9D9D9",
   "#C00000",
-  "#ED7D31",
+  "#FF0000",
   "#FFC000",
-  "#70AD47",
+  "#FFFF00",
+  "#92D050",
+  "#00B050",
+  "#00B0F0",
+  "#0070C0",
+  "#002060",
   "#7030A0",
 ];
 
@@ -58,6 +62,18 @@ function applyPickedColor(hex: string): void {
   if (handler) withErrorHandling(() => handler(hex))();
 }
 
+function renderColorSwatches(container: Element, hexes: string[]): void {
+  for (const hex of hexes) {
+    const swatchBtn = document.createElement("button");
+    swatchBtn.type = "button";
+    swatchBtn.className = "color-picker-swatch";
+    swatchBtn.style.backgroundColor = hex;
+    swatchBtn.title = hex;
+    swatchBtn.addEventListener("click", () => applyPickedColor(hex));
+    container.appendChild(swatchBtn);
+  }
+}
+
 /**
  * Builds the shared color picker panel's contents once and wires its
  * dismiss behavior (click outside, Escape). See the HTML comment above
@@ -68,26 +84,44 @@ function applyPickedColor(hex: string): void {
  * CSS pin, then a getBoundingClientRect()-computed one) both still opened
  * it at the screen's bottom-left. A plain in-page dropdown behaves like
  * any other positioned element instead, so it doesn't have that problem.
+ *
+ * Colors come from three places: the deck's own actual theme colors
+ * (fetched once here, async — see FillLineColors.getThemeColors), a
+ * fixed standard palette matching PowerPoint's own picker, and a hex
+ * input for anything else. "More colors…" still opens the native
+ * <input type="color"> as a last resort for full-spectrum picking — its
+ * position isn't reliable (the same bug this panel exists to work around
+ * everywhere else), but as a secondary, deliberately-chosen action that's
+ * an acceptable trade for getting the full color spectrum back.
  */
 function initColorPickerPanel(): void {
   const panel = document.getElementById("colorPickerPanel");
-  const swatchesContainer = panel?.querySelector(".color-picker-swatches");
+  const themeSection = document.getElementById("colorPickerThemeSection");
+  const themeSwatches = document.getElementById("colorPickerThemeSwatches");
+  const standardSwatches = document.getElementById("colorPickerStandardSwatches");
   const hexInput = document.getElementById("colorPickerHexInput") as HTMLInputElement | null;
   const applyBtn = document.getElementById("colorPickerApply");
-  if (!panel || !swatchesContainer || !hexInput || !applyBtn) {
+  const moreBtn = document.getElementById("colorPickerMore");
+  if (!panel || !themeSection || !themeSwatches || !standardSwatches || !hexInput || !applyBtn || !moreBtn) {
     console.warn("Color picker panel not found in taskpane.html");
     return;
   }
 
-  for (const hex of COLOR_PALETTE) {
-    const swatchBtn = document.createElement("button");
-    swatchBtn.type = "button";
-    swatchBtn.className = "color-picker-swatch";
-    swatchBtn.style.backgroundColor = hex;
-    swatchBtn.title = hex;
-    swatchBtn.addEventListener("click", () => applyPickedColor(hex));
-    swatchesContainer.appendChild(swatchBtn);
-  }
+  renderColorSwatches(standardSwatches, STANDARD_COLOR_PALETTE);
+
+  FillLineColors.getThemeColors()
+    .then((colors) => {
+      if (colors.length === 0) return; // unsupported PowerPoint build — leave the section hidden, not an error
+      renderColorSwatches(
+        themeSwatches,
+        colors.map((c) => c.hex)
+      );
+      themeSwatches.querySelectorAll(".color-picker-swatch").forEach((el, i) => {
+        (el as HTMLElement).title = `${colors[i].label} (${colors[i].hex})`;
+      });
+      themeSection.style.display = "block";
+    })
+    .catch((err) => console.warn("Couldn't load theme colors:", err));
 
   applyBtn.addEventListener("click", () => {
     const hex = hexInput.value.trim();
@@ -95,6 +129,15 @@ function initColorPickerPanel(): void {
       applyPickedColor(hex);
     } else {
       notify("Enter a color as #RRGGBB.", "error");
+    }
+  });
+
+  moreBtn.addEventListener("click", () => {
+    if (!activeColorInput) return;
+    if (typeof activeColorInput.showPicker === "function") {
+      activeColorInput.showPicker();
+    } else {
+      activeColorInput.click();
     }
   });
 
@@ -129,12 +172,20 @@ function openColorPickerPanel(
 }
 
 /**
- * Wires a swatch + caret + hidden <input type="color"> (now just a value
- * store, see .color-input-hidden's comment in taskpane.css) as one
- * control. The swatch is the default click target and applies the
- * currently-held color immediately — no picker in the way, so reusing the
- * same color across several shapes is one click each time. The caret opens
- * the shared custom color picker panel to actually change the color.
+ * Wires a swatch + caret + hidden <input type="color"> as one control. The
+ * swatch is the default click target and applies the currently-held color
+ * immediately — no picker in the way, so reusing the same color across
+ * several shapes is one click each time. The caret opens the shared custom
+ * color picker panel (see initColorPickerPanel) to actually change the
+ * color; that panel's "More colors…" button re-purposes this same hidden
+ * input to reach the native OS picker for full-spectrum picking, so this
+ * still needs to react when the input's value changes there (listened on
+ * `input` rather than `change` — macOS's native colour panel has no
+ * explicit commit action, and `change` is unreliable in WKWebView-hosted
+ * Mac Office task panes, while `input` fires live as the user moves around
+ * the picker). Debounced so dragging around that picker doesn't fire a
+ * PowerPoint.run call per pixel — it applies once movement settles for
+ * 150ms.
  */
 function bindColorControl(baseId: string, handler: (hex: string) => Promise<void>): void {
   const input = document.getElementById(`${baseId}Input`) as HTMLInputElement | null;
@@ -146,6 +197,14 @@ function bindColorControl(baseId: string, handler: (hex: string) => Promise<void
   }
 
   swatch.style.backgroundColor = input.value;
+
+  let debounceTimer: number | undefined;
+  input.addEventListener("input", () => {
+    swatch.style.backgroundColor = input.value;
+    window.clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(withErrorHandling(() => handler(input.value)), 150);
+  });
+
   swatch.addEventListener("click", withErrorHandling(() => handler(input.value)));
   caret.addEventListener("click", () => openColorPickerPanel(caret, input, swatch, handler));
 }
