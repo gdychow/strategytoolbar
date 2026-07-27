@@ -16,18 +16,125 @@ function bindButton(id: string, handler: () => Promise<void>): void {
   el.addEventListener("click", withErrorHandling(handler));
 }
 
+// A fixed palette, not the native OS picker's full spectrum — matches how
+// this is actually used (pick a brand/theme color quickly), with a hex
+// input in the panel below for anything outside the palette. Mixes the
+// theme's own colors (src/config/theme.json) with a standard set, so the
+// deck's own header/axis colors are one click away.
+const COLOR_PALETTE = [
+  "#000000",
+  "#FFFFFF",
+  "#808080",
+  theme.tableStyle.borderColor,
+  theme.defaultColorSwatch,
+  theme.tableStyle.headerFill,
+  theme.tableStyle.axisFill,
+  "#C00000",
+  "#ED7D31",
+  "#FFC000",
+  "#70AD47",
+  "#7030A0",
+];
+
+let activeColorHandler: ((hex: string) => Promise<void>) | null = null;
+let activeColorInput: HTMLInputElement | null = null;
+let activeColorSwatch: HTMLButtonElement | null = null;
+
+function closeColorPickerPanel(): void {
+  const panel = document.getElementById("colorPickerPanel");
+  if (panel) panel.style.display = "none";
+  activeColorHandler = null;
+  activeColorInput = null;
+  activeColorSwatch = null;
+}
+
+function applyPickedColor(hex: string): void {
+  const input = activeColorInput;
+  const swatch = activeColorSwatch;
+  const handler = activeColorHandler;
+  closeColorPickerPanel();
+  if (input) input.value = hex;
+  if (swatch) swatch.style.backgroundColor = hex;
+  if (handler) withErrorHandling(() => handler(hex))();
+}
+
 /**
- * Wires a swatch + caret + hidden native <input type="color"> as one
+ * Builds the shared color picker panel's contents once and wires its
+ * dismiss behavior (click outside, Escape). See the HTML comment above
+ * #colorPickerPanel in taskpane.html for why this exists instead of the
+ * browser's native <input type="color"> picker: the native picker's
+ * on-screen position isn't reliably controllable inside this WKWebView-
+ * hosted task pane — two separate attempts at positioning it (a static
+ * CSS pin, then a getBoundingClientRect()-computed one) both still opened
+ * it at the screen's bottom-left. A plain in-page dropdown behaves like
+ * any other positioned element instead, so it doesn't have that problem.
+ */
+function initColorPickerPanel(): void {
+  const panel = document.getElementById("colorPickerPanel");
+  const swatchesContainer = panel?.querySelector(".color-picker-swatches");
+  const hexInput = document.getElementById("colorPickerHexInput") as HTMLInputElement | null;
+  const applyBtn = document.getElementById("colorPickerApply");
+  if (!panel || !swatchesContainer || !hexInput || !applyBtn) {
+    console.warn("Color picker panel not found in taskpane.html");
+    return;
+  }
+
+  for (const hex of COLOR_PALETTE) {
+    const swatchBtn = document.createElement("button");
+    swatchBtn.type = "button";
+    swatchBtn.className = "color-picker-swatch";
+    swatchBtn.style.backgroundColor = hex;
+    swatchBtn.title = hex;
+    swatchBtn.addEventListener("click", () => applyPickedColor(hex));
+    swatchesContainer.appendChild(swatchBtn);
+  }
+
+  applyBtn.addEventListener("click", () => {
+    const hex = hexInput.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+      applyPickedColor(hex);
+    } else {
+      notify("Enter a color as #RRGGBB.", "error");
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (panel.style.display === "none") return;
+    const target = e.target as HTMLElement;
+    if (panel.contains(target) || target.closest(".color-caret")) return;
+    closeColorPickerPanel();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeColorPickerPanel();
+  });
+}
+
+function openColorPickerPanel(
+  caret: HTMLElement,
+  input: HTMLInputElement,
+  swatch: HTMLButtonElement,
+  handler: (hex: string) => Promise<void>
+): void {
+  const panel = document.getElementById("colorPickerPanel");
+  if (!panel) return;
+  const rect = caret.getBoundingClientRect();
+  panel.style.left = `${rect.left}px`;
+  panel.style.top = `${rect.bottom + 4}px`;
+  activeColorHandler = handler;
+  activeColorInput = input;
+  activeColorSwatch = swatch;
+  const hexInput = document.getElementById("colorPickerHexInput") as HTMLInputElement | null;
+  if (hexInput) hexInput.value = "";
+  panel.style.display = "block";
+}
+
+/**
+ * Wires a swatch + caret + hidden <input type="color"> (now just a value
+ * store, see .color-input-hidden's comment in taskpane.css) as one
  * control. The swatch is the default click target and applies the
  * currently-held color immediately — no picker in the way, so reusing the
  * same color across several shapes is one click each time. The caret opens
- * the native picker to actually change the color; picking a new one there
- * applies it too (listened on `input` rather than `change`, since macOS's
- * native colour panel has no explicit commit action — `change` is
- * unreliable in WKWebView-hosted Mac Office task panes, while `input`
- * fires live as the user moves around the picker) and updates the swatch.
- * Debounced so dragging around the picker doesn't fire a PowerPoint.run
- * call per pixel — it applies once movement settles for 150ms.
+ * the shared custom color picker panel to actually change the color.
  */
 function bindColorControl(baseId: string, handler: (hex: string) => Promise<void>): void {
   const input = document.getElementById(`${baseId}Input`) as HTMLInputElement | null;
@@ -38,34 +145,9 @@ function bindColorControl(baseId: string, handler: (hex: string) => Promise<void
     return;
   }
 
-  const syncSwatch = () => {
-    swatch.style.backgroundColor = input.value;
-  };
-  syncSwatch();
-
-  let debounceTimer: number | undefined;
-  input.addEventListener("input", () => {
-    syncSwatch();
-    window.clearTimeout(debounceTimer);
-    debounceTimer = window.setTimeout(withErrorHandling(() => handler(input.value)), 150);
-  });
-
+  swatch.style.backgroundColor = input.value;
   swatch.addEventListener("click", withErrorHandling(() => handler(input.value)));
-  caret.addEventListener("click", () => {
-    // The native OS color picker anchors to this input's actual on-screen
-    // position at the moment it opens — position it at the caret's own
-    // rect (not a static CSS guess) right before opening it. See
-    // .color-input-hidden's comment in taskpane.css for why this replaced
-    // a CSS-only attempt that didn't reliably track the caret.
-    const rect = caret.getBoundingClientRect();
-    input.style.left = `${rect.left}px`;
-    input.style.top = `${rect.bottom}px`;
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
-    } else {
-      input.click();
-    }
-  });
+  caret.addEventListener("click", () => openColorPickerPanel(caret, input, swatch, handler));
 }
 
 function setSectionEnabled(sectionId: string, enabled: boolean, reason?: string): void {
@@ -280,6 +362,7 @@ Office.onReady((info) => {
   if (info.host !== Office.HostType.PowerPoint) return;
 
   initSectionReordering();
+  initColorPickerPanel();
 
   const statusEl = document.getElementById("status");
   if (statusEl) bindStatusElement(statusEl);

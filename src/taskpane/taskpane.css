@@ -65,8 +65,13 @@ section.dragging {
 }
 
 .color-row label {
-  width: 32px;
+  min-width: 32px;
   flex: 0 0 auto;
+}
+
+/* "Margin" is wider than the 32px that fits "Fill"/"Line"/"Text" fine on its own — min-width above already covers it, this just gives it a bit more breathing room from the input next to it. */
+.margin-label {
+  margin-right: 2px;
 }
 
 .color-row select,
@@ -108,18 +113,12 @@ section.dragging {
 }
 
 /*
- * Positioned (not display:none) so showPicker()/click() reliably opens the
- * native picker across engines. position:fixed rather than absolute: the
- * native OS color picker anchors to wherever this <input> actually sits
- * on screen at the moment showPicker()/click() fires, so taskpane.ts sets
- * left/top here explicitly (via the caret's own getBoundingClientRect())
- * right before opening it — a prior attempt pinned this to the *row's*
- * top-left via position:absolute + .color-row's position:relative, which
- * didn't reliably track the caret's actual position and still opened the
- * picker far from it.
+ * No longer opens the native OS picker (see .color-picker-panel below for
+ * why) — kept purely as an off-screen value store for the control's
+ * current hex color, read/written by bindColorControl in taskpane.ts.
  */
 .color-input-hidden {
-  position: fixed;
+  position: absolute;
   width: 1px;
   height: 1px;
   padding: 0;
@@ -134,6 +133,10 @@ section.dragging {
 
 button {
   flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 6px 8px;
   font-size: 12px;
   cursor: pointer;
@@ -156,12 +159,69 @@ button:disabled {
  * (Package Files/Microsoft/AddIns/StrategyPPT.ppam's customUI/images/) so
  * these read the same way to a user who already knows that tool. Native
  * resolution (16-24px) — not scaled up, to avoid blurring these small
- * pixel-art icons. The button's own title= attribute is the tooltip.
+ * pixel-art icons.
  */
 .btn-icon {
   width: 16px;
   height: 16px;
-  vertical-align: middle;
+  flex: 0 0 auto;
+}
+
+.btn-label {
+  white-space: nowrap;
+}
+
+/*
+ * A plain in-page dropdown, not the browser's native <input type="color">
+ * picker — see the HTML comment above #colorPickerPanel for why. Shared
+ * by all three color controls (fill/line/text); taskpane.ts repositions
+ * and rebinds it to whichever caret opened it.
+ */
+.color-picker-panel {
+  position: fixed;
+  z-index: 1000;
+  width: 160px;
+  background: #fff;
+  border: 1px solid #c8c8c8;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  padding: 8px;
+}
+
+.color-picker-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.color-picker-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid #c8c8c8;
+  border-radius: 3px;
+  cursor: pointer;
+  flex: none;
+}
+
+.color-picker-custom {
+  display: flex;
+  gap: 4px;
+}
+
+#colorPickerHexInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 12px;
+  border: 1px solid #c8c8c8;
+  border-radius: 4px;
+  background: #fafafa;
+}
+
+#colorPickerApply {
+  flex: 0 0 auto;
 }
 
 .status {
