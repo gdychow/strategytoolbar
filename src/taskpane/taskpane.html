@@ -40,22 +40,30 @@
   <section id="sectionColor">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Fill, Line &amp; Text Color</h2>
     <div class="color-row">
-      <label for="fillColorSwatch">Fill</label>
-      <button type="button" id="fillColorSwatch" class="color-swatch" title="Apply fill color"></button>
-      <button type="button" id="fillColorCaret" class="color-caret" aria-label="Choose fill color">▾</button>
-      <input type="color" id="fillColorInput" class="color-input-hidden" tabindex="-1" />
-    </div>
-    <div class="color-row">
-      <label for="lineColorSwatch">Line</label>
-      <button type="button" id="lineColorSwatch" class="color-swatch" title="Apply line color"></button>
-      <button type="button" id="lineColorCaret" class="color-caret" aria-label="Choose line color">▾</button>
-      <input type="color" id="lineColorInput" class="color-input-hidden" tabindex="-1" />
-    </div>
-    <div class="color-row">
-      <label for="textColorSwatch">Text</label>
-      <button type="button" id="textColorSwatch" class="color-swatch" title="Apply text color"></button>
-      <button type="button" id="textColorCaret" class="color-caret" aria-label="Choose text color">▾</button>
-      <input type="color" id="textColorInput" class="color-input-hidden" tabindex="-1" />
+      <div class="color-control">
+        <label for="fillColorSwatch">Fill</label>
+        <span class="color-swatch-group">
+          <button type="button" id="fillColorSwatch" class="color-swatch" title="Apply fill color"></button>
+          <button type="button" id="fillColorCaret" class="color-caret" aria-label="Choose fill color">▾</button>
+        </span>
+        <input type="color" id="fillColorInput" class="color-input-hidden" tabindex="-1" />
+      </div>
+      <div class="color-control">
+        <label for="lineColorSwatch">Line</label>
+        <span class="color-swatch-group">
+          <button type="button" id="lineColorSwatch" class="color-swatch" title="Apply line color"></button>
+          <button type="button" id="lineColorCaret" class="color-caret" aria-label="Choose line color">▾</button>
+        </span>
+        <input type="color" id="lineColorInput" class="color-input-hidden" tabindex="-1" />
+      </div>
+      <div class="color-control">
+        <label for="textColorSwatch">Text</label>
+        <span class="color-swatch-group">
+          <button type="button" id="textColorSwatch" class="color-swatch" title="Apply text color"></button>
+          <button type="button" id="textColorCaret" class="color-caret" aria-label="Choose text color">▾</button>
+        </span>
+        <input type="color" id="textColorInput" class="color-input-hidden" tabindex="-1" />
+      </div>
     </div>
   </section>
 
@@ -111,13 +119,13 @@
       <button id="btnHalfSlideLeft"><img class="btn-icon" src="/assets/icons/AlignCentreLeft.png" alt="" /><span class="btn-label">Half-Slide: Left</span></button>
       <button id="btnHalfSlideRight"><img class="btn-icon" src="/assets/icons/AlignCentreRight.png" alt="" /><span class="btn-label">Half-Slide: Right</span></button>
     </div>
-    <div class="btn-row">
+    <div class="btn-row" style="display: none;">
       <button id="btnResetMargins">Reset Template Margins</button>
     </div>
   </section>
 
   <section id="sectionAngles">
-    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Angle Tools</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Chevron Tools</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
       <button id="btnAlignAngles"><img class="btn-icon" src="/assets/icons/LayoutAlignAngles.png" alt="" /><span class="btn-label">Align Angles</span></button>
@@ -126,7 +134,7 @@
   </section>
 
   <section id="sectionOtherTweaks">
-    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Other Tweaks</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Text Tweaks</h2>
     <div class="btn-row">
       <button id="btnToggleWordWrap"><img class="btn-icon" src="/assets/icons/Tweaksword_wrapon.png" alt="" /><span class="btn-label">Toggle Word Wrap</span></button>
       <button id="btnToggleAutoSize"><img class="btn-icon" src="/assets/icons/TweaksAutosizeshapeon.png" alt="" /><span class="btn-label">Toggle Autosize</span></button>
