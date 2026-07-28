@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Create Account</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="/register.css?v=__CACHE_BUST__" />
+</head>
+<body>
+  <h2>Create your account</h2>
+  <p id="status"></p>
+  <form id="registerForm">
+    <div class="field">
+      <label for="fullName">Full name</label>
+      <input id="fullName" name="fullName" type="text" required />
+    </div>
+    <div id="companyField" class="field">
+      <label for="companyName">Company</label>
+      <input id="companyName" name="companyName" type="text" />
+    </div>
+    <p id="noCompanyNote" class="note" style="display: none;">
+      No company detected for your email domain — you'll get a personal library only, not a company library.
+    </p>
+    <div class="field">
+      <label for="jobTitle">Job title</label>
+      <input id="jobTitle" name="jobTitle" type="text" />
+    </div>
+    <fieldset class="field">
+      <legend>Plan</legend>
+      <label class="radio"><input type="radio" name="plan" value="monthly" checked /> Monthly</label>
+      <label class="radio"><input type="radio" name="plan" value="annual" /> Annual</label>
+    </fieldset>
+    <div class="field">
+      <label class="checkbox"><input id="termsAccepted" type="checkbox" required /> I agree to the Terms of Service</label>
+    </div>
+    <p id="errorMsg" class="error" style="display: none;"></p>
+    <button id="btnSubmit" type="submit">Create Account</button>
+  </form>
+  <script src="/register.js?v=__CACHE_BUST__"></script>
+</body>
+</html>

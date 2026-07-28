@@ -11,6 +11,7 @@ const {
   waitForDatabase,
   upsertUser,
   getUserByKey,
+  completeRegistration,
   listUsersByCompanyDomain,
   setCompanyAdmin,
   listSharedCatalogItems,
@@ -121,13 +122,14 @@ app.use(async (req, res, next) => {
 
   req.user = verified.claims;
   if (verified.shouldRefresh) {
-    // Task Pane Phase 14: companyDomain/isCompanyAdmin are re-fetched from
-    // the DB here (not just carried over from the old JWT claims the way
-    // oid/tid/email/displayName are) so a promote/demote takes effect
-    // within one refresh cycle (~12h) instead of requiring a full
-    // sign-out — is_company_admin is real mutable state, unlike isAdmin,
-    // which stays purely env-var-derived and is safe to recompute cheaply
-    // inside createSessionToken on every reissue.
+    // Task Pane Phase 14/15: companyDomain/isCompanyAdmin/isRegistered are
+    // re-fetched from the DB here (not just carried over from the old JWT
+    // claims the way oid/tid/email/displayName are) so a promote/demote
+    // or a just-completed registration takes effect within one refresh
+    // cycle (~12h) instead of requiring a full sign-out — all three are
+    // real mutable state, unlike isAdmin, which stays purely env-var-
+    // derived and is safe to recompute cheaply inside createSessionToken
+    // on every reissue.
     const dbUser = await getUserByKey(verified.claims.oid, verified.claims.tid);
     const fresh = await createSessionToken(
       {
@@ -137,6 +139,7 @@ app.use(async (req, res, next) => {
         displayName: verified.claims.displayName,
         companyDomain: dbUser?.company_domain ?? null,
         isCompanyAdmin: dbUser?.is_company_admin ?? false,
+        isRegistered: dbUser?.is_registered ?? false,
       },
       verified.claims.sessionStart
     );
@@ -165,6 +168,7 @@ app.post("/api/auth/session", async (req, res) => {
     ...identity,
     companyDomain: user.company_domain,
     isCompanyAdmin: user.is_company_admin,
+    isRegistered: user.is_registered,
   });
   res.cookie(SESSION_COOKIE, sessionToken, cookieOptions);
   res.json({
@@ -177,8 +181,56 @@ app.post("/api/auth/session", async (req, res) => {
 
 app.get("/api/auth/me", (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
-  const { oid, tid, email, displayName, isAdmin, companyDomain, isCompanyAdmin } = req.user;
-  res.json({ oid, tid, email, displayName, isAdmin, companyDomain, isCompanyAdmin });
+  const { oid, tid, email, displayName, isAdmin, companyDomain, isCompanyAdmin, isRegistered } = req.user;
+  res.json({ oid, tid, email, displayName, isAdmin, companyDomain, isCompanyAdmin, isRegistered });
+});
+
+// Task Pane Phase 15: completes registration for an already-signed-in but
+// not-yet-registered user — deliberately doesn't require isRegistered
+// (that's exactly what this sets). companyName is only required when the
+// user actually has a companyDomain (consumer-domain users have no
+// company step to fill in at all — see server/consumerDomains.js).
+app.post("/api/auth/register", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Sign in first." });
+
+  const fullName = typeof req.body?.fullName === "string" ? req.body.fullName.trim() : "";
+  const companyName = typeof req.body?.companyName === "string" ? req.body.companyName.trim() : "";
+  const jobTitle = typeof req.body?.jobTitle === "string" ? req.body.jobTitle.trim() : "";
+  const plan = req.body?.plan;
+  const termsAccepted = req.body?.termsAccepted === true;
+
+  if (!fullName) return res.status(400).json({ error: "Full name is required." });
+  if (req.user.companyDomain && !companyName) return res.status(400).json({ error: "Company name is required." });
+  if (plan !== "monthly" && plan !== "annual") return res.status(400).json({ error: "Choose a plan." });
+  if (!termsAccepted) return res.status(400).json({ error: "You must accept the Terms of Service." });
+
+  const updated = await completeRegistration({
+    oid: req.user.oid,
+    tid: req.user.tid,
+    fullName,
+    companyName: req.user.companyDomain ? companyName : null,
+    jobTitle: jobTitle || null,
+    plan,
+  });
+  if (!updated) return res.status(404).json({ error: "Account not found." });
+
+  // Reissues the cookie so the response of this very call already reflects
+  // the new isRegistered/isCompanyAdmin state — the client doesn't have to
+  // wait on the sliding-refresh cycle for its own registration to apply.
+  const sessionToken = await createSessionToken(
+    {
+      oid: updated.oid,
+      tid: updated.tid,
+      email: updated.email,
+      displayName: updated.display_name,
+      companyDomain: updated.company_domain,
+      isCompanyAdmin: updated.is_company_admin,
+      isRegistered: updated.is_registered,
+    },
+    req.user.sessionStart
+  );
+  res.cookie(SESSION_COOKIE, sessionToken, cookieOptions);
+  res.json({ ok: true, isCompanyAdmin: updated.is_company_admin });
 });
 
 app.post("/api/auth/signout", (req, res) => {
@@ -194,6 +246,7 @@ app.post("/api/auth/signout", (req, res) => {
 // category value by the param route.
 app.get("/api/catalog/personal", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   const items = await listPersonalCatalogItems(req.user.oid, req.user.tid);
   res.json({
     groups: [],
@@ -221,6 +274,7 @@ app.get("/api/catalog/personal", async (req, res) => {
 // be swallowed as a literal (invalid) category value.
 app.get("/api/catalog/company", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   if (!req.user.companyDomain) return res.status(403).json({ error: "You don't have a company library." });
 
   const [items, groups] = await Promise.all([
@@ -259,6 +313,7 @@ app.get("/api/catalog/company", async (req, res) => {
 // be contiguous in that ordering).
 app.get("/api/catalog/:category", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   const [items, groups] = await Promise.all([
     listSharedCatalogItems(req.params.category),
     listGroupsForCategory(req.params.category),
@@ -284,6 +339,7 @@ app.get("/api/catalog/:category", async (req, res) => {
 
 app.get("/api/catalog/file/:itemId", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
 
   const item = await getCatalogItem(req.params.itemId);
   if (!item || item.insert_mode !== "file") {
@@ -317,6 +373,7 @@ app.get("/api/catalog/file/:itemId", async (req, res) => {
 // for their own company's items.
 app.post("/api/admin/catalog/:id/content", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid item id." });
 
@@ -366,6 +423,7 @@ app.post("/api/admin/catalog/:id/content", async (req, res) => {
 // orthogonal-scoping-columns design).
 app.post("/api/admin/catalog", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   const { pptxBase64, thumbnailBase64, scope } = req.body ?? {};
   if (typeof pptxBase64 !== "string" || typeof thumbnailBase64 !== "string") {
     return res.status(400).json({ error: "Missing content." });
@@ -404,6 +462,7 @@ app.post("/api/admin/catalog", async (req, res) => {
 // stamps owner_oid/owner_tid instead of leaving them null.
 app.post("/api/personal/catalog", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
 
   const { pptxBase64, thumbnailBase64 } = req.body ?? {};
   if (typeof pptxBase64 !== "string" || typeof thumbnailBase64 !== "string") {
@@ -436,6 +495,7 @@ app.post("/api/personal/catalog", async (req, res) => {
 // admin status (see getOwnedCatalogItem/updateOwnedCatalogItemContent).
 app.post("/api/personal/catalog/:id/content", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid item id." });
 
@@ -469,6 +529,7 @@ app.post("/api/personal/catalog/:id/content", async (req, res) => {
 // their only metadata edit (no category/group/tags, unlike shared items).
 app.post("/api/personal/catalog/:id", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid item id." });
 
@@ -482,6 +543,7 @@ app.post("/api/personal/catalog/:id", async (req, res) => {
 
 app.post("/api/personal/catalog/:id/delete", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid item id." });
 
@@ -499,6 +561,7 @@ app.post("/api/personal/catalog/:id/delete", async (req, res) => {
 
 function requireAdmin(req, res, next) {
   if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
   if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
   next();
 }
@@ -542,6 +605,7 @@ function canManageRow(user, row) {
 // avoids showing a dead link).
 app.get("/admin/company-admins", async (req, res) => {
   if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
   const domain = typeof req.query.domain === "string" && req.query.domain ? req.query.domain : req.user.companyDomain;
   if (!domain) return res.status(400).send("No company to show.");
   if (!canAdminCompany(req.user, domain)) return res.status(403).send("Not an admin for this company.");
@@ -575,6 +639,7 @@ app.get("/admin/company-admins", async (req, res) => {
 
 app.post("/admin/company-admins/:oid/:tid/promote", async (req, res) => {
   if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
   const { oid, tid } = req.params;
   const target = await getUserByKey(oid, tid);
   if (!target || !target.company_domain) return res.status(404).send("User not found.");
@@ -590,6 +655,7 @@ app.post("/admin/company-admins/:oid/:tid/promote", async (req, res) => {
 // the backstop if a company ever does end up with none.
 app.post("/admin/company-admins/:oid/:tid/demote", async (req, res) => {
   if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
   const { oid, tid } = req.params;
   const target = await getUserByKey(oid, tid);
   if (!target || !target.company_domain) return res.status(404).send("User not found.");
@@ -831,6 +897,16 @@ function renderSignInPage() {
 // items is also out of scope here (deferred, not forgotten).
 app.get("/admin", async (req, res) => {
   if (!req.user) return res.send(renderSignInPage());
+  // Task Pane Phase 15: registration is required uniformly — even for a
+  // global admin (ADMIN_EMAILS membership doesn't bypass it) — so this
+  // stays a single point of enforcement rather than an exception. No
+  // second registration form is built for the browser context; this just
+  // points back to the one that exists, in the task pane.
+  if (!req.user.isRegistered) {
+    return res
+      .status(403)
+      .send("Your account isn't fully set up yet — open the task pane in PowerPoint, click \"Create Account\" to finish, then reload this page.");
+  }
 
   // Task Pane Phase 14: ?scope=company:<domain> is the only new value this
   // takes — absent (or any other value) falls through to today's exact
@@ -1428,6 +1504,7 @@ app.get("/admin", async (req, res) => {
 // companyDomain body, req.user.isAdmin for a category one).
 app.post("/admin/catalog/reorder", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   const { category, companyDomain, groupId, orderedIds } = req.body ?? {};
   if (companyDomain) {
     if (!canAdminCompany(req.user, companyDomain)) return res.status(403).json({ error: "Not an admin for this company." });
@@ -1462,6 +1539,7 @@ app.post("/admin/catalog/:id", upload.single("thumbnail"), async (req, res) => {
     json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo ?? "/admin", message);
 
   if (!req.user) return fail(401, "Sign in first.");
+  if (!req.user.isRegistered) return fail(403, "Finish creating your account first.");
   if (!Number.isInteger(id) || id <= 0) return fail(400, "Invalid item id.");
 
   const existing = await getCatalogItem(id);
@@ -1515,6 +1593,7 @@ app.post("/admin/catalog/:id/delete", async (req, res) => {
     json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo ?? "/admin", message);
 
   if (!req.user) return fail(401, "Sign in first.");
+  if (!req.user.isRegistered) return fail(403, "Finish creating your account first.");
   if (!Number.isInteger(id) || id <= 0) return fail(400, "Invalid item id.");
 
   const existing = await getCatalogItem(id);
@@ -1564,6 +1643,7 @@ app.post("/admin/groups", async (req, res) => {
   const fail = (status, message) => (json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo, message));
 
   if (!req.user) return fail(401, "Sign in first.");
+  if (!req.user.isRegistered) return fail(403, "Finish creating your account first.");
   if (companyDomain) {
     if (!canAdminCompany(req.user, companyDomain)) return fail(403, "Not an admin for this company.");
   } else {
@@ -1591,6 +1671,7 @@ app.post("/admin/groups", async (req, res) => {
 // swallow this as a request to rename a group literally named "reorder".
 app.post("/admin/groups/reorder", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
   const { category, companyDomain, orderedGroupIds } = req.body ?? {};
   if (companyDomain) {
     if (!canAdminCompany(req.user, companyDomain)) return res.status(403).json({ error: "Not an admin for this company." });
@@ -1625,6 +1706,7 @@ app.post("/admin/groups/:id", async (req, res) => {
   const fail = (status, message) => (json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo, message));
 
   if (!req.user) return fail(401, "Sign in first.");
+  if (!req.user.isRegistered) return fail(403, "Finish creating your account first.");
   if (!existing) return fail(404, "Group not found.");
   if (!canManageRow(req.user, existing)) return fail(403, "Not an admin for this group.");
   if (!name) return fail(400, "Group name can't be empty.");
@@ -1645,6 +1727,7 @@ app.post("/admin/groups/:id/delete", async (req, res) => {
   const fail = (status, message) => (json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo, message));
 
   if (!req.user) return fail(401, "Sign in first.");
+  if (!req.user.isRegistered) return fail(403, "Finish creating your account first.");
   if (!existing) return fail(404, "Group not found.");
   if (!canManageRow(req.user, existing)) return fail(403, "Not an admin for this group.");
 

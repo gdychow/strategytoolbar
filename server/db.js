@@ -29,34 +29,95 @@ async function waitForDatabase(maxAttempts = 10, delayMs = 1000) {
  * successful token verification. companyDomain (Task Pane Phase 14,
  * already resolved by the caller via server/consumerDomains.js's
  * deriveCompanyDomain) is refreshed on every call — an email's domain
- * could theoretically change across logins — but is_company_admin is
- * computed only on first INSERT (true exactly when this is the first
- * user this DB has ever seen for that domain — the auto-promotion) and
- * is deliberately NOT touched on the ON CONFLICT branch, so this never
- * silently promotes/demotes an existing user; that only ever happens via
- * the explicit promote/demote routes in server.js.
+ * could theoretically change across logins.
+ *
+ * Task Pane Phase 15: a brand-new row always starts is_company_admin =
+ * false and is_registered = false — the "first user of a domain becomes
+ * that domain's admin" auto-promotion no longer happens here. It moved to
+ * completeRegistration (below), scoped to is_registered = true rows only,
+ * so an abandoned/incomplete sign-in can never permanently squat a
+ * company's admin slot. The ON CONFLICT branch only ever refreshes
+ * email/display_name/company_domain/last_seen_at — it must never touch
+ * is_registered/full_name/company_name/job_title/terms_accepted_at/
+ * registered_at/is_company_admin, all of which are owned exclusively by
+ * completeRegistration and the promote/demote routes in server.js.
  */
 async function upsertUser({ oid, tid, email, displayName, companyDomain }) {
   const result = await pool.query(
-    `INSERT INTO users (oid, tid, email, display_name, company_domain, is_company_admin, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5::text,
-       CASE WHEN $5::text IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users WHERE company_domain = $5::text) THEN true ELSE false END,
-       now())
+    `INSERT INTO users (oid, tid, email, display_name, company_domain, last_seen_at)
+     VALUES ($1, $2, $3, $4, $5::text, now())
      ON CONFLICT (oid, tid)
      DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name, company_domain = EXCLUDED.company_domain, last_seen_at = now()
-     RETURNING oid, tid, email, display_name, company_domain, is_company_admin, created_at, last_seen_at`,
+     RETURNING oid, tid, email, display_name, company_domain, is_company_admin, is_registered, full_name, company_name, job_title, created_at, last_seen_at`,
     [oid, tid, email, displayName, companyDomain ?? null]
   );
   return result.rows[0];
 }
 
-/** Plain lookup by primary key — used by the session-refresh middleware to pick up a promote/demote without forcing a full sign-out. */
+/** Plain lookup by primary key — used by the session-refresh middleware to pick up a promote/demote or a just-completed registration without forcing a full sign-out. */
 async function getUserByKey(oid, tid) {
   const result = await pool.query(
-    `SELECT oid, tid, email, display_name, company_domain, is_company_admin FROM users WHERE oid = $1 AND tid = $2`,
+    `SELECT oid, tid, email, display_name, company_domain, is_company_admin, is_registered, full_name, company_name, job_title FROM users WHERE oid = $1 AND tid = $2`,
     [oid, tid]
   );
   return result.rows[0] ?? null;
+}
+
+/**
+ * Task Pane Phase 15: completes registration for an already-signed-in but
+ * not-yet-registered user — the only place is_registered ever flips to
+ * true. Also where the "first user of a domain becomes that domain's
+ * admin" auto-promotion now happens (relocated from upsertUser's old
+ * first-INSERT check), scoped to is_registered = true rows so it only
+ * ever considers people who've actually finished setting up an account.
+ * One transaction: updates the user row, then upserts a subscriptions row
+ * for the chosen plan (ON CONFLICT covers a retried/duplicate submission,
+ * not a real re-subscribe flow — there is no real billing yet).
+ */
+async function completeRegistration({ oid, tid, fullName, companyName, jobTitle, plan }) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const userResult = await client.query(
+      `UPDATE users
+       SET full_name = $3,
+           company_name = $4,
+           job_title = $5,
+           terms_accepted_at = now(),
+           registered_at = now(),
+           is_registered = true,
+           is_company_admin = (
+             company_domain IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM users u2
+               WHERE u2.company_domain = users.company_domain
+                 AND u2.is_registered = true
+                 AND (u2.oid, u2.tid) <> (users.oid, users.tid)
+             )
+           )
+       WHERE oid = $1 AND tid = $2
+       RETURNING oid, tid, email, display_name, company_domain, is_company_admin, is_registered, full_name, company_name, job_title`,
+      [oid, tid, fullName, companyName ?? null, jobTitle ?? null]
+    );
+    const user = userResult.rows[0];
+    if (!user) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    await client.query(
+      `INSERT INTO subscriptions (owner_oid, owner_tid, plan, status)
+       VALUES ($1, $2, $3, 'pending')
+       ON CONFLICT (owner_oid, owner_tid) DO UPDATE SET plan = EXCLUDED.plan, updated_at = now()`,
+      [oid, tid, plan]
+    );
+    await client.query("COMMIT");
+    return user;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /** Every user sharing a company_domain, for /admin/company-admins' listing. */
@@ -547,6 +608,7 @@ module.exports = {
   waitForDatabase,
   upsertUser,
   getUserByKey,
+  completeRegistration,
   listUsersByCompanyDomain,
   setCompanyAdmin,
   listSharedCatalogItems,

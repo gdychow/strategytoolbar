@@ -1,0 +1,125 @@
+:root {
+  --bg: #ffffff;
+  --bg-alt: #fafafa;
+  --text: #1a1a1a;
+  --text-muted: #666;
+  --border: #c8c8c8;
+  --accent: #1a5fb4;
+  --accent-hover: #154a8f;
+  --error-bg: #fdeaea;
+  --error-text: #a12525;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1e;
+    --bg-alt: #2b2b2b;
+    --text: #e8e8e8;
+    --text-muted: #aaa;
+    --border: #555;
+    --accent: #4c8fd6;
+    --accent-hover: #6fabe6;
+    --error-bg: #4a2222;
+    --error-text: #ff8f8f;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: light dark;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+#status {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+legend {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+label.radio,
+label.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  margin-right: 16px;
+}
+
+.note {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: -8px 0 14px;
+}
+
+.error {
+  font-size: 12px;
+  color: var(--error-text);
+  background: var(--error-bg);
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+button {
+  width: 100%;
+  padding: 9px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 4px;
+}
+
+button:hover {
+  background: var(--accent-hover);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

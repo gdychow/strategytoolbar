@@ -65,10 +65,11 @@ function isAdminEmail(email) {
   return admins.includes(email.toLowerCase());
 }
 
-// companyDomain/isCompanyAdmin (Task Pane Phase 14) are sourced from the
-// caller (the DB row), unlike isAdmin — is_company_admin is real mutable
-// state (set by promote/demote actions), not something cheaply
-// re-derivable from an env var on every call the way isAdminEmail is.
+// companyDomain/isCompanyAdmin (Task Pane Phase 14) and isRegistered
+// (Task Pane Phase 15) are all sourced from the caller (the DB row),
+// unlike isAdmin — they're real mutable state (set by promote/demote
+// actions or by completeRegistration), not something cheaply re-derivable
+// from an env var on every call the way isAdminEmail is.
 async function createSessionToken(user, sessionStart = Date.now()) {
   return new SignJWT({
     oid: user.oid,
@@ -78,6 +79,7 @@ async function createSessionToken(user, sessionStart = Date.now()) {
     isAdmin: isAdminEmail(user.email),
     companyDomain: user.companyDomain ?? null,
     isCompanyAdmin: !!user.isCompanyAdmin,
+    isRegistered: !!user.isRegistered,
     sessionStart,
   })
     .setProtectedHeader({ alg: "HS256" })

@@ -20,6 +20,10 @@ const options = { ...sharedOptions, entryPoints: ["src/taskpane/taskpane.ts"], o
 // simpler than switching to `outdir` (which would rename taskpane.js's
 // output path and touch every reference to it) for one extra small page.
 const galleryOptions = { ...sharedOptions, entryPoints: ["src/gallery/gallery.ts"], outfile: "dist/gallery.js" };
+// Task Pane Phase 15: the account-creation dialog, same reasoning as
+// galleryOptions above — its own small bundle, not a second entry point
+// sharing taskpane.js's outfile.
+const registerOptions = { ...sharedOptions, entryPoints: ["src/register/register.ts"], outfile: "dist/register.js" };
 
 /**
  * Prefers GIT_COMMIT from the environment (set as a Docker build ARG, since
@@ -52,6 +56,9 @@ async function copyStaticAssets() {
   const galleryHtml = await readFile("src/gallery/gallery.html", "utf8");
   await writeFile("dist/gallery.html", galleryHtml.replaceAll("__CACHE_BUST__", commit));
   await cp("src/gallery/gallery.css", "dist/gallery.css");
+  const registerHtml = await readFile("src/register/register.html", "utf8");
+  await writeFile("dist/register.html", registerHtml.replaceAll("__CACHE_BUST__", commit));
+  await cp("src/register/register.css", "dist/register.css");
   await cp("assets", "dist/assets", { recursive: true });
   await cp(prod ? "manifest.prod.xml" : "manifest.xml", "dist/manifest.xml");
   // Vendored fresh from node_modules on every build (not committed to the
@@ -69,18 +76,21 @@ async function copyStaticAssets() {
     "node_modules/@azure/msal-browser/lib/redirect-bridge/msal-redirect-bridge.min.js",
     "dist/vendor/msal-redirect-bridge.min.js"
   );
-  console.log("Copied taskpane.html (with build stamp)/css, assets/, vendor/, and manifest.xml into dist/");
+  console.log("Copied taskpane.html (with build stamp)/css, gallery/register html+css, assets/, vendor/, and manifest.xml into dist/");
 }
 
 if (watch) {
   const ctx = await esbuild.context(options);
   const galleryCtx = await esbuild.context(galleryOptions);
+  const registerCtx = await esbuild.context(registerOptions);
   await ctx.watch();
   await galleryCtx.watch();
+  await registerCtx.watch();
   await copyStaticAssets();
   console.log("Watching for changes...");
 } else {
   await esbuild.build(options);
   await esbuild.build(galleryOptions);
+  await esbuild.build(registerOptions);
   await copyStaticAssets();
 }

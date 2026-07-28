@@ -346,6 +346,10 @@ interface SessionUser {
   // Task Pane Phase 14
   companyDomain: string | null;
   isCompanyAdmin: boolean;
+  // Task Pane Phase 15 — the real access gate for every account-dependent
+  // feature (Content Library, My Library); a session existing at all no
+  // longer implies the account is actually usable.
+  isRegistered: boolean;
 }
 
 let currentFileInsertHandle: Library.FileInsertHandle | null = null;
@@ -369,16 +373,24 @@ async function insertPickedItem(item: Library.CatalogItem): Promise<void> {
   }
 }
 
-/** Gates the Content Library section whenever sign-in state changes. The gallery dialog loads its own data lazily on open, so there's nothing to pre-fetch here. */
+/**
+ * Gates the Content Library section whenever sign-in/registration state
+ * changes. The gallery dialog loads its own data lazily on open, so
+ * there's nothing to pre-fetch here. Task Pane Phase 15: gated on
+ * isRegistered, not just a valid session — an unregistered user is still
+ * "signed in" (their session cookie is real) but has no access to any
+ * account-dependent feature until they finish creating their account.
+ */
 function refreshLibrarySection(user: SessionUser | null): void {
-  const signedIn = !!user;
+  const unlocked = !!user?.isRegistered;
   const supported = Library.isLibraryInsertSupported();
-  setSectionEnabled(
-    "sectionLibrary",
-    signedIn && supported,
-    signedIn ? "Requires a newer PowerPoint build (PowerPointApi 1.2) than this one has." : "Sign in above to browse the content library."
-  );
-  if (!signedIn || !supported) {
+  const reason = !user
+    ? "Sign in above to browse the content library."
+    : !user.isRegistered
+      ? 'Finish creating your account above to browse the content library.'
+      : "Requires a newer PowerPoint build (PowerPointApi 1.2) than this one has.";
+  setSectionEnabled("sectionLibrary", unlocked && supported, reason);
+  if (!unlocked || !supported) {
     showLibraryFinishRow(false);
     currentFileInsertHandle = null;
   }
@@ -437,10 +449,13 @@ function updateLibraryEditUI(): void {
  * section over it.
  */
 function refreshMyLibrarySection(user: SessionUser | null): void {
-  const signedIn = !!user;
+  // Task Pane Phase 15: gated on isRegistered, same reasoning as
+  // refreshLibrarySection above — an unregistered user is still signed
+  // in, but has no access to My Library until registration completes.
+  const unlocked = !!user?.isRegistered;
   const section = document.getElementById("sectionMyLibrary");
-  if (section) (section as HTMLElement).style.display = signedIn ? "" : "none";
-  if (!signedIn) {
+  if (section) (section as HTMLElement).style.display = unlocked ? "" : "none";
+  if (!unlocked) {
     currentLibraryEdit = null;
     updateLibraryEditUI();
   }
@@ -673,7 +688,10 @@ async function getSessionUser(): Promise<SessionUser | null> {
 function updateSignInStatus(user: SessionUser | null): void {
   const el = document.getElementById("signInStatus");
   if (!el) return;
-  if (user) {
+  if (user && !user.isRegistered) {
+    el.textContent = `Signed in as ${user.email ?? user.displayName ?? "unknown user"} — finish creating your account.`;
+    el.classList.remove("signed-in");
+  } else if (user) {
     el.textContent = `Signed in as ${user.email ?? user.displayName ?? "unknown user"}${user.isAdmin ? " (admin)" : ""}.`;
     el.classList.add("signed-in");
   } else {
@@ -682,10 +700,27 @@ function updateSignInStatus(user: SessionUser | null): void {
   }
 }
 
-/** Hides the Sign In button once signed in — the admin-only Open Admin link now lives in sectionMyLibrary (see refreshMyLibrarySection), not here. */
+/**
+ * Task Pane Phase 15: three states, not two — no session at all shows
+ * "Sign In"; a session that exists but hasn't finished registering shows
+ * "Create Account" (clicking it opens the registration dialog directly,
+ * see bindButton("btnSignIn", ...) below — no second Microsoft auth
+ * needed); a fully registered session hides the button entirely. The
+ * admin-only Open Admin link lives in sectionMyLibrary (see
+ * refreshMyLibrarySection), not here.
+ */
 function updateAuthButtons(user: SessionUser | null): void {
   const signIn = document.getElementById("btnSignIn") as HTMLButtonElement | null;
-  if (signIn) signIn.style.display = user ? "none" : "";
+  if (!signIn) return;
+  if (!user) {
+    signIn.style.display = "";
+    signIn.textContent = "Sign In";
+  } else if (!user.isRegistered) {
+    signIn.style.display = "";
+    signIn.textContent = "Create Account";
+  } else {
+    signIn.style.display = "none";
+  }
 }
 
 /** Applies a change in sign-in state everywhere it matters — the status line, the auth buttons, and the Content Library gates. */
@@ -779,6 +814,44 @@ function initSectionReordering(): void {
   });
 }
 
+/**
+ * Task Pane Phase 15: opens the account-creation dialog, same
+ * displayDialogAsync mechanism as btnBrowseLibrary's gallery wiring below
+ * — the dialog captures details and calls POST /api/auth/register itself
+ * (it can make its own authenticated fetch calls directly, same as the
+ * gallery already does for /api/catalog/...), then reports back a bare
+ * { success: true } via messageParent so the task pane knows to refresh
+ * its own session state and unlock the account-dependent sections.
+ */
+function openRegistrationDialog(): void {
+  Office.context.ui.displayDialogAsync(
+    `${window.location.origin}/register.html?v=${Date.now()}`,
+    { height: 60, width: 40 },
+    (result) => {
+      if (result.status === Office.AsyncResultStatus.Failed) {
+        notify(`Failed to open account creation: ${result.error.message}`, "error");
+        return;
+      }
+      const dialog = result.value;
+      dialog.addEventHandler(Office.EventType.DialogMessageReceived, (args) => {
+        if (!("message" in args)) return;
+        dialog.close();
+        try {
+          const parsed = JSON.parse(args.message);
+          if (parsed?.success) {
+            getSessionUser().then((user) => {
+              applySessionState(user);
+              notify("Account created.");
+            });
+          }
+        } catch {
+          // malformed message — nothing to do
+        }
+      });
+    }
+  );
+}
+
 Office.onReady((info) => {
   if (info.host !== Office.HostType.PowerPoint) return;
 
@@ -788,18 +861,34 @@ Office.onReady((info) => {
   const statusEl = document.getElementById("status");
   if (statusEl) bindStatusElement(statusEl);
 
+  // Task Pane Phase 15: a returning-but-unregistered visitor already has a
+  // valid session (checked first, cheaply) — that skips straight to the
+  // registration dialog with no Microsoft popup at all. Only a visitor
+  // with no session yet goes through the full Auth.signIn() flow; if the
+  // resulting account also turns out to be unregistered (a brand-new
+  // sign-in), the dialog opens immediately after, so one "Sign In" click
+  // takes a new user straight through Microsoft auth into account
+  // creation, no second click required.
   bindButton("btnSignIn", async () => {
-    const user = await Auth.signIn((step) => notify(step));
-    const claimsEl = document.getElementById("authClaims") as HTMLElement;
-    claimsEl.style.display = "block";
-    claimsEl.textContent = JSON.stringify(user, null, 2);
-    if (!user.email) {
-      notify("Signed in, but no email claim was returned — check the Azure app registration's optional claims.", "error");
-      return;
+    let user = await getSessionUser();
+    if (!user) {
+      const msalUser = await Auth.signIn((step) => notify(step));
+      const claimsEl = document.getElementById("authClaims") as HTMLElement;
+      claimsEl.style.display = "block";
+      claimsEl.textContent = JSON.stringify(msalUser, null, 2);
+      if (!msalUser.email) {
+        notify("Signed in, but no email claim was returned — check the Azure app registration's optional claims.", "error");
+        return;
+      }
+      await establishSession(msalUser.idToken);
+      user = await getSessionUser();
+      applySessionState(user);
     }
-    await establishSession(user.idToken);
-    applySessionState(await getSessionUser());
-    notify(`Signed in as ${user.email}`);
+    if (user && !user.isRegistered) {
+      openRegistrationDialog();
+    } else if (user) {
+      notify(`Signed in as ${user.email}`);
+    }
   });
   document.getElementById("btnOpenAdmin")?.addEventListener("click", () => {
     window.open("/admin", "_blank");

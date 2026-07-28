@@ -149,3 +149,41 @@ ALTER TABLE catalog_groups ADD CONSTRAINT catalog_groups_scope_check
 ALTER TABLE catalog_groups DROP CONSTRAINT IF EXISTS catalog_groups_category_name_key;
 CREATE UNIQUE INDEX IF NOT EXISTS catalog_groups_global_unique ON catalog_groups (category, name) WHERE company_domain IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS catalog_groups_company_unique ON catalog_groups (company_domain, name) WHERE company_domain IS NOT NULL;
+
+-- Task Pane Phase 15: explicit account registration. A row existing in
+-- `users` no longer implies the person has actually finished setting up
+-- an account (see server/db.js's completeRegistration) — is_registered is
+-- the real access gate for every account-dependent route from this phase
+-- on. full_name/company_name/job_title are captured at registration and
+-- are deliberately separate from display_name/company_domain (the raw,
+-- always-refreshed Microsoft/email-derived values) so an edit here never
+-- gets silently overwritten on a later sign-in.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_registered BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS job_title TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS registered_at TIMESTAMPTZ;
+
+-- One row per user for now (UNIQUE(owner_oid, owner_tid)) — seat/company-
+-- wide billing would be a bigger redesign, deliberately not built ahead
+-- of need. status starts 'pending' at registration since no real payment
+-- happens yet; the stripe_* columns are nullable placeholders, a seam for
+-- real billing later, not wired to anything in this phase. Subscription
+-- status does not gate access anywhere yet — is_registered on users is
+-- the only access gate this phase wires up.
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id SERIAL PRIMARY KEY,
+  owner_oid TEXT NOT NULL,
+  owner_tid TEXT NOT NULL,
+  plan TEXT NOT NULL CHECK (plan IN ('monthly', 'annual')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'trial', 'active', 'past_due', 'canceled')),
+  current_period_start TIMESTAMPTZ,
+  current_period_end TIMESTAMPTZ,
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (owner_oid, owner_tid),
+  FOREIGN KEY (owner_oid, owner_tid) REFERENCES users (oid, tid)
+);
