@@ -18,8 +18,12 @@
  */
 import { fetchCatalog, type CatalogItem, type CatalogResponse } from "../features/libraryInsert";
 
-// Matches what's actually seeded (see db/seed/catalog-*.json).
-const CATEGORIES: { value: string; label: string }[] = [
+// Matches what's actually seeded (see db/seed/catalog-*.json). "My Items"
+// (Task Pane Phase 13) is appended once sign-in state is known, not listed
+// here statically — see Office.onReady, which awaits the auth check before
+// the first render so the tab is present from the start rather than
+// popping in after a delay.
+let CATEGORIES: { value: string; label: string }[] = [
   { value: "text", label: "Text" },
   { value: "objects", label: "Objects" },
   { value: "shapes", label: "Shapes" },
@@ -36,9 +40,12 @@ const CATEGORIES: { value: string; label: string }[] = [
 const cache = new Map<string, CatalogResponse>();
 let activeCategory = CATEGORIES[0].value;
 let selectedItem: CatalogItem | null = null;
-// Admin-only Edit affordance (Task Pane Phase 12) — never assumed, fetched
-// once on load exactly like the task pane's own admin check.
+// Fetched once on load, before the first render (Task Pane Phase 13 moved
+// this earlier — it used to run fire-and-forget after the initial paint,
+// only affecting the Edit button, but the tab list now depends on it too).
 let isAdmin = false;
+let myOid: string | null = null;
+let myTid: string | null = null;
 
 function statusEl(): HTMLElement | null {
   return document.getElementById("status");
@@ -68,11 +75,26 @@ function hidePreview(): void {
   if (panel) panel.style.display = "none";
 }
 
+/**
+ * Whether the signed-in viewer can Edit/Delete this item — a global admin
+ * can touch any shared item; anyone else only their own personal item
+ * (Task Pane Phase 13). No "graphic" to edit/delete for a bare character
+ * either way (see Task Pane Phase 12). The server re-checks real ownership
+ * on every mutating request regardless of what this returns — this only
+ * controls whether the buttons are offered.
+ */
+function canEdit(item: CatalogItem): boolean {
+  if (item.insertMode === "unicode-char") return false;
+  if (isAdmin) return true;
+  return !!item.ownerOid && item.ownerOid === myOid && item.ownerTid === myTid;
+}
+
 function showPreview(item: CatalogItem): void {
   const panel = document.getElementById("previewPanel");
   const img = document.getElementById("previewImg") as HTMLImageElement | null;
   const title = document.getElementById("previewTitle");
   const editBtn = document.getElementById("btnEdit");
+  const deleteBtn = document.getElementById("btnDelete");
   if (!panel || !img || !title) return;
   const existingGlyph = panel.querySelector(".preview-glyph");
   if (existingGlyph) existingGlyph.remove();
@@ -90,21 +112,32 @@ function showPreview(item: CatalogItem): void {
   }
   title.textContent = item.title;
   panel.style.display = "flex";
-  // No "graphic" to edit for a bare character — the button just doesn't
-  // offer it, rather than opening edit mode on something with nothing to
-  // export (see Task Pane Phase 12).
-  if (editBtn) (editBtn as HTMLElement).style.display = isAdmin && item.insertMode !== "unicode-char" ? "" : "none";
+  const editable = canEdit(item);
+  if (editBtn) (editBtn as HTMLElement).style.display = editable ? "" : "none";
+  if (deleteBtn) (deleteBtn as HTMLElement).style.display = editable ? "" : "none";
 }
 
 /**
  * The dialog's only way to communicate outward — see the module comment.
  * { action, item } instead of a bare item (Task Pane Phase 12) so the task
  * pane's DialogMessageReceived handler can tell an ordinary insert apart
- * from an admin-only edit request. Sends the full item either way, not
- * just its id, so the task pane never needs a separate lookup/refetch.
+ * from an edit/delete request. Sends the full item either way, not just
+ * its id, so the task pane never needs a separate lookup/refetch.
  */
 function insertItem(item: CatalogItem): void {
   Office.context.ui.messageParent(JSON.stringify({ action: "insert", item }));
+}
+
+/**
+ * Deletion asks for confirmation right here via window.confirm — unlike
+ * the task pane's own embedded webview, this dialog is an ordinary browser
+ * context where window.confirm works fine (confirmed directly this
+ * session while building the color picker/admin-add flows), so there's no
+ * need for the task pane's two-step arm/confirm workaround for this action.
+ */
+function deleteItem(item: CatalogItem): void {
+  if (!window.confirm(`Delete "${item.title}" from the library? This can't be undone.`)) return;
+  Office.context.ui.messageParent(JSON.stringify({ action: "delete", item }));
 }
 
 function editItem(item: CatalogItem): void {
@@ -241,7 +274,25 @@ function switchCategory(category: string): void {
   });
 }
 
-Office.onReady(() => {
+Office.onReady(async () => {
+  // Same-origin, session-cookie-authenticated fetch — confirmed working
+  // from this dialog already (see the module comment). Awaited *before*
+  // the first render (Task Pane Phase 13) since the tab list now depends
+  // on it, not just the Edit button. A failed/timed-out check just means
+  // "not signed in", same fail-safe default the task pane's own checks use.
+  try {
+    const res = await fetch("/api/auth/me");
+    if (res.ok) {
+      const user = await res.json();
+      isAdmin = !!user?.isAdmin;
+      myOid = user?.oid ?? null;
+      myTid = user?.tid ?? null;
+      CATEGORIES = [...CATEGORIES, { value: "personal", label: "My Items" }];
+    }
+  } catch {
+    // not signed in — leave CATEGORIES/isAdmin at their defaults
+  }
+
   renderTabs();
   loadCategory(activeCategory).catch((err) => {
     const status = statusEl();
@@ -256,16 +307,7 @@ Office.onReady(() => {
   document.getElementById("btnEdit")?.addEventListener("click", () => {
     if (selectedItem) editItem(selectedItem);
   });
-
-  // Same-origin, session-cookie-authenticated fetch — confirmed working
-  // from this dialog already (see the module comment). A failed/timed-out
-  // check just means "not admin", same fail-safe default the task pane's
-  // own admin check uses.
-  fetch("/api/auth/me")
-    .then((res) => (res.ok ? res.json() : null))
-    .then((user) => {
-      isAdmin = !!user?.isAdmin;
-      if (selectedItem) showPreview(selectedItem);
-    })
-    .catch(() => {});
+  document.getElementById("btnDelete")?.addEventListener("click", () => {
+    if (selectedItem) deleteItem(selectedItem);
+  });
 });

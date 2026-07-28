@@ -36,19 +36,25 @@
     </div>
   </section>
 
-  <section id="sectionAdminLibrary" style="display: none;">
-    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Admin: Library</h2>
-    <div class="btn-row">
+  <!-- Task Pane Phase 13: visible to every signed-in user (not admin-only
+       any more — see refreshMyLibrarySection in taskpane.ts). "Open Admin…"
+       and the "Global Catalog" target option below stay admin-only. -->
+  <section id="sectionMyLibrary" style="display: none;">
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>My Library</h2>
+    <div id="openAdminRow" class="btn-row">
       <button id="btnOpenAdmin">Open Admin…</button>
     </div>
-    <p id="adminLibraryUnsupportedNote" class="unsupported-note"></p>
-    <div id="adminAddRow" class="btn-row">
-      <button id="btnAdminAddToLibrary">Add Selected Slide to Library</button>
+    <p id="libraryUnsupportedNote" class="unsupported-note"></p>
+    <div id="libraryAddRow" class="btn-row">
+      <label for="libraryTarget">Save to</label>
+      <select id="libraryTarget"></select>
+      <button id="btnLibraryAdd">Add Selected Slide</button>
     </div>
-    <div id="adminEditRow" class="library-finish-row" style="display: none;">
-      <p id="adminEditStatus"></p>
-      <button id="btnAdminSaveEdit">Save to Library</button>
-      <button id="btnAdminCancelEdit">Cancel</button>
+    <div id="libraryEditRow" class="library-finish-row" style="display: none;">
+      <p id="libraryEditStatus"></p>
+      <input id="libraryEditTitle" type="text" placeholder="Title" style="display: none;" />
+      <button id="btnLibrarySave">Save to Library</button>
+      <button id="btnLibraryCancel">Cancel</button>
     </div>
   </section>
 

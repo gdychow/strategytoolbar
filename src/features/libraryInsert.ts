@@ -58,6 +58,11 @@ export interface CatalogItem {
   groupId: number | null;
   groupName: string | null;
   tags: string[];
+  // Task Pane Phase 13: non-null only for items returned from
+  // GET /api/catalog/personal — lets the gallery/task pane tell "this is
+  // mine" without a second round-trip. Always null for shared/global items.
+  ownerOid: string | null;
+  ownerTid: string | null;
 }
 
 export interface CatalogGroup {

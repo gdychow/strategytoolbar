@@ -26,9 +26,14 @@ const {
   deleteGroup,
   listAllTagNames,
   setItemTags,
+  listPersonalCatalogItems,
+  getOwnedCatalogItem,
+  updateOwnedCatalogItemContent,
+  renameOwnedCatalogItem,
+  deleteOwnedCatalogItem,
 } = require("./server/db");
 const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken } = require("./server/auth");
-const { THUMBNAILS_DIR, ADMIN_ADDED_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath } = require("./server/catalog");
+const { THUMBNAILS_DIR, ADMIN_ADDED_DIR, PERSONAL_ADDED_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath } = require("./server/catalog");
 // Same clientId/authority the task pane's NAA client uses (src/auth/msal.ts)
 // — reused as-is by /admin's separate, standard-MSAL browser sign-in flow
 // below. Plain JSON, requirable directly from Node with no build step.
@@ -160,6 +165,33 @@ app.post("/api/auth/signout", (req, res) => {
   res.status(204).end();
 });
 
+// Task Pane Phase 13: a signed-in user's own personal library — flat (no
+// groups), owner-scoped instead of category-scoped. Registered *before*
+// the /:category route below, same route-ordering fix already required
+// once this session for /admin/catalog/reorder vs. /admin/catalog/:id —
+// otherwise "personal" would be swallowed as a literal (and invalid)
+// category value by the param route.
+app.get("/api/catalog/personal", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  const items = await listPersonalCatalogItems(req.user.oid, req.user.tid);
+  res.json({
+    groups: [],
+    items: items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      insertMode: item.insert_mode,
+      reconstructSpec: item.reconstruct_spec,
+      unicodeChar: item.unicode_char,
+      thumbnailUrl: item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}?v=${ASSET_VERSION}` : null,
+      groupId: item.group_id,
+      groupName: item.group_name,
+      tags: item.tags,
+      ownerOid: req.user.oid,
+      ownerTid: req.user.tid,
+    })),
+  });
+});
+
 // Tier 3: the shared content library. Any signed-in user can browse and
 // insert from it — it's "shared", not "admin-only to read". source_file
 // itself is never client-supplied: the client only ever sends a numeric
@@ -189,6 +221,8 @@ app.get("/api/catalog/:category", async (req, res) => {
       groupId: item.group_id,
       groupName: item.group_name,
       tags: item.tags,
+      ownerOid: null,
+      ownerTid: null,
     })),
   });
 });
@@ -287,6 +321,105 @@ app.post("/api/admin/catalog", requireAdmin, async (req, res) => {
   });
 
   res.json({ id: created.id, category });
+});
+
+// Task Pane Phase 13: any signed-in user, no admin check — see
+// addSelectedSlideToLibrary in taskpane.ts with target "personal". Mirrors
+// POST /api/admin/catalog exactly, but writes into PERSONAL_ADDED_DIR and
+// stamps owner_oid/owner_tid instead of leaving them null.
+app.post("/api/personal/catalog", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+
+  const { pptxBase64, thumbnailBase64 } = req.body ?? {};
+  if (typeof pptxBase64 !== "string" || typeof thumbnailBase64 !== "string") {
+    return res.status(400).json({ error: "Missing content." });
+  }
+
+  const category = CATALOG_CATEGORIES[0];
+  const fileId = crypto.randomUUID();
+  const sourceFile = `personal-added/${fileId}.pptx`;
+  const thumbnailPath = `${fileId}.png`;
+  await fs.promises.writeFile(path.join(PERSONAL_ADDED_DIR, `${fileId}.pptx`), Buffer.from(pptxBase64, "base64"));
+  await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), Buffer.from(thumbnailBase64, "base64"));
+
+  const created = await insertCatalogItem({
+    category,
+    title: "Untitled item",
+    insertMode: "file",
+    sourceFile,
+    thumbnailPath,
+    sortOrder: 0,
+    ownerOid: req.user.oid,
+    ownerTid: req.user.tid,
+  });
+
+  res.json({ id: created.id });
+});
+
+// Owner-scoped equivalent of POST /api/admin/catalog/:id/content — the
+// existing-row fetch and the update both filter by ownership instead of
+// admin status (see getOwnedCatalogItem/updateOwnedCatalogItemContent).
+app.post("/api/personal/catalog/:id/content", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid item id." });
+
+  const { pptxBase64, thumbnailBase64 } = req.body ?? {};
+  if (typeof pptxBase64 !== "string" || typeof thumbnailBase64 !== "string") {
+    return res.status(400).json({ error: "Missing content." });
+  }
+
+  const existing = await getOwnedCatalogItem(id, req.user.oid, req.user.tid);
+  if (!existing) return res.status(404).json({ error: "Item not found." });
+
+  const sourceFile = `personal-added/item-${id}.pptx`;
+  const thumbnailPath = `item-${id}.png`;
+  await fs.promises.writeFile(path.join(PERSONAL_ADDED_DIR, `item-${id}.pptx`), Buffer.from(pptxBase64, "base64"));
+  await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), Buffer.from(thumbnailBase64, "base64"));
+
+  const updated = await updateOwnedCatalogItemContent({ id, oid: req.user.oid, tid: req.user.tid, sourceFile, thumbnailPath });
+  if (!updated) return res.status(404).json({ error: "Item not found." });
+
+  if (existing.source_file && existing.source_file !== sourceFile) {
+    await fs.promises.unlink(resolveCatalogFilePath(existing.source_file)).catch(() => {});
+  }
+  if (existing.thumbnail_path && existing.thumbnail_path !== thumbnailPath) {
+    await fs.promises.unlink(path.join(THUMBNAILS_DIR, existing.thumbnail_path)).catch(() => {});
+  }
+
+  res.json({ ok: true });
+});
+
+// Rename-only — personal items have no /admin-equivalent page, so this is
+// their only metadata edit (no category/group/tags, unlike shared items).
+app.post("/api/personal/catalog/:id", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid item id." });
+
+  const title = typeof req.body?.title === "string" ? req.body.title.trim() : "";
+  if (!title) return res.status(400).json({ error: "Title is required." });
+
+  const updated = await renameOwnedCatalogItem({ id, oid: req.user.oid, tid: req.user.tid, title });
+  if (!updated) return res.status(404).json({ error: "Item not found." });
+  res.json({ ok: true });
+});
+
+app.post("/api/personal/catalog/:id/delete", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid item id." });
+
+  const existing = await getOwnedCatalogItem(id, req.user.oid, req.user.tid);
+  if (!existing) return res.status(404).json({ error: "Item not found." });
+
+  const deleted = await deleteOwnedCatalogItem(id, req.user.oid, req.user.tid);
+  if (!deleted) return res.status(404).json({ error: "Item not found." });
+
+  if (existing.source_file) await fs.promises.unlink(resolveCatalogFilePath(existing.source_file)).catch(() => {});
+  if (existing.thumbnail_path) await fs.promises.unlink(path.join(THUMBNAILS_DIR, existing.thumbnail_path)).catch(() => {});
+
+  res.json({ ok: true });
 });
 
 function requireAdmin(req, res, next) {

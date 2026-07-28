@@ -219,11 +219,29 @@ async function deleteCatalogItemsByCategory(category) {
   await pool.query(`DELETE FROM catalog_items WHERE category = $1 AND owner_oid IS NULL`, [category]);
 }
 
-/** Inserts one shared catalog item. Used only by scripts/seed-catalog.js, always after a same-category deleteCatalogItemsByCategory(). */
-async function insertCatalogItem({ category, title, insertMode, sourceFile, reconstructSpec, unicodeChar, thumbnailPath, sortOrder, groupId }) {
+/**
+ * Inserts one catalog item. Used by scripts/seed-catalog.js (always shared,
+ * always after a same-category deleteCatalogItemsByCategory()) and, since
+ * Task Pane Phase 13, by POST /api/personal/catalog for a brand-new
+ * personal item — ownerOid/ownerTid default to null (shared/admin item,
+ * today's only behavior) unless explicitly passed.
+ */
+async function insertCatalogItem({
+  category,
+  title,
+  insertMode,
+  sourceFile,
+  reconstructSpec,
+  unicodeChar,
+  thumbnailPath,
+  sortOrder,
+  groupId,
+  ownerOid,
+  ownerTid,
+}) {
   const result = await pool.query(
-    `INSERT INTO catalog_items (category, title, insert_mode, source_file, reconstruct_spec, unicode_char, thumbnail_path, sort_order, group_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO catalog_items (category, title, insert_mode, source_file, reconstruct_spec, unicode_char, thumbnail_path, sort_order, group_id, owner_oid, owner_tid)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING id`,
     [
       category,
@@ -235,6 +253,8 @@ async function insertCatalogItem({ category, title, insertMode, sourceFile, reco
       thumbnailPath ?? null,
       sortOrder ?? 0,
       groupId ?? null,
+      ownerOid ?? null,
+      ownerTid ?? null,
     ]
   );
   return result.rows[0];
@@ -341,6 +361,75 @@ async function deleteCatalogItem(id) {
   return result.rows[0] ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Task Pane Phase 13 — personal (owner-scoped) library items. Kept as their
+// own small explicit functions rather than parameterizing the
+// shared/admin functions above with an optional owner filter, matching
+// this file's existing style (e.g. updateCatalogItem vs.
+// updateCatalogItemThumbnail are already kept separate for the same
+// reason: one clear WHERE clause per function beats one function with a
+// conditional WHERE).
+// ---------------------------------------------------------------------------
+
+/** One user's own personal items, in display order — no category/group scoping, since personal libraries are a flat list (see gallery.ts's "My Items" tab). */
+async function listPersonalCatalogItems(oid, tid) {
+  const result = await pool.query(
+    `SELECT ci.id, ci.category, ci.title, ci.insert_mode, ci.reconstruct_spec, ci.unicode_char, ci.thumbnail_path, ci.sort_order,
+            ${CATALOG_ITEM_GROUP_TAGS_SELECT}
+     FROM catalog_items ci
+     ${CATALOG_ITEM_GROUP_TAGS_JOIN}
+     WHERE ci.owner_oid = $1 AND ci.owner_tid = $2
+     GROUP BY ci.id, cg.name
+     ORDER BY ci.sort_order, ci.id`,
+    [oid, tid]
+  );
+  return result.rows;
+}
+
+/** A single personal item by ID, scoped to its owner — mirrors getCatalogItem, used to read the old source_file/thumbnail_path before an owner-driven edit/delete. Returns null both when the id doesn't exist and when it exists but isn't this user's, so callers can't distinguish "not found" from "not yours" (an intentional 404-not-403 shape, matching how the rest of this API never leaks another user's data via response codes). */
+async function getOwnedCatalogItem(id, oid, tid) {
+  const result = await pool.query(
+    `SELECT ci.id, ci.category, ci.title, ci.insert_mode, ci.source_file, ci.reconstruct_spec, ci.unicode_char, ci.thumbnail_path, ci.sort_order,
+            ${CATALOG_ITEM_GROUP_TAGS_SELECT}
+     FROM catalog_items ci
+     ${CATALOG_ITEM_GROUP_TAGS_JOIN}
+     WHERE ci.id = $1 AND ci.owner_oid = $2 AND ci.owner_tid = $3
+     GROUP BY ci.id, cg.name`,
+    [id, oid, tid]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Owner-scoped equivalent of updateCatalogItemContent (Task Pane Phase 12) — replaces a personal item's underlying graphic, always landing as insert_mode 'file' with reconstruct_spec cleared, same migration behavior as the admin version. */
+async function updateOwnedCatalogItemContent({ id, oid, tid, sourceFile, thumbnailPath }) {
+  const result = await pool.query(
+    `UPDATE catalog_items
+     SET source_file = $4, thumbnail_path = $5, insert_mode = 'file', reconstruct_spec = NULL
+     WHERE id = $1 AND owner_oid = $2 AND owner_tid = $3
+     RETURNING id`,
+    [id, oid, tid, sourceFile, thumbnailPath]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Renames a personal item — personal items have no /admin-equivalent page, so this is their only metadata-edit surface (unlike shared items, which also get category/group/tags via updateCatalogItem). */
+async function renameOwnedCatalogItem({ id, oid, tid, title }) {
+  const result = await pool.query(
+    `UPDATE catalog_items SET title = $4 WHERE id = $1 AND owner_oid = $2 AND owner_tid = $3 RETURNING id`,
+    [id, oid, tid, title]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Deletes one personal item. RETURNING id lets the caller distinguish "deleted" from "not yours/doesn't exist". */
+async function deleteOwnedCatalogItem(id, oid, tid) {
+  const result = await pool.query(
+    `DELETE FROM catalog_items WHERE id = $1 AND owner_oid = $2 AND owner_tid = $3 RETURNING id`,
+    [id, oid, tid]
+  );
+  return result.rows[0] ?? null;
+}
+
 module.exports = {
   pool,
   waitForDatabase,
@@ -364,4 +453,9 @@ module.exports = {
   getOrCreateTag,
   listAllTagNames,
   setItemTags,
+  listPersonalCatalogItems,
+  getOwnedCatalogItem,
+  updateOwnedCatalogItemContent,
+  renameOwnedCatalogItem,
+  deleteOwnedCatalogItem,
 };

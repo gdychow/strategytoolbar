@@ -382,45 +382,84 @@ function refreshLibrarySection(user: SessionUser | null): void {
 }
 
 // ---------------------------------------------------------------------------
-// Admin-only: edit an existing library item's graphic natively in
-// PowerPoint, or add a new one from the current slide (Task Pane Phase 12).
-// Mirrors the existing file-mode insert/Finish state machine above —
-// currentFileInsertHandle/showLibraryFinishRow for end users,
-// currentAdminEdit/updateAdminLibraryUI for this admin-only variant — since
-// both are the same underlying "temp slide, do something, clean up" shape.
+// My Library: add a new item from the current slide, or edit an existing
+// item's graphic natively in PowerPoint (Task Pane Phase 12, generalized
+// in Phase 13 from admin-only to every signed-in user, with a "Save to"
+// target picking which scope a new item lands in). Mirrors the file-mode
+// insert/Finish state machine above — currentFileInsertHandle/
+// showLibraryFinishRow for end users, currentLibraryEdit/
+// updateLibraryEditUI for this variant — since both are the same
+// underlying "temp slide, do something, clean up" shape.
 // ---------------------------------------------------------------------------
 
-let currentAdminEdit: { itemId: number; title: string; handle: Library.FileInsertHandle } | null = null;
+type LibraryTarget = "personal" | "global";
 
-function updateAdminLibraryUI(): void {
-  const addRow = document.getElementById("adminAddRow");
-  const editRow = document.getElementById("adminEditRow");
-  if (addRow) (addRow as HTMLElement).style.display = currentAdminEdit ? "none" : "";
-  if (editRow) (editRow as HTMLElement).style.display = currentAdminEdit ? "block" : "none";
+// Where a brand-new item gets POSTed, keyed by the #libraryTarget select's
+// value. "global" requires isAdmin server-side (requireAdmin on
+// /api/admin/catalog); "personal" requires only a signed-in user.
+const TARGET_ENDPOINTS: Record<LibraryTarget, string> = {
+  personal: "/api/personal/catalog",
+  global: "/api/admin/catalog",
+};
+
+function currentLibraryTarget(): LibraryTarget {
+  const select = document.getElementById("libraryTarget") as HTMLSelectElement | null;
+  return select?.value === "global" ? "global" : "personal";
+}
+
+let currentLibraryEdit: { itemId: number; title: string; handle: Library.FileInsertHandle; isPersonal: boolean } | null =
+  null;
+
+function updateLibraryEditUI(): void {
+  const addRow = document.getElementById("libraryAddRow");
+  const editRow = document.getElementById("libraryEditRow");
+  if (addRow) (addRow as HTMLElement).style.display = currentLibraryEdit ? "none" : "";
+  if (editRow) (editRow as HTMLElement).style.display = currentLibraryEdit ? "block" : "none";
+  const titleInput = document.getElementById("libraryEditTitle") as HTMLInputElement | null;
+  if (titleInput && !currentLibraryEdit) titleInput.style.display = "none";
 }
 
 /**
- * Shows the whole admin-only section whenever the user is an admin —
- * "Open Admin…" lives here now (moved from sectionAuth, since it's an
- * admin action, not a sign-in one) and has no PowerPoint API dependency
- * at all, so it stays reachable regardless of platform. Only the
- * add/edit actions below it need the exportAsBase64/getImageAsBase64
- * requirement set (PowerPointApi 1.8) — those get disabled with an
- * explanatory note instead of hiding the whole section over it.
+ * Shows the section for every signed-in user (Phase 13 — was admin-only).
+ * "Open Admin…" and the "Global Catalog" target option stay admin-only,
+ * toggled independently below rather than gating the whole section, since
+ * "Open Admin…" has no PowerPoint API dependency at all and should stay
+ * reachable regardless of platform. Only the add/edit actions need the
+ * exportAsBase64/getImageAsBase64 requirement set (PowerPointApi 1.8) —
+ * those get disabled with an explanatory note instead of hiding the
+ * section over it.
  */
-function refreshAdminLibrarySection(user: SessionUser | null): void {
-  const isAdmin = !!user?.isAdmin;
-  const section = document.getElementById("sectionAdminLibrary");
-  if (section) (section as HTMLElement).style.display = isAdmin ? "" : "none";
-  if (!isAdmin) {
-    currentAdminEdit = null;
-    updateAdminLibraryUI();
+function refreshMyLibrarySection(user: SessionUser | null): void {
+  const signedIn = !!user;
+  const section = document.getElementById("sectionMyLibrary");
+  if (section) (section as HTMLElement).style.display = signedIn ? "" : "none";
+  if (!signedIn) {
+    currentLibraryEdit = null;
+    updateLibraryEditUI();
+  }
+
+  const openAdminRow = document.getElementById("openAdminRow");
+  if (openAdminRow) (openAdminRow as HTMLElement).style.display = user?.isAdmin ? "" : "none";
+
+  const targetSelect = document.getElementById("libraryTarget") as HTMLSelectElement | null;
+  if (targetSelect) {
+    const previous = targetSelect.value;
+    targetSelect.innerHTML = "";
+    const addOption = (value: LibraryTarget, label: string) => {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = label;
+      targetSelect.appendChild(opt);
+    };
+    addOption("personal", "My Items");
+    if (user?.isAdmin) addOption("global", "Global Catalog");
+    if (Array.from(targetSelect.options).some((o) => o.value === previous)) targetSelect.value = previous;
   }
 
   const editSupported = Library.isAdminLibraryEditSupported();
-  const addBtn = document.getElementById("btnAdminAddToLibrary") as HTMLButtonElement | null;
+  const addBtn = document.getElementById("btnLibraryAdd") as HTMLButtonElement | null;
   if (addBtn) addBtn.disabled = !editSupported;
-  const note = document.getElementById("adminLibraryUnsupportedNote");
+  const note = document.getElementById("libraryUnsupportedNote");
   if (note) {
     (note as HTMLElement).style.display = editSupported ? "none" : "block";
     if (!editSupported) {
@@ -429,8 +468,16 @@ function refreshAdminLibrarySection(user: SessionUser | null): void {
   }
 }
 
-async function beginAdminEdit(item: Library.CatalogItem): Promise<void> {
-  if (currentAdminEdit) {
+/**
+ * Determines a clicked item's scope from ownerOid rather than the
+ * #libraryTarget select — editing an *existing* item's scope is fixed by
+ * that item, not user-chosen. The server re-checks real ownership
+ * regardless (requireAdmin for shared items, owner_oid match for personal
+ * ones), so this client-side inference only decides which endpoint to
+ * call, never acts as the actual authorization.
+ */
+async function beginLibraryEdit(item: Library.CatalogItem): Promise<void> {
+  if (currentLibraryEdit) {
     notify("Finish or cancel the current edit first.", "error");
     return;
   }
@@ -442,18 +489,27 @@ async function beginAdminEdit(item: Library.CatalogItem): Promise<void> {
     item.insertMode === "file"
       ? await Library.insertFileItem(item.id)
       : await Library.insertReconstructedItemOnTempSlide(item.reconstructSpec!);
-  currentAdminEdit = { itemId: item.id, title: item.title, handle };
-  const status = document.getElementById("adminEditStatus");
+  const isPersonal = !!item.ownerOid;
+  currentLibraryEdit = { itemId: item.id, title: item.title, handle, isPersonal };
+  const status = document.getElementById("libraryEditStatus");
   if (status) status.textContent = `Editing "${item.title}" — make your changes, then Save.`;
-  updateAdminLibraryUI();
+  // Personal items have no /admin-equivalent page, so title editing lives
+  // here; shared items keep editing their title via /admin as before.
+  const titleInput = document.getElementById("libraryEditTitle") as HTMLInputElement | null;
+  if (titleInput) {
+    titleInput.style.display = isPersonal ? "" : "none";
+    titleInput.value = item.title;
+  }
+  updateLibraryEditUI();
   notify(`Editing "${item.title}" on a temporary slide.`);
 }
 
-async function saveAdminEdit(): Promise<void> {
-  if (!currentAdminEdit) return;
-  const { itemId, title, handle } = currentAdminEdit;
+async function saveLibraryEdit(): Promise<void> {
+  if (!currentLibraryEdit) return;
+  const { itemId, title, handle, isPersonal } = currentLibraryEdit;
+  const endpointPrefix = isPersonal ? "/api/personal/catalog" : "/api/admin/catalog";
   const { pptxBase64, thumbnailBase64 } = await Library.exportSlideForAdmin(handle.tempSlideId);
-  const res = await fetchWithTimeout(`/api/admin/catalog/${itemId}/content`, {
+  const res = await fetchWithTimeout(`${endpointPrefix}/${itemId}/content`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pptxBase64, thumbnailBase64 }),
@@ -462,35 +518,55 @@ async function saveAdminEdit(): Promise<void> {
     notify(`Couldn't save "${title}" to the library (${res.status}).`, "error");
     return;
   }
+
+  let finalTitle = title;
+  if (isPersonal) {
+    const titleInput = document.getElementById("libraryEditTitle") as HTMLInputElement | null;
+    const newTitle = titleInput?.value.trim();
+    if (newTitle && newTitle !== title) {
+      const renameRes = await fetchWithTimeout(`/api/personal/catalog/${itemId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      if (renameRes.ok) finalTitle = newTitle;
+    }
+  }
+
   await Library.finishFileInsert(handle);
-  currentAdminEdit = null;
-  updateAdminLibraryUI();
-  notify(`Saved "${title}" to the library.`);
+  currentLibraryEdit = null;
+  updateLibraryEditUI();
+  notify(`Saved "${finalTitle}" to the library.`);
 }
 
-async function cancelAdminEdit(): Promise<void> {
-  if (!currentAdminEdit) return;
-  await Library.finishFileInsert(currentAdminEdit.handle);
-  currentAdminEdit = null;
-  updateAdminLibraryUI();
+async function cancelLibraryEdit(): Promise<void> {
+  if (!currentLibraryEdit) return;
+  await Library.finishFileInsert(currentLibraryEdit.handle);
+  currentLibraryEdit = null;
+  updateLibraryEditUI();
 }
 
-// window.confirm/alert/prompt aren't supported inside this task pane's
-// embedded webview (confirmed directly — the same call works fine in the
-// gallery dialog and in /admin, both more ordinary browser contexts, but
-// throws "Function window.confirm is not supported" here). Same fix
-// already applied once this session for the color picker: stop relying on
-// the unsupported native thing, build a small in-page equivalent instead
-// — here, a two-step "click again to confirm" on the button itself, no
-// new markup needed.
+/**
+ * Deletion has no in-task-pane UI (see deleteLibraryItem below, triggered
+ * from the gallery dialog instead) since the gallery is an ordinary
+ * browser context where window.confirm works fine — the arm/confirm
+ * pattern here exists only because *this* task pane's embedded webview
+ * doesn't support window.confirm/alert/prompt (confirmed directly: the
+ * same call works in the gallery dialog and in /admin, both more ordinary
+ * browser contexts, but throws "Function window.confirm is not supported"
+ * here). Same fix already applied once this session for the color picker:
+ * stop relying on the unsupported native thing, build a small in-page
+ * equivalent instead — here, a two-step "click again to confirm" on the
+ * button itself, no new markup needed.
+ */
 let addToLibraryArmed = false;
 let addToLibraryArmedTimer: number | undefined;
 
-const ADD_TO_LIBRARY_LABEL = "Add Selected Slide to Library";
+const ADD_TO_LIBRARY_LABEL = "Add Selected Slide";
 const ADD_TO_LIBRARY_CONFIRM_LABEL = "Click again to confirm — adds the current slide";
 
 async function addSelectedSlideToLibrary(): Promise<void> {
-  const btn = document.getElementById("btnAdminAddToLibrary") as HTMLButtonElement | null;
+  const btn = document.getElementById("btnLibraryAdd") as HTMLButtonElement | null;
   if (!addToLibraryArmed) {
     addToLibraryArmed = true;
     if (btn) btn.textContent = ADD_TO_LIBRARY_CONFIRM_LABEL;
@@ -505,8 +581,9 @@ async function addSelectedSlideToLibrary(): Promise<void> {
   window.clearTimeout(addToLibraryArmedTimer);
   if (btn) btn.textContent = ADD_TO_LIBRARY_LABEL;
 
+  const target = currentLibraryTarget();
   const { pptxBase64, thumbnailBase64 } = await Library.exportCurrentSlideForAdmin();
-  const res = await fetchWithTimeout("/api/admin/catalog", {
+  const res = await fetchWithTimeout(TARGET_ENDPOINTS[target], {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pptxBase64, thumbnailBase64 }),
@@ -515,9 +592,24 @@ async function addSelectedSlideToLibrary(): Promise<void> {
     notify(`Couldn't add to the library (${res.status}).`, "error");
     return;
   }
-  const { id, category } = await res.json();
-  window.open(`/admin?category=${category}&highlight=${id}`, "_blank");
-  notify("Added to the library — finish naming it in the Admin tab that just opened.");
+  if (target === "global") {
+    const { id, category } = await res.json();
+    window.open(`/admin?category=${category}&highlight=${id}`, "_blank");
+    notify("Added to the library — finish naming it in the Admin tab that just opened.");
+  } else {
+    notify('Added to your personal library — open "Browse Library…" to rename or insert it.');
+  }
+}
+
+/** Triggered from the gallery dialog's Delete button (which does its own window.confirm — see the comment above addSelectedSlideToLibrary for why that's fine there but not here). */
+async function deleteLibraryItem(item: Library.CatalogItem): Promise<void> {
+  const url = item.ownerOid ? `/api/personal/catalog/${item.id}/delete` : `/admin/catalog/${item.id}/delete`;
+  const res = await fetchWithTimeout(url, { method: "POST", headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    notify(`Couldn't delete "${item.title}" (${res.status}).`, "error");
+    return;
+  }
+  notify(`Deleted "${item.title}".`);
 }
 
 /**
@@ -573,7 +665,7 @@ function updateSignInStatus(user: SessionUser | null): void {
   }
 }
 
-/** Hides the Sign In button once signed in — the admin-only Open Admin link now lives in sectionAdminLibrary (see refreshAdminLibrarySection), not here. */
+/** Hides the Sign In button once signed in — the admin-only Open Admin link now lives in sectionMyLibrary (see refreshMyLibrarySection), not here. */
 function updateAuthButtons(user: SessionUser | null): void {
   const signIn = document.getElementById("btnSignIn") as HTMLButtonElement | null;
   if (signIn) signIn.style.display = user ? "none" : "";
@@ -584,7 +676,7 @@ function applySessionState(user: SessionUser | null): void {
   updateSignInStatus(user);
   updateAuthButtons(user);
   refreshLibrarySection(user);
-  refreshAdminLibrarySection(user);
+  refreshMyLibrarySection(user);
 }
 
 const SECTION_ORDER_STORAGE_KEY = "sectionOrder";
@@ -731,7 +823,8 @@ Office.onReady((info) => {
             notify(`Couldn't read the selected item: ${err instanceof Error ? err.message : String(err)}`, "error");
             return;
           }
-          const action = payload.action === "edit" ? beginAdminEdit : insertPickedItem;
+          const action =
+            payload.action === "edit" ? beginLibraryEdit : payload.action === "delete" ? deleteLibraryItem : insertPickedItem;
           action(payload.item).catch((err) =>
             notify(`Error: ${err instanceof Error ? err.message : String(err)}`, "error")
           );
@@ -748,9 +841,9 @@ Office.onReady((info) => {
     notify("Done — temporary slide removed.");
   });
 
-  bindButton("btnAdminAddToLibrary", addSelectedSlideToLibrary);
-  bindButton("btnAdminSaveEdit", saveAdminEdit);
-  bindButton("btnAdminCancelEdit", cancelAdminEdit);
+  bindButton("btnLibraryAdd", addSelectedSlideToLibrary);
+  bindButton("btnLibrarySave", saveLibraryEdit);
+  bindButton("btnLibraryCancel", cancelLibraryEdit);
 
   applySessionState(null); // starting state — the background check below updates this once it resolves, however long that takes
 
