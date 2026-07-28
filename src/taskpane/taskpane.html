@@ -20,7 +20,6 @@
     <p id="signInStatus" class="sign-in-status">Not signed in.</p>
     <div class="btn-row">
       <button id="btnSignIn">Sign In</button>
-      <button id="btnOpenAdmin" style="display: none;">Open Admin…</button>
     </div>
     <pre id="authClaims" style="font-size: 11px; background: #f5f5f5; padding: 6px; border-radius: 4px; white-space: pre-wrap; display: none;"></pre>
   </section>
@@ -39,6 +38,10 @@
 
   <section id="sectionAdminLibrary" style="display: none;">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Admin: Library</h2>
+    <div class="btn-row">
+      <button id="btnOpenAdmin">Open Admin…</button>
+    </div>
+    <p id="adminLibraryUnsupportedNote" class="unsupported-note"></p>
     <div id="adminAddRow" class="btn-row">
       <button id="btnAdminAddToLibrary">Add Selected Slide to Library</button>
     </div>

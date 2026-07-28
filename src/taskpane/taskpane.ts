@@ -399,14 +399,33 @@ function updateAdminLibraryUI(): void {
   if (editRow) (editRow as HTMLElement).style.display = currentAdminEdit ? "block" : "none";
 }
 
-/** Shows/hides the whole admin-only section — same on/off signal as updateAuthButtons' Open Admin button, plus the exportAsBase64/getImageAsBase64 requirement-set check (PowerPointApi 1.8) those two actions actually need. */
+/**
+ * Shows the whole admin-only section whenever the user is an admin —
+ * "Open Admin…" lives here now (moved from sectionAuth, since it's an
+ * admin action, not a sign-in one) and has no PowerPoint API dependency
+ * at all, so it stays reachable regardless of platform. Only the
+ * add/edit actions below it need the exportAsBase64/getImageAsBase64
+ * requirement set (PowerPointApi 1.8) — those get disabled with an
+ * explanatory note instead of hiding the whole section over it.
+ */
 function refreshAdminLibrarySection(user: SessionUser | null): void {
-  const visible = !!user?.isAdmin && Library.isAdminLibraryEditSupported();
+  const isAdmin = !!user?.isAdmin;
   const section = document.getElementById("sectionAdminLibrary");
-  if (section) (section as HTMLElement).style.display = visible ? "" : "none";
-  if (!visible) {
+  if (section) (section as HTMLElement).style.display = isAdmin ? "" : "none";
+  if (!isAdmin) {
     currentAdminEdit = null;
     updateAdminLibraryUI();
+  }
+
+  const editSupported = Library.isAdminLibraryEditSupported();
+  const addBtn = document.getElementById("btnAdminAddToLibrary") as HTMLButtonElement | null;
+  if (addBtn) addBtn.disabled = !editSupported;
+  const note = document.getElementById("adminLibraryUnsupportedNote");
+  if (note) {
+    (note as HTMLElement).style.display = editSupported ? "none" : "block";
+    if (!editSupported) {
+      note.textContent = "Adding/editing library content requires a newer PowerPoint build (PowerPointApi 1.8) than this one has.";
+    }
   }
 }
 
@@ -554,12 +573,10 @@ function updateSignInStatus(user: SessionUser | null): void {
   }
 }
 
-/** Hides the Sign In button once signed in, and shows the admin-only Open Admin link — the only two other places sign-in/role state should be reflected in the UI. */
+/** Hides the Sign In button once signed in — the admin-only Open Admin link now lives in sectionAdminLibrary (see refreshAdminLibrarySection), not here. */
 function updateAuthButtons(user: SessionUser | null): void {
   const signIn = document.getElementById("btnSignIn") as HTMLButtonElement | null;
-  const openAdmin = document.getElementById("btnOpenAdmin") as HTMLButtonElement | null;
   if (signIn) signIn.style.display = user ? "none" : "";
-  if (openAdmin) openAdmin.style.display = user?.isAdmin ? "" : "none";
 }
 
 /** Applies a change in sign-in state everywhere it matters — the status line, the auth buttons, and the Content Library gates. */
