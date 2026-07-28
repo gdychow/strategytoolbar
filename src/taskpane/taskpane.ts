@@ -1,6 +1,7 @@
 import { bindStatusElement, notify, withErrorHandling } from "../core/ui";
 import { darken, THEME_SHADE_PERCENTS } from "../core/colorMath";
 import * as Layout from "../features/layout";
+import * as ObjectOrder from "../features/objectOrder";
 import * as FillLineColors from "../features/fillLineColors";
 import * as CustomColors from "../features/customColors";
 import * as OtherTweaks from "../features/otherTweaks";
@@ -1006,6 +1007,19 @@ Office.onReady((info) => {
   bindButton("btnDistributeV", Layout.enhancedDistributeVertical);
   bindButton("btnEdgeJoinH", () => Layout.edgeJoin("Horizontal"));
   bindButton("btnEdgeJoinV", () => Layout.edgeJoin("Vertical"));
+
+  // Group & order (requires PowerPointApi 1.8 — addGroup/ungroup/setZOrder)
+  bindButton("btnGroupShapes", ObjectOrder.groupShapes);
+  bindButton("btnUngroupShapes", ObjectOrder.ungroupShapes);
+  bindButton("btnBringToFront", ObjectOrder.bringToFront);
+  bindButton("btnSendToBack", ObjectOrder.sendToBack);
+  bindButton("btnBringForward", ObjectOrder.bringForward);
+  bindButton("btnSendBackward", ObjectOrder.sendBackward);
+  setSectionEnabled(
+    "sectionObjectOrder",
+    ObjectOrder.isGroupingSupported(),
+    "Requires a newer PowerPoint build (PowerPointApi 1.8) than this one has."
+  );
 
   // Centre on slide (requires PowerPointApi 1.10 — slide dimensions)
   bindButton("btnCentreH", Layout.centreOnSlideHorizontal);
