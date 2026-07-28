@@ -456,14 +456,36 @@ async function cancelAdminEdit(): Promise<void> {
   updateAdminLibraryUI();
 }
 
+// window.confirm/alert/prompt aren't supported inside this task pane's
+// embedded webview (confirmed directly — the same call works fine in the
+// gallery dialog and in /admin, both more ordinary browser contexts, but
+// throws "Function window.confirm is not supported" here). Same fix
+// already applied once this session for the color picker: stop relying on
+// the unsupported native thing, build a small in-page equivalent instead
+// — here, a two-step "click again to confirm" on the button itself, no
+// new markup needed.
+let addToLibraryArmed = false;
+let addToLibraryArmedTimer: number | undefined;
+
+const ADD_TO_LIBRARY_LABEL = "Add Selected Slide to Library";
+const ADD_TO_LIBRARY_CONFIRM_LABEL = "Click again to confirm — adds the current slide";
+
 async function addSelectedSlideToLibrary(): Promise<void> {
-  if (
-    !confirm(
-      "This will add the current slide as a new library item — make sure it only has the content you want to add."
-    )
-  ) {
+  const btn = document.getElementById("btnAdminAddToLibrary") as HTMLButtonElement | null;
+  if (!addToLibraryArmed) {
+    addToLibraryArmed = true;
+    if (btn) btn.textContent = ADD_TO_LIBRARY_CONFIRM_LABEL;
+    window.clearTimeout(addToLibraryArmedTimer);
+    addToLibraryArmedTimer = window.setTimeout(() => {
+      addToLibraryArmed = false;
+      if (btn) btn.textContent = ADD_TO_LIBRARY_LABEL;
+    }, 4000);
     return;
   }
+  addToLibraryArmed = false;
+  window.clearTimeout(addToLibraryArmedTimer);
+  if (btn) btn.textContent = ADD_TO_LIBRARY_LABEL;
+
   const { pptxBase64, thumbnailBase64 } = await Library.exportCurrentSlideForAdmin();
   const res = await fetchWithTimeout("/api/admin/catalog", {
     method: "POST",
