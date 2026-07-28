@@ -1548,16 +1548,21 @@ app.post("/admin/catalog/:id", upload.single("thumbnail"), async (req, res) => {
 
   const isCompanyItem = !!existing.company_domain;
   const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
-  const category = isCompanyItem ? undefined : req.body.category;
+  // Task Pane Phase 16: the gallery's lightweight quick-edit never sends
+  // `category` at all (no category-reassignment UI there) — treat an
+  // omitted category the same way a company item's always-omitted
+  // category is already treated (updateCatalogItem's COALESCE leaves it
+  // unchanged), rather than requiring it the way /admin's own full edit
+  // form still does.
+  const categoryProvided = !isCompanyItem && typeof req.body.category === "string";
+  const category = categoryProvided ? req.body.category : undefined;
   const groupId = req.body.groupId ? Number(req.body.groupId) : null;
   const tags = typeof req.body.tags === "string" ? req.body.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
   const backTo = isCompanyItem
     ? `/admin?scope=company:${encodeURIComponent(existing.company_domain)}`
-    : CATALOG_CATEGORIES.includes(category)
-      ? `/admin?category=${category}`
-      : "/admin";
+    : `/admin?category=${categoryProvided ? category : existing.category}`;
   if (!title) return fail(400, "Title can't be empty.", backTo);
-  if (!isCompanyItem && !CATALOG_CATEGORIES.includes(category)) return fail(400, "Invalid category.");
+  if (categoryProvided && !CATALOG_CATEGORIES.includes(category)) return fail(400, "Invalid category.");
   if (groupId !== null && (!Number.isInteger(groupId) || groupId <= 0)) {
     return fail(400, "Invalid group.", backTo);
   }

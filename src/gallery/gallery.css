@@ -234,3 +234,76 @@ body {
 .preview-panel button:hover {
   background: var(--accent-hover);
 }
+
+/* Task Pane Phase 16: lightweight in-gallery quick-edit (title/tags/group) */
+.gallery-item.dragging {
+  opacity: 0.4;
+}
+
+#editDetailsForm {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
+
+#editDetailsForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+#editDetailsForm input,
+#editDetailsForm select {
+  font-size: 12px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-actions button {
+  flex: 1 1 auto;
+  padding: 6px 0;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.edit-actions button[type="submit"] {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.edit-actions button[type="submit"]:hover {
+  background: var(--accent-hover);
+}
+
+.edit-actions button[type="button"] {
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text);
+}
+
+.edit-actions button[type="button"]:hover {
+  background: var(--bg-hover);
+}
+
+#editError.error {
+  margin: 0;
+  font-size: 11px;
+  color: #d32f2f;
+}

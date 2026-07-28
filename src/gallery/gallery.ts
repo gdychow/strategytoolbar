@@ -40,6 +40,13 @@ let CATEGORIES: { value: string; label: string }[] = [
 const cache = new Map<string, CatalogResponse>();
 let activeCategory = CATEGORIES[0].value;
 let selectedItem: CatalogItem | null = null;
+// Task Pane Phase 16: the one card currently being dragged, mirroring
+// /admin's own draggedCard/getDragAfterElement pattern (server.js) — same
+// nearest-card-center heuristic, generalized from a dedicated drag handle
+// to the whole card (these tiles are small, and only editable cards are
+// draggable at all, so there's no accidental-drag risk from an ordinary
+// browsing click).
+let draggedCard: HTMLElement | null = null;
 // Fetched once on load, before the first render (Task Pane Phase 13 moved
 // this earlier — it used to run fire-and-forget after the initial paint,
 // only affecting the Edit button, but the tab list now depends on it too).
@@ -100,8 +107,10 @@ function showPreview(item: CatalogItem): void {
   const img = document.getElementById("previewImg") as HTMLImageElement | null;
   const title = document.getElementById("previewTitle");
   const editBtn = document.getElementById("btnEdit");
+  const editDetailsBtn = document.getElementById("btnEditDetails");
   const deleteBtn = document.getElementById("btnDelete");
   if (!panel || !img || !title) return;
+  closeEditDetails();
   const existingGlyph = panel.querySelector(".preview-glyph");
   if (existingGlyph) existingGlyph.remove();
   if (item.unicodeChar) {
@@ -120,7 +129,125 @@ function showPreview(item: CatalogItem): void {
   panel.style.display = "flex";
   const editable = canEdit(item);
   if (editBtn) (editBtn as HTMLElement).style.display = editable ? "" : "none";
+  if (editDetailsBtn) (editDetailsBtn as HTMLElement).style.display = editable ? "" : "none";
   if (deleteBtn) (deleteBtn as HTMLElement).style.display = editable ? "" : "none";
+}
+
+/**
+ * Task Pane Phase 16: lightweight title/tags/group quick-edit, so a
+ * company/global admin doesn't have to leave the gallery and open /admin
+ * just to fix a typo or move an item between groups. Category reassignment,
+ * thumbnail replacement, and new-group creation stay /admin-only — this is
+ * deliberately the small subset worth editing without leaving the gallery.
+ */
+function openEditDetails(item: CatalogItem): void {
+  const form = document.getElementById("editDetailsForm") as HTMLFormElement | null;
+  const titleInput = document.getElementById("editTitle") as HTMLInputElement | null;
+  const scopedFields = document.getElementById("editScopedFields");
+  const tagsInput = document.getElementById("editTags") as HTMLInputElement | null;
+  const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
+  const errorEl = document.getElementById("editError");
+  if (!form || !titleInput || !scopedFields || !tagsInput || !groupSelect) return;
+
+  if (errorEl) {
+    errorEl.style.display = "none";
+    errorEl.textContent = "";
+  }
+  titleInput.value = item.title;
+
+  const isPersonal = !!item.ownerOid;
+  scopedFields.style.display = isPersonal ? "none" : "";
+  if (!isPersonal) {
+    tagsInput.value = item.tags.join(", ");
+    groupSelect.innerHTML = "";
+    const noneOption = document.createElement("option");
+    noneOption.value = "";
+    noneOption.textContent = "(none)";
+    groupSelect.appendChild(noneOption);
+    const groups = cache.get(activeCategory)?.groups ?? [];
+    for (const group of [...groups].sort((a, b) => a.sortOrder - b.sortOrder)) {
+      const opt = document.createElement("option");
+      opt.value = String(group.id);
+      opt.textContent = group.name;
+      groupSelect.appendChild(opt);
+    }
+    groupSelect.value = item.groupId !== null ? String(item.groupId) : "";
+  }
+
+  form.style.display = "";
+  titleInput.focus();
+}
+
+function closeEditDetails(): void {
+  const form = document.getElementById("editDetailsForm") as HTMLFormElement | null;
+  const errorEl = document.getElementById("editError");
+  if (form) form.style.display = "none";
+  if (errorEl) {
+    errorEl.style.display = "none";
+    errorEl.textContent = "";
+  }
+}
+
+async function saveEditDetails(item: CatalogItem): Promise<void> {
+  const titleInput = document.getElementById("editTitle") as HTMLInputElement | null;
+  const tagsInput = document.getElementById("editTags") as HTMLInputElement | null;
+  const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
+  const errorEl = document.getElementById("editError");
+  if (!titleInput) return;
+
+  const title = titleInput.value.trim();
+  const isPersonal = !!item.ownerOid;
+
+  try {
+    if (isPersonal) {
+      const res = await fetch(`/api/personal/catalog/${item.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      item.title = title;
+    } else {
+      const tags = (tagsInput?.value ?? "")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const groupIdRaw = groupSelect?.value ?? "";
+      const groupId = groupIdRaw ? Number(groupIdRaw) : null;
+      const res = await fetch(`/admin/catalog/${item.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ title, tags: tags.join(","), groupId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      item.title = title;
+      item.tags = tags;
+      item.groupId = groupId;
+      const group = (cache.get(activeCategory)?.groups ?? []).find((g) => g.id === groupId);
+      item.groupName = group?.name ?? null;
+    }
+    closeEditDetails();
+    showPreview(item);
+    rerenderGrid();
+  } catch (err) {
+    if (errorEl) {
+      errorEl.textContent = err instanceof Error ? err.message : String(err);
+      errorEl.style.display = "block";
+    }
+  }
+}
+
+/**
+ * Maps the gallery's tab value to the shape POST /admin/catalog/reorder
+ * expects. Every fixed category tab's value already matches a real
+ * `category` string; the "company" tab's value is the literal string
+ * "company", not the viewer's real domain, so it needs translating.
+ */
+function scopeForActiveCategory(): { category: string } | { companyDomain: string | null } {
+  if (activeCategory === "company") return { companyDomain: myCompanyDomain };
+  return { category: activeCategory };
 }
 
 /**
@@ -166,6 +293,23 @@ function renderItemCard(item: CatalogItem): HTMLElement {
   const card = document.createElement("button");
   card.type = "button";
   card.className = "gallery-item" + (selectedItem?.id === item.id ? " selected" : "");
+  card.dataset.itemId = String(item.id);
+
+  // Drag-to-reorder only applies where groups exist at all — "My Items"
+  // has no group concept (Task Pane Phase 13's own design) and no reorder
+  // endpoint to call.
+  if (activeCategory !== "personal" && canEdit(item)) {
+    card.draggable = true;
+    card.addEventListener("dragstart", (e) => {
+      draggedCard = card;
+      e.dataTransfer?.setData("text/plain", String(item.id));
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", () => {
+      draggedCard?.classList.remove("dragging");
+      draggedCard = null;
+    });
+  }
 
   if (item.unicodeChar) {
     const glyph = document.createElement("span");
@@ -195,7 +339,57 @@ function renderItemCard(item: CatalogItem): HTMLElement {
   return card;
 }
 
-function renderGroupSection(container: HTMLElement, heading: string | null, items: CatalogItem[]): void {
+/** Nearest-card-center heuristic, matching /admin's own getDragAfterElement (server.js) — good enough for a small drop target, not a strict row/column layout solve. */
+function getDragAfterElement(container: HTMLElement, clientX: number, clientY: number): Element | null {
+  const cards = Array.from(container.querySelectorAll(".gallery-item:not(.dragging)"));
+  let closest: { card: Element; after: boolean } | null = null;
+  let closestDistance = Infinity;
+  for (const card of cards) {
+    const box = card.getBoundingClientRect();
+    const dx = clientX - (box.left + box.width / 2);
+    const dy = clientY - (box.top + box.height / 2);
+    const distance = dx * dx + dy * dy;
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = { card, after: dx > 0 };
+    }
+  }
+  if (!closest) return null;
+  return closest.after ? closest.card.nextElementSibling : closest.card;
+}
+
+function persistReorder(row: HTMLElement): void {
+  const groupIdRaw = row.dataset.groupId ?? "";
+  const groupId = groupIdRaw ? Number(groupIdRaw) : null;
+  const orderedIds = Array.from(row.querySelectorAll<HTMLElement>(".gallery-item")).map((c) => Number(c.dataset.itemId));
+  const status = statusEl();
+
+  fetch("/admin/catalog/reorder", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...scopeForActiveCategory(), groupId, orderedIds }),
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = cache.get(activeCategory);
+      if (!data) return;
+      const idToItem = new Map(data.items.map((i) => [i.id, i]));
+      const movedItems = orderedIds.map((id) => idToItem.get(id)).filter((i): i is CatalogItem => !!i);
+      for (const it of movedItems) it.groupId = groupId;
+      const group = data.groups.find((g) => g.id === groupId);
+      for (const it of movedItems) it.groupName = group?.name ?? null;
+      const firstIndex = data.items.findIndex((i) => orderedIds.includes(i.id));
+      const remaining = data.items.filter((i) => !orderedIds.includes(i.id));
+      remaining.splice(firstIndex, 0, ...movedItems);
+      data.items = remaining;
+      if (status) status.textContent = "";
+    })
+    .catch((err) => {
+      if (status) status.textContent = `Couldn't save order: ${err instanceof Error ? err.message : String(err)}`;
+    });
+}
+
+function renderGroupSection(container: HTMLElement, heading: string | null, groupId: number | null, items: CatalogItem[]): void {
   if (heading) {
     const h = document.createElement("h3");
     h.className = "gallery-group-heading";
@@ -204,8 +398,23 @@ function renderGroupSection(container: HTMLElement, heading: string | null, item
   }
   const row = document.createElement("div");
   row.className = "gallery-item-row";
+  row.dataset.groupId = groupId !== null ? String(groupId) : "";
   for (const item of items) {
     row.appendChild(renderItemCard(item));
+  }
+  if (activeCategory !== "personal") {
+    row.addEventListener("dragover", (e) => {
+      if (!draggedCard) return;
+      e.preventDefault();
+      const afterElement = getDragAfterElement(row, e.clientX, e.clientY);
+      row.insertBefore(draggedCard, afterElement);
+    });
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      if (!draggedCard) return;
+      const finalRow = draggedCard.closest(".gallery-item-row") as HTMLElement | null;
+      if (finalRow) persistReorder(finalRow);
+    });
   }
   container.appendChild(row);
 }
@@ -231,14 +440,14 @@ function renderGrid(data: CatalogResponse, filter: string): void {
 
   for (const group of sortedGroups) {
     const items = grouped.get(group.id);
-    if (items && items.length > 0) renderGroupSection(grid, group.name, items);
+    if (items && items.length > 0) renderGroupSection(grid, group.name, group.id, items);
   }
   const ungrouped = grouped.get(null);
   if (ungrouped && ungrouped.length > 0) {
     // Only label it "Other" if there's at least one real group to
     // distinguish it from — with no groups at all in this category, every
     // item is ungrouped and a heading would just be noise.
-    renderGroupSection(grid, sortedGroups.length > 0 ? "Other" : null, ungrouped);
+    renderGroupSection(grid, sortedGroups.length > 0 ? "Other" : null, null, ungrouped);
   }
 
   if (grid.children.length === 0) {
@@ -322,5 +531,13 @@ Office.onReady(async () => {
   });
   document.getElementById("btnDelete")?.addEventListener("click", () => {
     if (selectedItem) deleteItem(selectedItem);
+  });
+  document.getElementById("btnEditDetails")?.addEventListener("click", () => {
+    if (selectedItem) openEditDetails(selectedItem);
+  });
+  document.getElementById("btnEditCancel")?.addEventListener("click", () => closeEditDetails());
+  document.getElementById("editDetailsForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (selectedItem) saveEditDetails(selectedItem).catch(() => {});
   });
 });
