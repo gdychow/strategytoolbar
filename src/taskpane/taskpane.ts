@@ -496,8 +496,8 @@ async function addSelectedSlideToLibrary(): Promise<void> {
     notify(`Couldn't add to the library (${res.status}).`, "error");
     return;
   }
-  const { category } = await res.json();
-  window.open(`/admin?category=${category}`, "_blank");
+  const { id, category } = await res.json();
+  window.open(`/admin?category=${category}&highlight=${id}`, "_blank");
   notify("Added to the library — finish naming it in the Admin tab that just opened.");
 }
 

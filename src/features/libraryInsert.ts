@@ -342,30 +342,107 @@ export interface AdminExport {
   thumbnailBase64: string;
 }
 
+const THUMBNAIL_MAX_DIMENSION = 480;
+const THUMBNAIL_PADDING_PX = 12;
+
+/**
+ * Crops a captured slide image down to its actual content's bounding box
+ * — library source content is a single shape/graphic on an otherwise
+ * blank slide, so a raw, unsized getImageAsBase64() capture is mostly
+ * white space around whatever the admin actually drew. Downscales the
+ * trimmed result afterward if it's still larger than a sane thumbnail
+ * size (this only ever shrinks; a small crop stays small).
+ *
+ * Assumes a white/near-white background, matching every item already in
+ * the library (all built from blank-background source content) — a
+ * slide with a genuinely colored background just won't find anything to
+ * trim around and falls back to the untrimmed capture, not a wrong one.
+ *
+ * Pure Canvas/Image work, nothing Office-specific — runs outside
+ * PowerPoint.run on purpose, since it has nothing to do with it.
+ */
+async function trimThumbnail(base64Png: string): Promise<string> {
+  const img = new Image();
+  const loaded = new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("Couldn't process the captured thumbnail."));
+  });
+  img.src = `data:image/png;base64,${base64Png}`;
+  await loaded;
+
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = img.naturalWidth;
+  sourceCanvas.height = img.naturalHeight;
+  const sourceCtx = sourceCanvas.getContext("2d");
+  if (!sourceCtx) return base64Png;
+  sourceCtx.drawImage(img, 0, 0);
+
+  const { data, width, height } = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const isBackground = data[i + 3] === 0 || (data[i] > 250 && data[i + 1] > 250 && data[i + 2] > 250);
+      if (!isBackground) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return base64Png; // nothing but background found — leave it as-is rather than crop to nothing
+
+  minX = Math.max(0, minX - THUMBNAIL_PADDING_PX);
+  minY = Math.max(0, minY - THUMBNAIL_PADDING_PX);
+  maxX = Math.min(width - 1, maxX + THUMBNAIL_PADDING_PX);
+  maxY = Math.min(height - 1, maxY + THUMBNAIL_PADDING_PX);
+  const cropWidth = maxX - minX + 1;
+  const cropHeight = maxY - minY + 1;
+
+  const scale = Math.min(1, THUMBNAIL_MAX_DIMENSION / Math.max(cropWidth, cropHeight));
+  const outWidth = Math.round(cropWidth * scale);
+  const outHeight = Math.round(cropHeight * scale);
+
+  const outCanvas = document.createElement("canvas");
+  outCanvas.width = outWidth;
+  outCanvas.height = outHeight;
+  const outCtx = outCanvas.getContext("2d");
+  if (!outCtx) return base64Png;
+  outCtx.drawImage(sourceCanvas, minX, minY, cropWidth, cropHeight, 0, 0, outWidth, outHeight);
+
+  return outCanvas.toDataURL("image/png").split(",")[1];
+}
+
 /** Captures a specific slide (by ID) for saving back to the library — used once an admin has finished editing it. */
 export async function exportSlideForAdmin(slideId: string): Promise<AdminExport> {
-  return PowerPoint.run(async (context) => {
+  const { pptxBase64, rawThumbnailBase64 } = await PowerPoint.run(async (context) => {
     const slide = context.presentation.slides.getItem(slideId);
     const pptxResult = slide.exportAsBase64();
-    // 320x180 matches the existing thumbnail convention (Phase 4's
-    // qlmanage-generated thumbnails are 320x180 — every library item is a
-    // 16:9 slide, so specifying both dimensions here is redundant with
-    // just specifying one, but explicit is cheap).
-    const imgResult = slide.getImageAsBase64({ width: 320, height: 180 });
+    // No width/height — "the true size of the slide is used" per the
+    // API's own docs, which is exactly what trimThumbnail needs to work
+    // with (a scaled-down capture would just mean trimming fewer, blurrier
+    // pixels).
+    const imgResult = slide.getImageAsBase64();
     await context.sync();
-    return { pptxBase64: pptxResult.value, thumbnailBase64: imgResult.value };
+    return { pptxBase64: pptxResult.value, rawThumbnailBase64: imgResult.value };
   });
+  return { pptxBase64, thumbnailBase64: await trimThumbnail(rawThumbnailBase64) };
 }
 
 /** Captures whatever slide is currently selected (or the last slide, via the same fallback insertFileItem/insertReconstructedItem already use) — used to add a brand-new item. */
 export async function exportCurrentSlideForAdmin(): Promise<AdminExport> {
-  return PowerPoint.run(async (context) => {
+  const { pptxBase64, rawThumbnailBase64 } = await PowerPoint.run(async (context) => {
     const slide = await getTargetSlide(context);
     const pptxResult = slide.exportAsBase64();
-    const imgResult = slide.getImageAsBase64({ width: 320, height: 180 });
+    const imgResult = slide.getImageAsBase64();
     await context.sync();
-    return { pptxBase64: pptxResult.value, thumbnailBase64: imgResult.value };
+    return { pptxBase64: pptxResult.value, rawThumbnailBase64: imgResult.value };
   });
+  return { pptxBase64, thumbnailBase64: await trimThumbnail(rawThumbnailBase64) };
 }
 
 // ---------------------------------------------------------------------------

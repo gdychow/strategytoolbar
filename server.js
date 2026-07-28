@@ -380,6 +380,8 @@ const ADMIN_STYLE = `
   .admin-card-wrap { position: relative; border: 1px solid #c8c8c8; border-radius: 6px; padding: 8px; background: #fff; display: flex; flex-direction: column; gap: 4px; }
   .admin-card-wrap.dragging { opacity: 0.4; }
   .admin-card-wrap.dirty { border-color: #1a5fb4; box-shadow: inset 3px 0 0 #1a5fb4; }
+  @keyframes admin-card-highlight-pulse { from { box-shadow: 0 0 0 3px rgba(26, 95, 180, 0.6); } to { box-shadow: 0 0 0 3px rgba(26, 95, 180, 0); } }
+  .admin-card-wrap.highlight { animation: admin-card-highlight-pulse 2s ease-out 1; }
   .admin-card-drag { position: absolute; top: 4px; right: 6px; cursor: grab; color: #999; font-size: 13px; user-select: none; line-height: 1; }
   .admin-card-drag:active { cursor: grabbing; }
   .admin-card { display: flex; flex-direction: column; gap: 4px; }
@@ -556,6 +558,11 @@ app.get("/admin", async (req, res) => {
     (c) => `<a href="/admin?category=${c}"${c === category ? ' class="active"' : ""}>${c}</a>`
   ).join("");
   const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
+  // Set by taskpane.ts's addSelectedSlideToLibrary after creating a new
+  // item — lets this page scroll straight to it instead of leaving the
+  // admin to hunt for "Untitled item" in a long, unsorted category.
+  const highlightId = Number(req.query.highlight);
+  const highlightItemId = Number.isInteger(highlightId) && highlightId > 0 ? highlightId : null;
 
   res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
     <div id="adminSaveBar" class="admin-save-bar">
@@ -570,6 +577,7 @@ app.get("/admin", async (req, res) => {
     <div id="adminLightbox" class="admin-lightbox"><img id="adminLightboxImg" alt=""></div>
     <script>
       const CURRENT_CATEGORY = ${JSON.stringify(category)};
+      const HIGHLIGHT_ITEM_ID = ${JSON.stringify(highlightItemId)};
 
       // Client-side typo-catching only, not a security boundary — the
       // server get-or-creates whatever tag names it's sent regardless
@@ -1004,6 +1012,18 @@ app.get("/admin", async (req, res) => {
           body: JSON.stringify({ category: CURRENT_CATEGORY, orderedGroupIds }),
         }).catch((err) => alert("Couldn't save group order: " + err.message));
       });
+
+      // Scrolls to and briefly highlights a just-added item (Task Pane
+      // Phase 12's "Add Selected Slide to Library" opens this page with
+      // ?highlight=<id> so the admin doesn't have to hunt for "Untitled
+      // item" in an unsorted category).
+      if (HIGHLIGHT_ITEM_ID !== null) {
+        const target = document.querySelector('.admin-card-wrap[data-item-id="' + HIGHLIGHT_ITEM_ID + '"]');
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+          target.classList.add("highlight");
+        }
+      }
     </script>
   </body></html>`);
 });
