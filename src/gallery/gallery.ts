@@ -40,6 +40,10 @@ let CATEGORIES: { value: string; label: string }[] = [
 const cache = new Map<string, CatalogResponse>();
 let activeCategory = CATEGORIES[0].value;
 let selectedItem: CatalogItem | null = null;
+// Task Pane Phase 16 follow-up: the last real (non-"__new__") value of
+// #editGroup, so a cancelled/failed "+ Add new group…" attempt can revert
+// the select instead of leaving it stuck on the placeholder option.
+let editGroupPreviousValue = "";
 // Task Pane Phase 16: the one card currently being dragged, mirroring
 // /admin's own draggedCard/getDragAfterElement pattern (server.js) — same
 // nearest-card-center heuristic, generalized from a dedicated drag handle
@@ -171,7 +175,12 @@ function openEditDetails(item: CatalogItem): void {
       opt.textContent = group.name;
       groupSelect.appendChild(opt);
     }
+    const newGroupOption = document.createElement("option");
+    newGroupOption.value = "__new__";
+    newGroupOption.textContent = "+ Add new group…";
+    groupSelect.appendChild(newGroupOption);
     groupSelect.value = item.groupId !== null ? String(item.groupId) : "";
+    editGroupPreviousValue = groupSelect.value;
   }
 
   form.style.display = "";
@@ -248,6 +257,50 @@ async function saveEditDetails(item: CatalogItem): Promise<void> {
 function scopeForActiveCategory(): { category: string } | { companyDomain: string | null } {
   if (activeCategory === "company") return { companyDomain: myCompanyDomain };
   return { category: activeCategory };
+}
+
+/**
+ * Handles the "+ Add new group…" option in #editGroup — mirrors /admin's
+ * own inline group-create flow (server.js) but against the gallery's own
+ * cached group list instead of a server-rendered <select>. Only new-group
+ * *creation* lives here; renaming/reordering/deleting groups stays
+ * /admin-only, same as category reassignment and thumbnail replacement.
+ */
+async function handleEditGroupChange(): Promise<void> {
+  const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
+  if (!groupSelect || groupSelect.value !== "__new__") {
+    if (groupSelect) editGroupPreviousValue = groupSelect.value;
+    return;
+  }
+
+  const name = window.prompt("New group name:")?.trim();
+  if (!name) {
+    groupSelect.value = editGroupPreviousValue;
+    return;
+  }
+
+  const data = cache.get(activeCategory);
+  const sortOrder = data?.groups.length ?? 0;
+  try {
+    const res = await fetch("/admin/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ ...scopeForActiveCategory(), name, sortOrder }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+
+    if (data) data.groups.push({ id: body.id, name, sortOrder });
+    const opt = document.createElement("option");
+    opt.value = String(body.id);
+    opt.textContent = name;
+    groupSelect.insertBefore(opt, groupSelect.querySelector('option[value="__new__"]'));
+    groupSelect.value = String(body.id);
+    editGroupPreviousValue = groupSelect.value;
+  } catch (err) {
+    window.alert(`Couldn't create group: ${err instanceof Error ? err.message : String(err)}`);
+    groupSelect.value = editGroupPreviousValue;
+  }
 }
 
 /**
@@ -539,5 +592,8 @@ Office.onReady(async () => {
   document.getElementById("editDetailsForm")?.addEventListener("submit", (e) => {
     e.preventDefault();
     if (selectedItem) saveEditDetails(selectedItem).catch(() => {});
+  });
+  document.getElementById("editGroup")?.addEventListener("change", () => {
+    handleEditGroupChange().catch(() => {});
   });
 });
