@@ -46,6 +46,9 @@ let selectedItem: CatalogItem | null = null;
 let isAdmin = false;
 let myOid: string | null = null;
 let myTid: string | null = null;
+// Task Pane Phase 14
+let myCompanyDomain: string | null = null;
+let isCompanyAdmin = false;
 
 function statusEl(): HTMLElement | null {
   return document.getElementById("status");
@@ -77,7 +80,8 @@ function hidePreview(): void {
 
 /**
  * Whether the signed-in viewer can Edit/Delete this item — a global admin
- * can touch any shared item; anyone else only their own personal item
+ * can touch any shared item; a company admin only their own company's
+ * items (Task Pane Phase 14); anyone else only their own personal item
  * (Task Pane Phase 13). No "graphic" to edit/delete for a bare character
  * either way (see Task Pane Phase 12). The server re-checks real ownership
  * on every mutating request regardless of what this returns — this only
@@ -86,7 +90,9 @@ function hidePreview(): void {
 function canEdit(item: CatalogItem): boolean {
   if (item.insertMode === "unicode-char") return false;
   if (isAdmin) return true;
-  return !!item.ownerOid && item.ownerOid === myOid && item.ownerTid === myTid;
+  if (item.ownerOid) return item.ownerOid === myOid && item.ownerTid === myTid;
+  if (item.companyDomain) return isCompanyAdmin && item.companyDomain === myCompanyDomain;
+  return false;
 }
 
 function showPreview(item: CatalogItem): void {
@@ -287,6 +293,13 @@ Office.onReady(async () => {
       isAdmin = !!user?.isAdmin;
       myOid = user?.oid ?? null;
       myTid = user?.tid ?? null;
+      myCompanyDomain = user?.companyDomain ?? null;
+      isCompanyAdmin = !!user?.isCompanyAdmin;
+      // Company tab before "My Items" — the company library is a shared,
+      // browsable-by-anyone-at-that-company surface (Task Pane Phase 14),
+      // closer in spirit to the fixed category tabs than to the strictly
+      // personal one that follows it.
+      if (myCompanyDomain) CATEGORIES = [...CATEGORIES, { value: "company", label: myCompanyDomain }];
       CATEGORIES = [...CATEGORIES, { value: "personal", label: "My Items" }];
     }
   } catch {

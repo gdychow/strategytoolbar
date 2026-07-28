@@ -95,3 +95,57 @@ CREATE TABLE IF NOT EXISTS catalog_item_tags (
   tag_id INTEGER NOT NULL REFERENCES tags (id) ON DELETE CASCADE,
   PRIMARY KEY (item_id, tag_id)
 );
+
+-- Task Pane Phase 14: company libraries. company_domain is a plain TEXT
+-- scoping key (the domain itself, e.g. 'acmecorp.com'), not a synthetic id
+-- into a separate companies table — consistent with how is_admin already
+-- avoids a users-table column in favor of something derived rather than
+-- stored, just here it's the domain, not a boolean, and it IS stored since
+-- (unlike ADMIN_EMAILS) it isn't cheaply re-derivable from an env var.
+-- Consumer-domain emails (gmail.com, etc. — see server/consumerDomains.js)
+-- get company_domain = NULL, same as everyone did before this phase.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_domain TEXT;
+-- Set once, either by auto-promotion (the first user ever seen for a given
+-- company_domain) or by an explicit promote/demote action (see
+-- server.js's /admin/company-admins routes) — never silently recomputed
+-- on login the way is_admin is, since it's real mutable state, not a live
+-- env-var lookup.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_company_admin BOOLEAN NOT NULL DEFAULT false;
+
+-- A company-scoped item (no owner, no global category) alongside the two
+-- existing scopes (global: both NULL; personal: owner_oid/tid set).
+ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS company_domain TEXT;
+ALTER TABLE catalog_items ADD CONSTRAINT catalog_items_owner_or_company_not_both
+  CHECK (owner_oid IS NULL OR company_domain IS NULL);
+
+-- category becomes conditionally required — global items keep a real
+-- category (their gallery tab IS a category), company items don't (their
+-- gallery tab is the company itself) — same "orthogonal scoping columns"
+-- pattern as owner_oid vs. company_domain above. Personal items may or
+-- may not have one (Phase 13 already defaults new personal items to a
+-- category; harmless, not special-cased here).
+ALTER TABLE catalog_items ALTER COLUMN category DROP NOT NULL;
+ALTER TABLE catalog_items DROP CONSTRAINT IF EXISTS catalog_items_category_check;
+ALTER TABLE catalog_items ADD CONSTRAINT catalog_items_category_check CHECK (
+  category IS NULL OR category IN ('text', 'objects', 'shapes', 'stamps', 'tables', 'symbols', 'diagrams', 'maps', 'clipart', 'frameworks', 'flags')
+);
+ALTER TABLE catalog_items ADD CONSTRAINT catalog_items_category_scope
+  CHECK ((company_domain IS NULL AND owner_oid IS NULL) = (category IS NOT NULL) OR owner_oid IS NOT NULL);
+
+ALTER TABLE catalog_groups ADD COLUMN IF NOT EXISTS company_domain TEXT;
+ALTER TABLE catalog_groups ALTER COLUMN category DROP NOT NULL;
+ALTER TABLE catalog_groups DROP CONSTRAINT IF EXISTS catalog_groups_category_check;
+ALTER TABLE catalog_groups ADD CONSTRAINT catalog_groups_category_check CHECK (
+  category IS NULL OR category IN ('text', 'objects', 'shapes', 'stamps', 'tables', 'symbols', 'diagrams', 'maps', 'clipart', 'frameworks', 'flags')
+);
+ALTER TABLE catalog_groups ADD CONSTRAINT catalog_groups_scope_check
+  CHECK ((category IS NOT NULL) <> (company_domain IS NOT NULL)); -- exactly one set
+-- Postgres treats NULL <> NULL as unknown (not true) in a plain
+-- UNIQUE(category, name), which would silently fail to catch two
+-- different companies' groups both named e.g. "Templates" — hence two
+-- partial unique indexes instead of one constraint, mirroring how
+-- idx_catalog_items_category_shared above already uses a partial index
+-- rather than a plain one.
+ALTER TABLE catalog_groups DROP CONSTRAINT IF EXISTS catalog_groups_category_name_key;
+CREATE UNIQUE INDEX IF NOT EXISTS catalog_groups_global_unique ON catalog_groups (category, name) WHERE company_domain IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS catalog_groups_company_unique ON catalog_groups (company_domain, name) WHERE company_domain IS NOT NULL;

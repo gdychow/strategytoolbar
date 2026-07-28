@@ -10,7 +10,11 @@ const crypto = require("crypto");
 const {
   waitForDatabase,
   upsertUser,
+  getUserByKey,
+  listUsersByCompanyDomain,
+  setCompanyAdmin,
   listSharedCatalogItems,
+  listCompanyCatalogItems,
   getCatalogItem,
   insertCatalogItem,
   updateCatalogItem,
@@ -19,6 +23,7 @@ const {
   updateCatalogItemContent,
   deleteCatalogItem,
   listGroupsForCategory,
+  listGroupsForCompany,
   getGroup,
   createGroup,
   updateGroup,
@@ -34,6 +39,7 @@ const {
 } = require("./server/db");
 const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken } = require("./server/auth");
 const { THUMBNAILS_DIR, ADMIN_ADDED_DIR, PERSONAL_ADDED_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath } = require("./server/catalog");
+const { deriveCompanyDomain } = require("./server/consumerDomains");
 // Same clientId/authority the task pane's NAA client uses (src/auth/msal.ts)
 // — reused as-is by /admin's separate, standard-MSAL browser sign-in flow
 // below. Plain JSON, requirable directly from Node with no build step.
@@ -115,12 +121,22 @@ app.use(async (req, res, next) => {
 
   req.user = verified.claims;
   if (verified.shouldRefresh) {
+    // Task Pane Phase 14: companyDomain/isCompanyAdmin are re-fetched from
+    // the DB here (not just carried over from the old JWT claims the way
+    // oid/tid/email/displayName are) so a promote/demote takes effect
+    // within one refresh cycle (~12h) instead of requiring a full
+    // sign-out — is_company_admin is real mutable state, unlike isAdmin,
+    // which stays purely env-var-derived and is safe to recompute cheaply
+    // inside createSessionToken on every reissue.
+    const dbUser = await getUserByKey(verified.claims.oid, verified.claims.tid);
     const fresh = await createSessionToken(
       {
         oid: verified.claims.oid,
         tid: verified.claims.tid,
         email: verified.claims.email,
         displayName: verified.claims.displayName,
+        companyDomain: dbUser?.company_domain ?? null,
+        isCompanyAdmin: dbUser?.is_company_admin ?? false,
       },
       verified.claims.sessionStart
     );
@@ -143,8 +159,13 @@ app.post("/api/auth/session", async (req, res) => {
     return res.status(401).json({ error: "Invalid token." });
   }
 
-  const user = await upsertUser(identity);
-  const sessionToken = await createSessionToken(identity);
+  const companyDomain = deriveCompanyDomain(identity.email);
+  const user = await upsertUser({ ...identity, companyDomain });
+  const sessionToken = await createSessionToken({
+    ...identity,
+    companyDomain: user.company_domain,
+    isCompanyAdmin: user.is_company_admin,
+  });
   res.cookie(SESSION_COOKIE, sessionToken, cookieOptions);
   res.json({
     oid: user.oid,
@@ -156,8 +177,8 @@ app.post("/api/auth/session", async (req, res) => {
 
 app.get("/api/auth/me", (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
-  const { oid, tid, email, displayName, isAdmin } = req.user;
-  res.json({ oid, tid, email, displayName, isAdmin });
+  const { oid, tid, email, displayName, isAdmin, companyDomain, isCompanyAdmin } = req.user;
+  res.json({ oid, tid, email, displayName, isAdmin, companyDomain, isCompanyAdmin });
 });
 
 app.post("/api/auth/signout", (req, res) => {
@@ -188,6 +209,39 @@ app.get("/api/catalog/personal", async (req, res) => {
       tags: item.tags,
       ownerOid: req.user.oid,
       ownerTid: req.user.tid,
+      companyDomain: null,
+    })),
+  });
+});
+
+// Task Pane Phase 14: a company member's shared library — any signed-in
+// user with a companyDomain can browse (only company admins can add/edit,
+// per the POST routes below). Registered before /:category for the same
+// reason listPersonalCatalogItems's route is — "company" would otherwise
+// be swallowed as a literal (invalid) category value.
+app.get("/api/catalog/company", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.companyDomain) return res.status(403).json({ error: "You don't have a company library." });
+
+  const [items, groups] = await Promise.all([
+    listCompanyCatalogItems(req.user.companyDomain),
+    listGroupsForCompany(req.user.companyDomain),
+  ]);
+  res.json({
+    groups: groups.map((g) => ({ id: g.id, name: g.name, sortOrder: g.sort_order })),
+    items: items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      insertMode: item.insert_mode,
+      reconstructSpec: item.reconstruct_spec,
+      unicodeChar: item.unicode_char,
+      thumbnailUrl: item.thumbnail_path ? `/assets/catalog/thumbnails/${item.thumbnail_path}?v=${ASSET_VERSION}` : null,
+      groupId: item.group_id,
+      groupName: item.group_name,
+      tags: item.tags,
+      ownerOid: null,
+      ownerTid: null,
+      companyDomain: item.company_domain,
     })),
   });
 });
@@ -223,6 +277,7 @@ app.get("/api/catalog/:category", async (req, res) => {
       tags: item.tags,
       ownerOid: null,
       ownerTid: null,
+      companyDomain: null,
     })),
   });
 });
@@ -249,15 +304,19 @@ app.get("/api/catalog/file/:itemId", async (req, res) => {
   });
 });
 
-// Task Pane Phase 12: admin-only, JSON, called directly from the task pane
-// (not a browser page) — see beginAdminEdit/saveAdminEdit in taskpane.ts.
+// Task Pane Phase 12: JSON, called directly from the task pane (not a
+// browser page) — see beginLibraryEdit/saveLibraryEdit in taskpane.ts.
 // Replaces an existing item's underlying content with whatever the admin
 // just exported from a live PowerPoint session (Slide.exportAsBase64 for
 // the content, Slide.getImageAsBase64 for the thumbnail — both base64,
 // no data: URL prefix). Always lands as insert_mode 'file', even if the
 // item was 'reconstruct' before — updateCatalogItemContent forces that
-// and clears reconstruct_spec.
-app.post("/api/admin/catalog/:id/content", requireAdmin, async (req, res) => {
+// and clears reconstruct_spec. Task Pane Phase 14: fetches the existing
+// row first and checks canManageRow against it, instead of the blanket
+// requireAdmin middleware — a company admin can now reach this route too,
+// for their own company's items.
+app.post("/api/admin/catalog/:id/content", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Sign in first." });
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid item id." });
 
@@ -268,6 +327,7 @@ app.post("/api/admin/catalog/:id/content", requireAdmin, async (req, res) => {
 
   const existing = await getCatalogItem(id);
   if (!existing) return res.status(404).json({ error: "Item not found." });
+  if (!canManageRow(req.user, existing)) return res.status(403).json({ error: "Not an admin for this item." });
 
   const sourceFile = `admin-added/item-${id}.pptx`;
   const thumbnailPath = `item-${id}.png`;
@@ -290,21 +350,35 @@ app.post("/api/admin/catalog/:id/content", requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-// Admin-only, JSON, called from the task pane — see addSelectedSlideToLibrary
-// in taskpane.ts. Creates a brand-new item from whatever slide the admin
+// JSON, called from the task pane — see addSelectedSlideToLibrary in
+// taskpane.ts. Creates a brand-new item from whatever slide the admin
 // currently has selected. Filenames are keyed by a fresh UUID rather than
 // the not-yet-known row id, since the row can't be inserted until
 // source_file already has a value (catalog_items' own CHECK constraint
 // requires a 'file'-mode row to have one). Lands with a placeholder title
-// and category — the admin finishes naming/categorizing it in /admin,
-// which the task pane opens immediately after this succeeds.
-app.post("/api/admin/catalog", requireAdmin, async (req, res) => {
-  const { pptxBase64, thumbnailBase64 } = req.body ?? {};
+// (and, for the global scope, a placeholder category) — the admin
+// finishes naming/categorizing it in /admin, which the task pane opens
+// immediately after this succeeds. Task Pane Phase 14: `scope` in the
+// body picks which of the two admin-gated destinations this goes to —
+// "global" (today's only behavior, requires req.user.isAdmin) or
+// "company" (requires req.user.isCompanyAdmin, lands with
+// company_domain set and no category at all, per the schema's
+// orthogonal-scoping-columns design).
+app.post("/api/admin/catalog", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  const { pptxBase64, thumbnailBase64, scope } = req.body ?? {};
   if (typeof pptxBase64 !== "string" || typeof thumbnailBase64 !== "string") {
     return res.status(400).json({ error: "Missing content." });
   }
+  const isCompanyScope = scope === "company";
+  if (isCompanyScope) {
+    if (!req.user.isCompanyAdmin || !req.user.companyDomain) return res.status(403).json({ error: "Not a company admin." });
+  } else if (!req.user.isAdmin) {
+    return res.status(403).json({ error: "Not an admin." });
+  }
 
-  const category = CATALOG_CATEGORIES[0];
+  const category = isCompanyScope ? null : CATALOG_CATEGORIES[0];
+  const companyDomain = isCompanyScope ? req.user.companyDomain : null;
   const fileId = crypto.randomUUID();
   const sourceFile = `admin-added/${fileId}.pptx`;
   const thumbnailPath = `${fileId}.png`;
@@ -313,6 +387,7 @@ app.post("/api/admin/catalog", requireAdmin, async (req, res) => {
 
   const created = await insertCatalogItem({
     category,
+    companyDomain,
     title: "Untitled item",
     insertMode: "file",
     sourceFile,
@@ -320,7 +395,7 @@ app.post("/api/admin/catalog", requireAdmin, async (req, res) => {
     sortOrder: 0,
   });
 
-  res.json({ id: created.id, category });
+  res.json({ id: created.id, category, companyDomain });
 });
 
 // Task Pane Phase 13: any signed-in user, no admin check — see
@@ -427,6 +502,105 @@ function requireAdmin(req, res, next) {
   if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
   next();
 }
+
+// Task Pane Phase 14: a global admin can manage any company; a company
+// admin only their own. Plain boolean helper rather than Express
+// middleware — every call site needs to resolve `domain` per-request
+// (from a query param, or from the target user's own row), so there's no
+// single domain to bind a middleware factory to ahead of time.
+function canAdminCompany(user, domain) {
+  if (!user || !domain) return false;
+  if (user.isAdmin) return true;
+  return !!user.isCompanyAdmin && user.companyDomain === domain;
+}
+
+/**
+ * Whether the signed-in user can manage a specific already-fetched
+ * catalog item or group row — a global admin can touch anything; a
+ * company admin only rows belonging to their own company; nobody else can
+ * touch a global (non-company) row. Used by routes that fetch the
+ * existing row first (to know its scope) before deciding, since
+ * requireAdmin's blanket global-only check no longer applies now that
+ * company-scoped rows exist alongside the shared catalog. Deliberately
+ * NOT built on top of canAdminCompany — that helper treats a falsy domain
+ * as "nothing to check, deny" (right for its own callers, which always
+ * have a real domain in hand), but here a falsy company_domain means "this
+ * is a global row," which a global admin must still be allowed to manage.
+ */
+function canManageRow(user, row) {
+  if (!user) return false;
+  if (user.isAdmin) return true;
+  if (row?.company_domain) return !!user.isCompanyAdmin && user.companyDomain === row.company_domain;
+  return false;
+}
+
+// Lists everyone at one company_domain with a promote/demote button per
+// row — reachable from GET /admin's company-scope nav (see below).
+// domain defaults to the viewer's own company when they aren't a global
+// admin, so a company admin can't even construct a URL into a domain
+// they don't belong to (canAdminCompany would 403 it anyway; this just
+// avoids showing a dead link).
+app.get("/admin/company-admins", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  const domain = typeof req.query.domain === "string" && req.query.domain ? req.query.domain : req.user.companyDomain;
+  if (!domain) return res.status(400).send("No company to show.");
+  if (!canAdminCompany(req.user, domain)) return res.status(403).send("Not an admin for this company.");
+
+  const users = await listUsersByCompanyDomain(domain);
+  const rows = users
+    .map(
+      (u) => `
+      <tr>
+        <td>${escapeHtml(u.email ?? "(no email)")}</td>
+        <td>${u.is_company_admin ? "Yes" : "No"}</td>
+        <td>
+          <form method="POST" action="/admin/company-admins/${encodeURIComponent(u.oid)}/${encodeURIComponent(u.tid)}/${u.is_company_admin ? "demote" : "promote"}">
+            <button type="submit">${u.is_company_admin ? "Demote" : "Promote"}</button>
+          </form>
+        </td>
+      </tr>`
+    )
+    .join("");
+
+  res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
+    <h1>Company Admins</h1>
+    <h2>${escapeHtml(domain)}</h2>
+    <p><a href="/admin?scope=company:${encodeURIComponent(domain)}">&larr; Back to library</a></p>
+    <table>
+      <thead><tr><th>Email</th><th>Company Admin</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </body></html>`);
+});
+
+app.post("/admin/company-admins/:oid/:tid/promote", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  const { oid, tid } = req.params;
+  const target = await getUserByKey(oid, tid);
+  if (!target || !target.company_domain) return res.status(404).send("User not found.");
+  if (!canAdminCompany(req.user, target.company_domain)) return res.status(403).send("Not an admin for this company.");
+
+  await setCompanyAdmin(oid, tid, true);
+  res.redirect(303, `/admin/company-admins?domain=${encodeURIComponent(target.company_domain)}`);
+});
+
+// The self-removal guard lives here, server-side — not just a disabled
+// button client-side — so a company can't be talked down to zero admins
+// by its own admins via a raw request. Global admins are exempt: they're
+// the backstop if a company ever does end up with none.
+app.post("/admin/company-admins/:oid/:tid/demote", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  const { oid, tid } = req.params;
+  const target = await getUserByKey(oid, tid);
+  if (!target || !target.company_domain) return res.status(404).send("User not found.");
+  if (!canAdminCompany(req.user, target.company_domain)) return res.status(403).send("Not an admin for this company.");
+  if (oid === req.user.oid && tid === req.user.tid && !req.user.isAdmin) {
+    return res.status(403).send("You can't remove your own company-admin status — ask another company admin or a global admin.");
+  }
+
+  await setCompanyAdmin(oid, tid, false);
+  res.redirect(303, `/admin/company-admins?domain=${encodeURIComponent(target.company_domain)}`);
+});
 
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -657,13 +831,31 @@ function renderSignInPage() {
 // items is also out of scope here (deferred, not forgotten).
 app.get("/admin", async (req, res) => {
   if (!req.user) return res.send(renderSignInPage());
-  if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
 
-  const category = CATALOG_CATEGORIES.includes(req.query.category) ? req.query.category : CATALOG_CATEGORIES[0];
+  // Task Pane Phase 14: ?scope=company:<domain> is the only new value this
+  // takes — absent (or any other value) falls through to today's exact
+  // ?category=-based behavior, unchanged. Kept as a separate query param
+  // from ?category= rather than folding category into ?scope= too, since
+  // every existing category link/reference stays valid with zero changes.
+  const scopeParam = typeof req.query.scope === "string" ? req.query.scope : null;
+  const companyScopeDomain = scopeParam && scopeParam.startsWith("company:") ? scopeParam.slice("company:".length) : null;
+  const isCompanyScope = !!companyScopeDomain;
+
+  if (isCompanyScope) {
+    if (!canAdminCompany(req.user, companyScopeDomain)) return res.status(403).send("Not an admin for this company.");
+  } else if (!req.user.isAdmin) {
+    return res.status(403).send("Not an admin.");
+  }
+
+  const category = isCompanyScope
+    ? null
+    : CATALOG_CATEGORIES.includes(req.query.category)
+      ? req.query.category
+      : CATALOG_CATEGORIES[0];
 
   const [items, groups, tagNames] = await Promise.all([
-    listSharedCatalogItems(category),
-    listGroupsForCategory(category),
+    isCompanyScope ? listCompanyCatalogItems(companyScopeDomain) : listSharedCatalogItems(category),
+    isCompanyScope ? listGroupsForCompany(companyScopeDomain) : listGroupsForCategory(category),
     listAllTagNames(),
   ]);
 
@@ -701,7 +893,7 @@ app.get("/admin", async (req, res) => {
               : `<div class="admin-card-thumb admin-card-thumb-empty">(none)</div>`
           }
           <input class="admin-card-title" name="title" value="${escapeHtml(item.title)}">
-          <select name="category">${categoryOptions}</select>
+          ${isCompanyScope ? "" : `<select name="category">${categoryOptions}</select>`}
           <select name="groupId">${groupOptionsFor(item.group_id)}</select>
           <input class="admin-card-tags tags-input" name="tags" placeholder="tags" value="${escapeHtml((item.tags || []).join(", "))}">
           <span class="admin-card-mode" title="${escapeHtml(mode?.title ?? "")}">${escapeHtml(mode?.label ?? item.insert_mode)}</span>
@@ -737,8 +929,17 @@ app.get("/admin", async (req, res) => {
   const clusterSections = clusters.map(renderCluster).join("");
 
   const categoryNav = CATALOG_CATEGORIES.map(
-    (c) => `<a href="/admin?category=${c}"${c === category ? ' class="active"' : ""}>${c}</a>`
+    (c) => `<a href="/admin?category=${c}"${!isCompanyScope && c === category ? ' class="active"' : ""}>${c}</a>`
   ).join("");
+  // Task Pane Phase 14: one extra nav entry for the viewer's own company,
+  // shown only when they're that company's admin (or a global admin) —
+  // reaching a *different* company's library than your own is possible
+  // for a global admin via a direct ?scope=company:<domain> URL, but not
+  // surfaced in the nav (no "list every company" picker built for v1).
+  const companyNavLink =
+    req.user.companyDomain && canAdminCompany(req.user, req.user.companyDomain)
+      ? `<a href="/admin?scope=company:${encodeURIComponent(req.user.companyDomain)}"${isCompanyScope ? ' class="active"' : ""}>${escapeHtml(req.user.companyDomain)}</a>`
+      : "";
   const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
   // Set by taskpane.ts's addSelectedSlideToLibrary after creating a new
   // item — lets this page scroll straight to it instead of leaving the
@@ -753,12 +954,13 @@ app.get("/admin", async (req, res) => {
     </div>
     <h1>Welcome, admin</h1>
     <p>Signed in as ${escapeHtml(req.user.email)}.<span id="admin-reorder-status" class="admin-reorder-status"></span></p>
+    ${isCompanyScope ? `<p>Viewing ${escapeHtml(companyScopeDomain)}'s library. <a href="/admin/company-admins?domain=${encodeURIComponent(companyScopeDomain)}">Manage company admins</a></p>` : ""}
     ${errorMsg ? `<p class="admin-error">${escapeHtml(errorMsg)}</p>` : ""}
-    <nav class="admin-category-nav">${categoryNav}</nav>
+    <nav class="admin-category-nav">${categoryNav}${companyNavLink}</nav>
     <div id="adminClusters">${clusterSections}</div>
     <div id="adminLightbox" class="admin-lightbox"><img id="adminLightboxImg" alt=""></div>
     <script>
-      const CURRENT_CATEGORY = ${JSON.stringify(category)};
+      const CURRENT_SCOPE = ${JSON.stringify(isCompanyScope ? { companyDomain: companyScopeDomain } : { category })};
       const HIGHLIGHT_ITEM_ID = ${JSON.stringify(highlightItemId)};
 
       // Client-side typo-catching only, not a security boundary — the
@@ -1003,7 +1205,7 @@ app.get("/admin", async (req, res) => {
           fetch("/admin/catalog/reorder", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ category: CURRENT_CATEGORY, groupId, orderedIds }),
+            body: JSON.stringify({ ...CURRENT_SCOPE, groupId, orderedIds }),
           })
             .then((res) => {
               if (!res.ok) throw new Error("HTTP " + res.status);
@@ -1078,7 +1280,7 @@ app.get("/admin", async (req, res) => {
           fetch("/admin/groups", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-            body: new URLSearchParams({ category: CURRENT_CATEGORY, name, sortOrder: String(sortOrder) }),
+            body: new URLSearchParams({ ...CURRENT_SCOPE, name, sortOrder: String(sortOrder) }),
           })
             .then(async (res) => {
               const body = await res.json().catch(() => ({}));
@@ -1191,7 +1393,7 @@ app.get("/admin", async (req, res) => {
         fetch("/admin/groups/reorder", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ category: CURRENT_CATEGORY, orderedGroupIds }),
+          body: JSON.stringify({ ...CURRENT_SCOPE, orderedGroupIds }),
         }).catch((err) => alert("Couldn't save group order: " + err.message));
       });
 
@@ -1219,10 +1421,19 @@ app.get("/admin", async (req, res) => {
 // Registered *before* POST /admin/catalog/:id below — Express matches
 // routes in registration order, and :id would otherwise swallow this as
 // a request to update an item literally named "reorder".
-app.post("/admin/catalog/reorder", requireAdmin, async (req, res) => {
-  const { category, groupId, orderedIds } = req.body ?? {};
-  if (!CATALOG_CATEGORIES.includes(category)) {
-    return res.status(400).json({ error: "Invalid category." });
+// Task Pane Phase 14: requireAdmin's blanket global-only check no longer
+// applies to this route — it's shared by both global-admin and
+// company-admin reorders now, so auth is checked per-request against
+// whichever scope the request actually names (canAdminCompany for a
+// companyDomain body, req.user.isAdmin for a category one).
+app.post("/admin/catalog/reorder", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  const { category, companyDomain, groupId, orderedIds } = req.body ?? {};
+  if (companyDomain) {
+    if (!canAdminCompany(req.user, companyDomain)) return res.status(403).json({ error: "Not an admin for this company." });
+  } else {
+    if (!CATALOG_CATEGORIES.includes(category)) return res.status(400).json({ error: "Invalid category." });
+    if (!req.user.isAdmin) return res.status(403).json({ error: "Not an admin." });
   }
   if (groupId !== null && !(Number.isInteger(groupId) && groupId > 0)) {
     return res.status(400).json({ error: "Invalid group." });
@@ -1230,34 +1441,48 @@ app.post("/admin/catalog/reorder", requireAdmin, async (req, res) => {
   if (!Array.isArray(orderedIds) || orderedIds.length === 0 || !orderedIds.every((id) => Number.isInteger(id) && id > 0)) {
     return res.status(400).json({ error: "Invalid item list." });
   }
-  await reorderCatalogItems({ category, groupId, orderedIds });
+  await reorderCatalogItems({ category: companyDomain ? null : category, companyDomain: companyDomain || null, groupId, orderedIds });
   res.json({ ok: true });
 });
 
-app.post("/admin/catalog/:id", requireAdmin, upload.single("thumbnail"), async (req, res) => {
+// Task Pane Phase 14: fetches the existing row first and checks
+// canManageRow against it, instead of the blanket requireAdmin middleware
+// — a company admin can now reach this route too, for their own
+// company's items. A company item's edit form has no category <select>
+// at all (see renderCard), so `category` arrives undefined for those;
+// updateCatalogItem treats that as "don't touch category" (see its own
+// comment) rather than a validation failure.
+app.post("/admin/catalog/:id", upload.single("thumbnail"), async (req, res) => {
   const id = Number(req.params.id);
   const json = wantsJson(req);
-  // Redirect back to whichever category's grid the edit was submitted
-  // from once it's known to be valid (redirect-mode only — the JSON path
-  // never navigates, so it has nothing to redirect to).
+  // Redirect back to whichever scope's grid the edit was submitted from
+  // once it's known (redirect-mode only — the JSON path never navigates,
+  // so it has nothing to redirect to).
   const fail = (status, message, backTo) =>
     json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo ?? "/admin", message);
 
+  if (!req.user) return fail(401, "Sign in first.");
   if (!Number.isInteger(id) || id <= 0) return fail(400, "Invalid item id.");
 
+  const existing = await getCatalogItem(id);
+  if (!existing) return fail(404, "Item not found.");
+  if (!canManageRow(req.user, existing)) return fail(403, "Not an admin for this item.");
+
+  const isCompanyItem = !!existing.company_domain;
   const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
-  const category = req.body.category;
+  const category = isCompanyItem ? undefined : req.body.category;
   const groupId = req.body.groupId ? Number(req.body.groupId) : null;
   const tags = typeof req.body.tags === "string" ? req.body.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
-  const backTo = CATALOG_CATEGORIES.includes(category) ? `/admin?category=${category}` : "/admin";
+  const backTo = isCompanyItem
+    ? `/admin?scope=company:${encodeURIComponent(existing.company_domain)}`
+    : CATALOG_CATEGORIES.includes(category)
+      ? `/admin?category=${category}`
+      : "/admin";
   if (!title) return fail(400, "Title can't be empty.", backTo);
-  if (!CATALOG_CATEGORIES.includes(category)) return fail(400, "Invalid category.");
+  if (!isCompanyItem && !CATALOG_CATEGORIES.includes(category)) return fail(400, "Invalid category.");
   if (groupId !== null && (!Number.isInteger(groupId) || groupId <= 0)) {
     return fail(400, "Invalid group.", backTo);
   }
-
-  const existing = await getCatalogItem(id);
-  if (!existing) return fail(404, "Item not found.", backTo);
 
   const updated = await updateCatalogItem({ id, title, category, groupId });
   if (!updated) return fail(404, "Item not found.", backTo);
@@ -1283,20 +1508,28 @@ app.post("/admin/catalog/:id", requireAdmin, upload.single("thumbnail"), async (
   res.redirect(303, backTo);
 });
 
-app.post("/admin/catalog/:id/delete", requireAdmin, async (req, res) => {
+app.post("/admin/catalog/:id/delete", async (req, res) => {
   const id = Number(req.params.id);
   const json = wantsJson(req);
   const fail = (status, message, backTo) =>
     json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo ?? "/admin", message);
 
+  if (!req.user) return fail(401, "Sign in first.");
   if (!Number.isInteger(id) || id <= 0) return fail(400, "Invalid item id.");
 
   const existing = await getCatalogItem(id);
-  const backTo = existing?.category && CATALOG_CATEGORIES.includes(existing.category) ? `/admin?category=${existing.category}` : "/admin";
+  if (!existing) return fail(404, "Item not found.");
+  if (!canManageRow(req.user, existing)) return fail(403, "Not an admin for this item.");
+
+  const backTo = existing.company_domain
+    ? `/admin?scope=company:${encodeURIComponent(existing.company_domain)}`
+    : existing.category && CATALOG_CATEGORIES.includes(existing.category)
+      ? `/admin?category=${existing.category}`
+      : "/admin";
   const deleted = await deleteCatalogItem(id);
   if (!deleted) return fail(404, "Item not found.", backTo);
 
-  if (existing?.thumbnail_path) {
+  if (existing.thumbnail_path) {
     await fs.promises.unlink(path.join(THUMBNAILS_DIR, existing.thumbnail_path)).catch(() => {});
   }
 
@@ -1317,26 +1550,38 @@ app.get("/admin/groups", requireAdmin, (req, res) => {
 
 // Reused by GET /admin's inline "+ Add new group…" dropdown option (via
 // fetch, Accept: application/json) — the redirect-based response stays as
-// a fallback for anything posting here without that header.
-app.post("/admin/groups", requireAdmin, async (req, res) => {
+// a fallback for anything posting here without that header. Task Pane
+// Phase 14: accepts either category (global scope) or companyDomain
+// (company scope) in the body — CURRENT_SCOPE's spread in GET /admin's
+// inline script sends whichever applies.
+app.post("/admin/groups", async (req, res) => {
   const category = req.body.category;
+  const companyDomain = req.body.companyDomain;
   const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
   const sortOrder = Number(req.body.sortOrder) || 0;
   const json = wantsJson(req);
-  const fail = (status, message) =>
-    json ? res.status(status).json({ error: message }) : redirectWithError(res, `/admin?category=${category}`, message);
+  const backTo = companyDomain ? `/admin?scope=company:${encodeURIComponent(companyDomain)}` : `/admin?category=${category}`;
+  const fail = (status, message) => (json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo, message));
 
-  if (!CATALOG_CATEGORIES.includes(category)) return fail(400, "Unknown category.");
+  if (!req.user) return fail(401, "Sign in first.");
+  if (companyDomain) {
+    if (!canAdminCompany(req.user, companyDomain)) return fail(403, "Not an admin for this company.");
+  } else {
+    if (!CATALOG_CATEGORIES.includes(category)) return fail(400, "Unknown category.");
+    if (!req.user.isAdmin) return fail(403, "Not an admin.");
+  }
   if (!name) return fail(400, "Group name can't be empty.");
 
   let created;
   try {
-    created = await createGroup({ category, name, sortOrder });
+    created = companyDomain
+      ? await createGroup({ companyDomain, name, sortOrder })
+      : await createGroup({ category, name, sortOrder });
   } catch (err) {
-    return fail(409, `A group named "${name}" already exists in this category.`);
+    return fail(409, `A group named "${name}" already exists here.`);
   }
   if (json) return res.json({ ok: true, id: created.id, name });
-  res.redirect(303, `/admin?category=${category}`);
+  res.redirect(303, backTo);
 });
 
 // Persists dragging a group heading to a new position (GET /admin's inline
@@ -1344,15 +1589,19 @@ app.post("/admin/groups", requireAdmin, async (req, res) => {
 // Express route-ordering pitfall already caught once this session for
 // /admin/catalog/reorder vs. /admin/catalog/:id: :id would otherwise
 // swallow this as a request to rename a group literally named "reorder".
-app.post("/admin/groups/reorder", requireAdmin, async (req, res) => {
-  const { category, orderedGroupIds } = req.body ?? {};
-  if (!CATALOG_CATEGORIES.includes(category)) {
-    return res.status(400).json({ error: "Invalid category." });
+app.post("/admin/groups/reorder", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  const { category, companyDomain, orderedGroupIds } = req.body ?? {};
+  if (companyDomain) {
+    if (!canAdminCompany(req.user, companyDomain)) return res.status(403).json({ error: "Not an admin for this company." });
+  } else {
+    if (!CATALOG_CATEGORIES.includes(category)) return res.status(400).json({ error: "Invalid category." });
+    if (!req.user.isAdmin) return res.status(403).json({ error: "Not an admin." });
   }
   if (!Array.isArray(orderedGroupIds) || orderedGroupIds.length === 0 || !orderedGroupIds.every((id) => Number.isInteger(id) && id > 0)) {
     return res.status(400).json({ error: "Invalid group list." });
   }
-  await reorderGroups({ category, orderedGroupIds });
+  await reorderGroups({ category: companyDomain ? null : category, companyDomain: companyDomain || null, orderedGroupIds });
   res.json({ ok: true });
 });
 
@@ -1360,34 +1609,48 @@ app.post("/admin/groups/reorder", requireAdmin, async (req, res) => {
 // blur/Enter to save). sortOrder is optional now that group order is set
 // by drag-and-drop (see POST /admin/groups/reorder above) — omitting it
 // leaves the group's current position untouched.
-app.post("/admin/groups/:id", requireAdmin, async (req, res) => {
+app.post("/admin/groups/:id", async (req, res) => {
   const id = Number(req.params.id);
   const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
   const sortOrder = req.body.sortOrder !== undefined ? Number(req.body.sortOrder) : null;
   const json = wantsJson(req);
-  // Category isn't submitted from this form (it's not editable — see
-  // updateGroup's comment) — read it back from the row itself so the
-  // redirect-mode fallback knows which category's page to send back to.
+  // Neither category nor companyDomain is submitted from this form (scope
+  // isn't editable — see updateGroup's comment) — read it back from the
+  // row itself so the redirect-mode fallback knows which page to send
+  // back to.
   const existing = await getGroup(id);
-  const category = existing?.category ?? CATALOG_CATEGORIES[0];
-  const fail = (status, message) =>
-    json ? res.status(status).json({ error: message }) : redirectWithError(res, `/admin?category=${category}`, message);
+  const backTo = existing?.company_domain
+    ? `/admin?scope=company:${encodeURIComponent(existing.company_domain)}`
+    : `/admin?category=${existing?.category ?? CATALOG_CATEGORIES[0]}`;
+  const fail = (status, message) => (json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo, message));
 
+  if (!req.user) return fail(401, "Sign in first.");
+  if (!existing) return fail(404, "Group not found.");
+  if (!canManageRow(req.user, existing)) return fail(403, "Not an admin for this group.");
   if (!name) return fail(400, "Group name can't be empty.");
 
   await updateGroup({ id, name, sortOrder });
   if (json) return res.json({ ok: true });
-  res.redirect(303, `/admin?category=${category}`);
+  res.redirect(303, backTo);
 });
 
 // Reused by GET /admin's inline group-heading delete button.
-app.post("/admin/groups/:id/delete", requireAdmin, async (req, res) => {
+app.post("/admin/groups/:id/delete", async (req, res) => {
   const id = Number(req.params.id);
+  const json = wantsJson(req);
   const existing = await getGroup(id);
-  const category = existing?.category ?? CATALOG_CATEGORIES[0];
+  const backTo = existing?.company_domain
+    ? `/admin?scope=company:${encodeURIComponent(existing.company_domain)}`
+    : `/admin?category=${existing?.category ?? CATALOG_CATEGORIES[0]}`;
+  const fail = (status, message) => (json ? res.status(status).json({ error: message }) : redirectWithError(res, backTo, message));
+
+  if (!req.user) return fail(401, "Sign in first.");
+  if (!existing) return fail(404, "Group not found.");
+  if (!canManageRow(req.user, existing)) return fail(403, "Not an admin for this group.");
+
   await deleteGroup(id);
-  if (wantsJson(req)) return res.json({ ok: true });
-  res.redirect(303, `/admin?category=${category}`);
+  if (json) return res.json({ ok: true });
+  res.redirect(303, backTo);
 });
 
 // Catches multer's file-size/type rejections (fileFilter's cb(new Error(...)))

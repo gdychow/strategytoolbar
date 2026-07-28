@@ -343,6 +343,9 @@ interface SessionUser {
   email: string | null;
   displayName: string | null;
   isAdmin: boolean;
+  // Task Pane Phase 14
+  companyDomain: string | null;
+  isCompanyAdmin: boolean;
 }
 
 let currentFileInsertHandle: Library.FileInsertHandle | null = null;
@@ -392,19 +395,23 @@ function refreshLibrarySection(user: SessionUser | null): void {
 // underlying "temp slide, do something, clean up" shape.
 // ---------------------------------------------------------------------------
 
-type LibraryTarget = "personal" | "global";
+type LibraryTarget = "personal" | "global" | "company";
 
 // Where a brand-new item gets POSTed, keyed by the #libraryTarget select's
-// value. "global" requires isAdmin server-side (requireAdmin on
-// /api/admin/catalog); "personal" requires only a signed-in user.
+// value. "global" and "company" both hit the same admin-gated route —
+// which one the server allows is decided by isAdmin/isCompanyAdmin plus a
+// "scope" field in the request body (see addSelectedSlideToLibrary) —
+// "personal" requires only a signed-in user, at its own route entirely.
 const TARGET_ENDPOINTS: Record<LibraryTarget, string> = {
   personal: "/api/personal/catalog",
   global: "/api/admin/catalog",
+  company: "/api/admin/catalog",
 };
 
 function currentLibraryTarget(): LibraryTarget {
   const select = document.getElementById("libraryTarget") as HTMLSelectElement | null;
-  return select?.value === "global" ? "global" : "personal";
+  const value = select?.value;
+  return value === "global" || value === "company" ? value : "personal";
 }
 
 let currentLibraryEdit: { itemId: number; title: string; handle: Library.FileInsertHandle; isPersonal: boolean } | null =
@@ -452,6 +459,7 @@ function refreshMyLibrarySection(user: SessionUser | null): void {
       targetSelect.appendChild(opt);
     };
     addOption("personal", "My Items");
+    if (user?.companyDomain && user?.isCompanyAdmin) addOption("company", user.companyDomain);
     if (user?.isAdmin) addOption("global", "Global Catalog");
     if (Array.from(targetSelect.options).some((o) => o.value === previous)) targetSelect.value = previous;
   }
@@ -583,10 +591,15 @@ async function addSelectedSlideToLibrary(): Promise<void> {
 
   const target = currentLibraryTarget();
   const { pptxBase64, thumbnailBase64 } = await Library.exportCurrentSlideForAdmin();
+  // "company" and "global" share one endpoint (see TARGET_ENDPOINTS) — the
+  // scope field is what the server uses to pick which admin check applies
+  // and which columns the new row gets (see POST /api/admin/catalog).
+  const body: { pptxBase64: string; thumbnailBase64: string; scope?: "company" } =
+    target === "company" ? { pptxBase64, thumbnailBase64, scope: "company" } : { pptxBase64, thumbnailBase64 };
   const res = await fetchWithTimeout(TARGET_ENDPOINTS[target], {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pptxBase64, thumbnailBase64 }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     notify(`Couldn't add to the library (${res.status}).`, "error");
@@ -596,6 +609,10 @@ async function addSelectedSlideToLibrary(): Promise<void> {
     const { id, category } = await res.json();
     window.open(`/admin?category=${category}&highlight=${id}`, "_blank");
     notify("Added to the library — finish naming it in the Admin tab that just opened.");
+  } else if (target === "company") {
+    const { id, companyDomain } = await res.json();
+    window.open(`/admin?scope=company:${encodeURIComponent(companyDomain)}&highlight=${id}`, "_blank");
+    notify("Added to the company library — finish naming it in the Admin tab that just opened.");
   } else {
     notify('Added to your personal library — open "Browse Library…" to rename or insert it.');
   }

@@ -24,17 +24,57 @@ async function waitForDatabase(maxAttempts = 10, delayMs = 1000) {
   throw new Error("Could not connect to Postgres after repeated attempts.");
 }
 
-/** Upserts a user by (oid, tid) and bumps last_seen_at — called on every successful token verification. */
-async function upsertUser({ oid, tid, email, displayName }) {
+/**
+ * Upserts a user by (oid, tid) and bumps last_seen_at — called on every
+ * successful token verification. companyDomain (Task Pane Phase 14,
+ * already resolved by the caller via server/consumerDomains.js's
+ * deriveCompanyDomain) is refreshed on every call — an email's domain
+ * could theoretically change across logins — but is_company_admin is
+ * computed only on first INSERT (true exactly when this is the first
+ * user this DB has ever seen for that domain — the auto-promotion) and
+ * is deliberately NOT touched on the ON CONFLICT branch, so this never
+ * silently promotes/demotes an existing user; that only ever happens via
+ * the explicit promote/demote routes in server.js.
+ */
+async function upsertUser({ oid, tid, email, displayName, companyDomain }) {
   const result = await pool.query(
-    `INSERT INTO users (oid, tid, email, display_name, last_seen_at)
-     VALUES ($1, $2, $3, $4, now())
+    `INSERT INTO users (oid, tid, email, display_name, company_domain, is_company_admin, last_seen_at)
+     VALUES ($1, $2, $3, $4, $5::text,
+       CASE WHEN $5::text IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users WHERE company_domain = $5::text) THEN true ELSE false END,
+       now())
      ON CONFLICT (oid, tid)
-     DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name, last_seen_at = now()
-     RETURNING oid, tid, email, display_name, created_at, last_seen_at`,
-    [oid, tid, email, displayName]
+     DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name, company_domain = EXCLUDED.company_domain, last_seen_at = now()
+     RETURNING oid, tid, email, display_name, company_domain, is_company_admin, created_at, last_seen_at`,
+    [oid, tid, email, displayName, companyDomain ?? null]
   );
   return result.rows[0];
+}
+
+/** Plain lookup by primary key — used by the session-refresh middleware to pick up a promote/demote without forcing a full sign-out. */
+async function getUserByKey(oid, tid) {
+  const result = await pool.query(
+    `SELECT oid, tid, email, display_name, company_domain, is_company_admin FROM users WHERE oid = $1 AND tid = $2`,
+    [oid, tid]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Every user sharing a company_domain, for /admin/company-admins' listing. */
+async function listUsersByCompanyDomain(companyDomain) {
+  const result = await pool.query(
+    `SELECT oid, tid, email, display_name, is_company_admin FROM users WHERE company_domain = $1 ORDER BY email`,
+    [companyDomain]
+  );
+  return result.rows;
+}
+
+/** Sets (or clears) one user's company-admin status — the only place is_company_admin is ever written after the initial auto-promotion in upsertUser. */
+async function setCompanyAdmin(oid, tid, isCompanyAdmin) {
+  const result = await pool.query(
+    `UPDATE users SET is_company_admin = $3 WHERE oid = $1 AND tid = $2 RETURNING oid, tid, company_domain, is_company_admin`,
+    [oid, tid, isCompanyAdmin]
+  );
+  return result.rows[0] ?? null;
 }
 
 // Shared by every catalog-item read query below: joins in the group name
@@ -66,10 +106,31 @@ async function listSharedCatalogItems(category) {
   return result.rows;
 }
 
-/** A single catalog item by ID, including source_file — used to resolve the file for a 'file'-mode insert, and by /admin's edit form. */
+/** Task Pane Phase 14 counterpart of listSharedCatalogItems, scoped by company_domain instead of category — a genuinely different WHERE and result set (no category shown), so kept as its own function. */
+async function listCompanyCatalogItems(companyDomain) {
+  const result = await pool.query(
+    `SELECT ci.id, ci.company_domain, ci.title, ci.insert_mode, ci.reconstruct_spec, ci.unicode_char, ci.thumbnail_path, ci.sort_order,
+            ${CATALOG_ITEM_GROUP_TAGS_SELECT}
+     FROM catalog_items ci
+     ${CATALOG_ITEM_GROUP_TAGS_JOIN}
+     WHERE ci.company_domain = $1
+     GROUP BY ci.id, cg.name
+     ORDER BY ci.sort_order, ci.id`,
+    [companyDomain]
+  );
+  return result.rows;
+}
+
+/**
+ * A single catalog item by ID, including source_file — used to resolve the
+ * file for a 'file'-mode insert, and by /admin's edit form. company_domain
+ * (Task Pane Phase 14) is included so the route-level scope-aware auth
+ * check (req.user.isAdmin || (isCompanyAdmin && companyDomain matches))
+ * has something to compare against.
+ */
 async function getCatalogItem(id) {
   const result = await pool.query(
-    `SELECT ci.id, ci.category, ci.title, ci.insert_mode, ci.source_file, ci.reconstruct_spec, ci.unicode_char, ci.thumbnail_path, ci.sort_order,
+    `SELECT ci.id, ci.category, ci.company_domain, ci.title, ci.insert_mode, ci.source_file, ci.reconstruct_spec, ci.unicode_char, ci.thumbnail_path, ci.sort_order,
             ${CATALOG_ITEM_GROUP_TAGS_SELECT}
      FROM catalog_items ci
      ${CATALOG_ITEM_GROUP_TAGS_JOIN}
@@ -80,7 +141,7 @@ async function getCatalogItem(id) {
   return result.rows[0] ?? null;
 }
 
-/** A category's groups, in display order — used by /admin/groups and the group <select> on the item edit form. */
+/** A category's groups, in display order — used by GET /admin and the group <select> on the item edit form. */
 async function listGroupsForCategory(category) {
   const result = await pool.query(
     `SELECT id, category, name, sort_order FROM catalog_groups WHERE category = $1 ORDER BY sort_order, name`,
@@ -89,17 +150,35 @@ async function listGroupsForCategory(category) {
   return result.rows;
 }
 
-/** A single group by ID, mainly so /admin/groups' edit/delete routes know which category page to redirect back to (category isn't resubmitted from those forms — see updateGroup's comment on why it's not editable). */
+/** Task Pane Phase 14 counterpart of listGroupsForCategory, scoped by company_domain instead — a genuinely different WHERE (and result set), so kept as its own function rather than parameterized. */
+async function listGroupsForCompany(companyDomain) {
+  const result = await pool.query(
+    `SELECT id, company_domain, name, sort_order FROM catalog_groups WHERE company_domain = $1 ORDER BY sort_order, name`,
+    [companyDomain]
+  );
+  return result.rows;
+}
+
+/** A single group by ID, mainly so /admin/groups' edit/delete routes know which scope's page to redirect back to (neither category nor company_domain is resubmitted from those forms — see updateGroup's comment on why category isn't editable; the same now holds for company_domain). */
 async function getGroup(id) {
-  const result = await pool.query(`SELECT id, category, name, sort_order FROM catalog_groups WHERE id = $1`, [id]);
+  const result = await pool.query(
+    `SELECT id, category, company_domain, name, sort_order FROM catalog_groups WHERE id = $1`,
+    [id]
+  );
   return result.rows[0] ?? null;
 }
 
-/** Creates a new group within a category. UNIQUE (category, name) surfaces a clear conflict on a duplicate name rather than silently duplicating. */
-async function createGroup({ category, name, sortOrder }) {
+/**
+ * Creates a new group, either within a category (global scope) or within a
+ * company (Task Pane Phase 14) — exactly one of category/companyDomain is
+ * expected to be set, matching catalog_groups' own CHECK constraint.
+ * Whichever UNIQUE partial index applies (global vs. company) surfaces a
+ * clear conflict on a duplicate name rather than silently duplicating.
+ */
+async function createGroup({ category, companyDomain, name, sortOrder }) {
   const result = await pool.query(
-    `INSERT INTO catalog_groups (category, name, sort_order) VALUES ($1, $2, $3) RETURNING id`,
-    [category, name, sortOrder ?? 0]
+    `INSERT INTO catalog_groups (category, company_domain, name, sort_order) VALUES ($1, $2, $3, $4) RETURNING id`,
+    [category ?? null, companyDomain ?? null, name, sortOrder ?? 0]
   );
   return result.rows[0];
 }
@@ -123,21 +202,33 @@ async function updateGroup({ id, name, sortOrder }) {
 }
 
 /**
- * Re-sequences a category's groups to match orderedGroupIds' order
- * (0..n-1) — mirrors reorderCatalogItems' transaction shape exactly. The
- * synthetic "Ungrouped" cluster has no backing row and is never part of
+ * Re-sequences a category's (or, since Task Pane Phase 14, a company's)
+ * groups to match orderedGroupIds' order (0..n-1) — mirrors
+ * reorderCatalogItems' transaction shape exactly. Exactly one of
+ * category/companyDomain is expected to be set, branching which WHERE
+ * predicate applies rather than duplicating the whole function, since the
+ * two scopes only ever differ in that one clause. The synthetic
+ * "Ungrouped" cluster has no backing row and is never part of
  * orderedGroupIds; it always renders last, client-side, unconditionally.
  */
-async function reorderGroups({ category, orderedGroupIds }) {
+async function reorderGroups({ category, companyDomain, orderedGroupIds }) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     for (let i = 0; i < orderedGroupIds.length; i++) {
-      await client.query(`UPDATE catalog_groups SET sort_order = $1 WHERE id = $2 AND category = $3`, [
-        i,
-        orderedGroupIds[i],
-        category,
-      ]);
+      if (companyDomain) {
+        await client.query(`UPDATE catalog_groups SET sort_order = $1 WHERE id = $2 AND company_domain = $3`, [
+          i,
+          orderedGroupIds[i],
+          companyDomain,
+        ]);
+      } else {
+        await client.query(`UPDATE catalog_groups SET sort_order = $1 WHERE id = $2 AND category = $3`, [
+          i,
+          orderedGroupIds[i],
+          category,
+        ]);
+      }
     }
     await client.query("COMMIT");
   } catch (err) {
@@ -228,6 +319,7 @@ async function deleteCatalogItemsByCategory(category) {
  */
 async function insertCatalogItem({
   category,
+  companyDomain,
   title,
   insertMode,
   sourceFile,
@@ -240,11 +332,12 @@ async function insertCatalogItem({
   ownerTid,
 }) {
   const result = await pool.query(
-    `INSERT INTO catalog_items (category, title, insert_mode, source_file, reconstruct_spec, unicode_char, thumbnail_path, sort_order, group_id, owner_oid, owner_tid)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `INSERT INTO catalog_items (category, company_domain, title, insert_mode, source_file, reconstruct_spec, unicode_char, thumbnail_path, sort_order, group_id, owner_oid, owner_tid)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING id`,
     [
-      category,
+      category ?? null,
+      companyDomain ?? null,
       title,
       insertMode,
       sourceFile ?? null,
@@ -278,41 +371,60 @@ async function insertCatalogItem({
  * The CASE's bare `category` reference is the pre-update row value (all
  * SET expressions in one UPDATE see the same pre-update row), so this is
  * a correct same-statement comparison, not a race.
+ *
+ * Task Pane Phase 14: category is optional — a company-scoped item's edit
+ * form has no category <select> at all (its gallery tab is the company,
+ * not a category), so `category` arrives as null/undefined for those
+ * edits. When it's omitted, the category/group_id columns are left
+ * exactly as they are (COALESCE keeps the existing category — always
+ * null for a company item — and group_id is set to whatever groupId was
+ * given, with no category-changed reset since category never changes on
+ * this path).
  */
 async function updateCatalogItem({ id, title, category, groupId }) {
   const result = await pool.query(
     `UPDATE catalog_items
      SET title = $2,
-         group_id = CASE WHEN category = $3 THEN $4::integer ELSE NULL END,
-         category = $3
+         group_id = CASE WHEN $3::text IS NULL OR category = $3 THEN $4::integer ELSE NULL END,
+         category = COALESCE($3, category)
      WHERE id = $1 AND owner_oid IS NULL
      RETURNING id`,
-    [id, title, category, groupId ?? null]
+    [id, title, category ?? null, groupId ?? null]
   );
   return result.rows[0] ?? null;
 }
 
 /**
- * Re-sequences one category+group cluster's sort_order to match
- * orderedIds' order (0..n-1), and reassigns group_id for every item in
- * that list — covers both "reordered within its own cluster" and
- * "dragged into a different cluster" in one call, since the destination
- * cluster's full membership is always what the client sends. The source
- * cluster (if an item moved out of it) is left with a gap in its
- * sequence, which is harmless — ordering only depends on relative order,
- * not contiguity. `category = $4` is defense in depth against a crafted
- * request smuggling an id from a different category into this call.
+ * Re-sequences one category+group (or, since Task Pane Phase 14, one
+ * company+group) cluster's sort_order to match orderedIds' order
+ * (0..n-1), and reassigns group_id for every item in that list — covers
+ * both "reordered within its own cluster" and "dragged into a different
+ * cluster" in one call, since the destination cluster's full membership
+ * is always what the client sends. The source cluster (if an item moved
+ * out of it) is left with a gap in its sequence, which is harmless —
+ * ordering only depends on relative order, not contiguity. The
+ * category/company_domain equality check in each branch is defense in
+ * depth against a crafted request smuggling an id from a different
+ * scope into this call.
  */
-async function reorderCatalogItems({ category, groupId, orderedIds }) {
+async function reorderCatalogItems({ category, companyDomain, groupId, orderedIds }) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     for (let i = 0; i < orderedIds.length; i++) {
-      await client.query(
-        `UPDATE catalog_items SET sort_order = $1, group_id = $2
-         WHERE id = $3 AND category = $4 AND owner_oid IS NULL`,
-        [i, groupId, orderedIds[i], category]
-      );
+      if (companyDomain) {
+        await client.query(
+          `UPDATE catalog_items SET sort_order = $1, group_id = $2
+           WHERE id = $3 AND company_domain = $4`,
+          [i, groupId, orderedIds[i], companyDomain]
+        );
+      } else {
+        await client.query(
+          `UPDATE catalog_items SET sort_order = $1, group_id = $2
+           WHERE id = $3 AND category = $4 AND owner_oid IS NULL`,
+          [i, groupId, orderedIds[i], category]
+        );
+      }
     }
     await client.query("COMMIT");
   } catch (err) {
@@ -434,7 +546,11 @@ module.exports = {
   pool,
   waitForDatabase,
   upsertUser,
+  getUserByKey,
+  listUsersByCompanyDomain,
+  setCompanyAdmin,
   listSharedCatalogItems,
+  listCompanyCatalogItems,
   getCatalogItem,
   deleteCatalogItemsByCategory,
   insertCatalogItem,
@@ -444,6 +560,7 @@ module.exports = {
   updateCatalogItemContent,
   deleteCatalogItem,
   listGroupsForCategory,
+  listGroupsForCompany,
   getGroup,
   createGroup,
   updateGroup,

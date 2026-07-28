@@ -63,6 +63,11 @@ export interface CatalogItem {
   // mine" without a second round-trip. Always null for shared/global items.
   ownerOid: string | null;
   ownerTid: string | null;
+  // Task Pane Phase 14: non-null only for items returned from
+  // GET /api/catalog/company — lets the gallery/task pane tell "this
+  // belongs to my company" without a second round-trip. Always null for
+  // global and personal items.
+  companyDomain: string | null;
 }
 
 export interface CatalogGroup {
