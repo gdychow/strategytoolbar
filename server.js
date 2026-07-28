@@ -5,15 +5,18 @@ const path = require("path");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
+const crypto = require("crypto");
 
 const {
   waitForDatabase,
   upsertUser,
   listSharedCatalogItems,
   getCatalogItem,
+  insertCatalogItem,
   updateCatalogItem,
   reorderCatalogItems,
   updateCatalogItemThumbnail,
+  updateCatalogItemContent,
   deleteCatalogItem,
   listGroupsForCategory,
   getGroup,
@@ -25,7 +28,7 @@ const {
   setItemTags,
 } = require("./server/db");
 const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken } = require("./server/auth");
-const { THUMBNAILS_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath } = require("./server/catalog");
+const { THUMBNAILS_DIR, ADMIN_ADDED_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath } = require("./server/catalog");
 // Same clientId/authority the task pane's NAA client uses (src/auth/msal.ts)
 // — reused as-is by /admin's separate, standard-MSAL browser sign-in flow
 // below. Plain JSON, requirable directly from Node with no build step.
@@ -44,7 +47,14 @@ const useTls = process.env.USE_TLS !== "false";
 const ASSET_VERSION = Date.now();
 
 const app = express();
-app.use(express.json());
+// Default (100kb) is far too small for Task Pane Phase 12's admin
+// content-save routes, whose JSON bodies carry a base64-encoded slide
+// (Slide.exportAsBase64) plus a base64 thumbnail (Slide.getImageAsBase64)
+// — raised globally rather than layered per-route, since body-parser
+// middleware consumes the request stream once: a second express.json()
+// later in the chain for just those routes would read nothing and
+// silently produce an empty body, not add a second, larger limit.
+app.use(express.json({ limit: "15mb" }));
 // Needed for the plain (non-multipart) forms on /admin/groups — the
 // catalog item edit form uses multipart/form-data (it has a file input,
 // parsed by multer instead), but groups have no file upload, so their
@@ -203,6 +213,80 @@ app.get("/api/catalog/file/:itemId", async (req, res) => {
   res.sendFile(filePath, (err) => {
     if (err && !res.headersSent) res.status(404).json({ error: "File not found." });
   });
+});
+
+// Task Pane Phase 12: admin-only, JSON, called directly from the task pane
+// (not a browser page) — see beginAdminEdit/saveAdminEdit in taskpane.ts.
+// Replaces an existing item's underlying content with whatever the admin
+// just exported from a live PowerPoint session (Slide.exportAsBase64 for
+// the content, Slide.getImageAsBase64 for the thumbnail — both base64,
+// no data: URL prefix). Always lands as insert_mode 'file', even if the
+// item was 'reconstruct' before — updateCatalogItemContent forces that
+// and clears reconstruct_spec.
+app.post("/api/admin/catalog/:id/content", requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid item id." });
+
+  const { pptxBase64, thumbnailBase64 } = req.body ?? {};
+  if (typeof pptxBase64 !== "string" || typeof thumbnailBase64 !== "string") {
+    return res.status(400).json({ error: "Missing content." });
+  }
+
+  const existing = await getCatalogItem(id);
+  if (!existing) return res.status(404).json({ error: "Item not found." });
+
+  const sourceFile = `admin-added/item-${id}.pptx`;
+  const thumbnailPath = `item-${id}.png`;
+  await fs.promises.writeFile(path.join(ADMIN_ADDED_DIR, `item-${id}.pptx`), Buffer.from(pptxBase64, "base64"));
+  await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), Buffer.from(thumbnailBase64, "base64"));
+
+  const updated = await updateCatalogItemContent({ id, sourceFile, thumbnailPath });
+  if (!updated) return res.status(404).json({ error: "Item not found." });
+
+  // Cleans up whatever this item pointed at before — a Python-pipeline
+  // category-prefixed file, a previous admin-added file, or (for a
+  // 'reconstruct' item being migrated) nothing at all for source_file.
+  if (existing.source_file && existing.source_file !== sourceFile) {
+    await fs.promises.unlink(resolveCatalogFilePath(existing.source_file)).catch(() => {});
+  }
+  if (existing.thumbnail_path && existing.thumbnail_path !== thumbnailPath) {
+    await fs.promises.unlink(path.join(THUMBNAILS_DIR, existing.thumbnail_path)).catch(() => {});
+  }
+
+  res.json({ ok: true });
+});
+
+// Admin-only, JSON, called from the task pane — see addSelectedSlideToLibrary
+// in taskpane.ts. Creates a brand-new item from whatever slide the admin
+// currently has selected. Filenames are keyed by a fresh UUID rather than
+// the not-yet-known row id, since the row can't be inserted until
+// source_file already has a value (catalog_items' own CHECK constraint
+// requires a 'file'-mode row to have one). Lands with a placeholder title
+// and category — the admin finishes naming/categorizing it in /admin,
+// which the task pane opens immediately after this succeeds.
+app.post("/api/admin/catalog", requireAdmin, async (req, res) => {
+  const { pptxBase64, thumbnailBase64 } = req.body ?? {};
+  if (typeof pptxBase64 !== "string" || typeof thumbnailBase64 !== "string") {
+    return res.status(400).json({ error: "Missing content." });
+  }
+
+  const category = CATALOG_CATEGORIES[0];
+  const fileId = crypto.randomUUID();
+  const sourceFile = `admin-added/${fileId}.pptx`;
+  const thumbnailPath = `${fileId}.png`;
+  await fs.promises.writeFile(path.join(ADMIN_ADDED_DIR, `${fileId}.pptx`), Buffer.from(pptxBase64, "base64"));
+  await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), Buffer.from(thumbnailBase64, "base64"));
+
+  const created = await insertCatalogItem({
+    category,
+    title: "Untitled item",
+    insertMode: "file",
+    sourceFile,
+    thumbnailPath,
+    sortOrder: 0,
+  });
+
+  res.json({ id: created.id, category });
 });
 
 function requireAdmin(req, res, next) {

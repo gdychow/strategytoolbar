@@ -36,6 +36,9 @@ const CATEGORIES: { value: string; label: string }[] = [
 const cache = new Map<string, CatalogResponse>();
 let activeCategory = CATEGORIES[0].value;
 let selectedItem: CatalogItem | null = null;
+// Admin-only Edit affordance (Task Pane Phase 12) — never assumed, fetched
+// once on load exactly like the task pane's own admin check.
+let isAdmin = false;
 
 function statusEl(): HTMLElement | null {
   return document.getElementById("status");
@@ -69,6 +72,7 @@ function showPreview(item: CatalogItem): void {
   const panel = document.getElementById("previewPanel");
   const img = document.getElementById("previewImg") as HTMLImageElement | null;
   const title = document.getElementById("previewTitle");
+  const editBtn = document.getElementById("btnEdit");
   if (!panel || !img || !title) return;
   const existingGlyph = panel.querySelector(".preview-glyph");
   if (existingGlyph) existingGlyph.remove();
@@ -86,16 +90,25 @@ function showPreview(item: CatalogItem): void {
   }
   title.textContent = item.title;
   panel.style.display = "flex";
+  // No "graphic" to edit for a bare character — the button just doesn't
+  // offer it, rather than opening edit mode on something with nothing to
+  // export (see Task Pane Phase 12).
+  if (editBtn) (editBtn as HTMLElement).style.display = isAdmin && item.insertMode !== "unicode-char" ? "" : "none";
 }
 
 /**
  * The dialog's only way to communicate outward — see the module comment.
- * Sends the full item, not just its id, so the task pane can call
- * Library.insertCatalogItem directly with no separate lookup/refetch —
- * it inserts exactly what the user saw and clicked here.
+ * { action, item } instead of a bare item (Task Pane Phase 12) so the task
+ * pane's DialogMessageReceived handler can tell an ordinary insert apart
+ * from an admin-only edit request. Sends the full item either way, not
+ * just its id, so the task pane never needs a separate lookup/refetch.
  */
 function insertItem(item: CatalogItem): void {
-  Office.context.ui.messageParent(JSON.stringify(item));
+  Office.context.ui.messageParent(JSON.stringify({ action: "insert", item }));
+}
+
+function editItem(item: CatalogItem): void {
+  Office.context.ui.messageParent(JSON.stringify({ action: "edit", item }));
 }
 
 function selectItem(item: CatalogItem): void {
@@ -240,4 +253,19 @@ Office.onReady(() => {
   document.getElementById("btnInsert")?.addEventListener("click", () => {
     if (selectedItem) insertItem(selectedItem);
   });
+  document.getElementById("btnEdit")?.addEventListener("click", () => {
+    if (selectedItem) editItem(selectedItem);
+  });
+
+  // Same-origin, session-cookie-authenticated fetch — confirmed working
+  // from this dialog already (see the module comment). A failed/timed-out
+  // check just means "not admin", same fail-safe default the task pane's
+  // own admin check uses.
+  fetch("/api/auth/me")
+    .then((res) => (res.ok ? res.json() : null))
+    .then((user) => {
+      isAdmin = !!user?.isAdmin;
+      if (selectedItem) showPreview(selectedItem);
+    })
+    .catch(() => {});
 });

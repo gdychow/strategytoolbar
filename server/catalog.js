@@ -11,6 +11,13 @@ const CATALOG_DIR = path.resolve(process.env.CATALOG_DIR || path.join(__dirname,
 const THUMBNAILS_DIR = path.join(CATALOG_DIR, "thumbnails");
 fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
 
+// Task Pane Phase 12: source files for items edited or added directly from
+// the task pane (via Slide.exportAsBase64) — flat and separate from the
+// Python pipeline's category-prefixed paths (e.g. "text/text-001.pptx"),
+// mirroring how THUMBNAILS_DIR above already sidesteps that same coupling.
+const ADMIN_ADDED_DIR = path.join(CATALOG_DIR, "admin-added");
+fs.mkdirSync(ADMIN_ADDED_DIR, { recursive: true });
+
 // Hand-kept in sync with db/init.sql's catalog_items.category CHECK
 // constraint — validated here before any DB write, so a bad value gets a
 // clean 400 instead of a raw constraint-violation error page.
@@ -31,4 +38,4 @@ function resolveCatalogFilePath(sourceFile) {
   return resolved;
 }
 
-module.exports = { CATALOG_DIR, THUMBNAILS_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath };
+module.exports = { CATALOG_DIR, THUMBNAILS_DIR, ADMIN_ADDED_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath };

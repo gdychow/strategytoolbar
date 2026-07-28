@@ -219,7 +219,7 @@ function applyParagraphs(shape: PowerPoint.Shape, paragraphs: ParagraphSpec[]): 
   }
 }
 
-function buildShape(slide: PowerPoint.Slide, spec: ShapeSpec): PowerPoint.Shape {
+export function buildShape(slide: PowerPoint.Slide, spec: ShapeSpec): PowerPoint.Shape {
   const options: PowerPoint.ShapeAddOptions = {
     left: spec.left,
     top: spec.top,
@@ -273,6 +273,98 @@ export async function insertReconstructedItem(spec: ReconstructSpec): Promise<vo
     }
 
     await context.sync();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin-only: edit an existing item's graphic natively in PowerPoint, or add
+// a new one from the current slide (Task Pane Phase 12). Two Office.js
+// primitives make this possible with no server-side rendering
+// infrastructure at all — both confirmed directly against @types/office-js,
+// both gated at PowerPointApi 1.8 (already an implicit baseline elsewhere in
+// this app, e.g. insertReconstructedItem's addGroup call above):
+//   - Slide.exportAsBase64() — the slide as its own base64-encoded .pptx.
+//   - Slide.getImageAsBase64({ width, height }) — a PNG rendered by
+//     PowerPoint itself, exactly as faithful as the qlmanage-generated
+//     thumbnails already in use, with nothing new to install anywhere.
+// ---------------------------------------------------------------------------
+
+/** Slide.exportAsBase64/getImageAsBase64 are both PowerPointApi 1.8. */
+export function isAdminLibraryEditSupported(): boolean {
+  return Office.context.requirements.isSetSupported("PowerPointApi", "1.8");
+}
+
+/**
+ * The 'reconstruct'-mode equivalent of insertFileItem: builds the item onto
+ * a fresh temporary slide (not the current one) so an admin can edit it
+ * natively without disturbing whatever they're actually working on, and
+ * returns the same FileInsertHandle shape so the caller can treat both
+ * insert modes identically from here on (export the result, then
+ * finishFileInsert to clean up).
+ */
+export async function insertReconstructedItemOnTempSlide(spec: ReconstructSpec): Promise<FileInsertHandle> {
+  return PowerPoint.run(async (context) => {
+    const originalSlide = await getTargetSlide(context);
+    originalSlide.load("id");
+    await context.sync();
+    const originalSlideId = originalSlide.id;
+
+    context.presentation.slides.add(); // PowerPointApi 1.3 — appends at the end
+    await context.sync();
+    const slides = context.presentation.slides;
+    slides.load("items/id");
+    await context.sync();
+    const tempSlide = slides.items[slides.items.length - 1];
+
+    if (spec.kind === "group") {
+      const children = spec.shapes.map((shapeSpec) => buildShape(tempSlide, shapeSpec));
+      await context.sync();
+      if (children.length > 1) {
+        tempSlide.shapes.addGroup(children);
+      }
+    } else {
+      buildShape(tempSlide, spec);
+    }
+    await context.sync();
+
+    tempSlide.shapes.load("items/id");
+    await context.sync();
+    tempSlide.setSelectedShapes(tempSlide.shapes.items.map((s) => s.id));
+    context.presentation.setSelectedSlides([tempSlide.id]);
+    await context.sync();
+
+    return { tempSlideId: tempSlide.id, originalSlideId };
+  });
+}
+
+export interface AdminExport {
+  pptxBase64: string;
+  thumbnailBase64: string;
+}
+
+/** Captures a specific slide (by ID) for saving back to the library — used once an admin has finished editing it. */
+export async function exportSlideForAdmin(slideId: string): Promise<AdminExport> {
+  return PowerPoint.run(async (context) => {
+    const slide = context.presentation.slides.getItem(slideId);
+    const pptxResult = slide.exportAsBase64();
+    // 320x180 matches the existing thumbnail convention (Phase 4's
+    // qlmanage-generated thumbnails are 320x180 — every library item is a
+    // 16:9 slide, so specifying both dimensions here is redundant with
+    // just specifying one, but explicit is cheap).
+    const imgResult = slide.getImageAsBase64({ width: 320, height: 180 });
+    await context.sync();
+    return { pptxBase64: pptxResult.value, thumbnailBase64: imgResult.value };
+  });
+}
+
+/** Captures whatever slide is currently selected (or the last slide, via the same fallback insertFileItem/insertReconstructedItem already use) — used to add a brand-new item. */
+export async function exportCurrentSlideForAdmin(): Promise<AdminExport> {
+  return PowerPoint.run(async (context) => {
+    const slide = await getTargetSlide(context);
+    const pptxResult = slide.exportAsBase64();
+    const imgResult = slide.getImageAsBase64({ width: 320, height: 180 });
+    await context.sync();
+    return { pptxBase64: pptxResult.value, thumbnailBase64: imgResult.value };
   });
 }
 

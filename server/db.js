@@ -312,6 +312,26 @@ async function updateCatalogItemThumbnail({ id, thumbnailPath }) {
   return result.rows[0] ?? null;
 }
 
+/**
+ * Points source_file/thumbnail_path at freshly admin-exported content
+ * (Task Pane Phase 12 — see POST /api/admin/catalog/:id/content) and
+ * forces insert_mode = 'file' with reconstruct_spec cleared, which is
+ * what actually migrates a 'reconstruct'-mode item to 'file'-mode the
+ * first time it's edited this way. Kept separate from updateCatalogItem
+ * (title/category/group) and updateCatalogItemThumbnail (thumbnail only)
+ * — neither of those covers replacing the underlying content itself.
+ */
+async function updateCatalogItemContent({ id, sourceFile, thumbnailPath }) {
+  const result = await pool.query(
+    `UPDATE catalog_items
+     SET source_file = $2, thumbnail_path = $3, insert_mode = 'file', reconstruct_spec = NULL
+     WHERE id = $1 AND owner_oid IS NULL
+     RETURNING id, category`,
+    [id, sourceFile, thumbnailPath]
+  );
+  return result.rows[0] ?? null;
+}
+
 /** Deletes one shared catalog item. RETURNING id lets the caller distinguish "deleted" from "already gone" (404 vs. success) instead of silently no-op'ing. */
 async function deleteCatalogItem(id) {
   const result = await pool.query(
@@ -332,6 +352,7 @@ module.exports = {
   updateCatalogItem,
   reorderCatalogItems,
   updateCatalogItemThumbnail,
+  updateCatalogItemContent,
   deleteCatalogItem,
   listGroupsForCategory,
   getGroup,

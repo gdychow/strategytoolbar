@@ -381,6 +381,104 @@ function refreshLibrarySection(user: SessionUser | null): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Admin-only: edit an existing library item's graphic natively in
+// PowerPoint, or add a new one from the current slide (Task Pane Phase 12).
+// Mirrors the existing file-mode insert/Finish state machine above —
+// currentFileInsertHandle/showLibraryFinishRow for end users,
+// currentAdminEdit/updateAdminLibraryUI for this admin-only variant — since
+// both are the same underlying "temp slide, do something, clean up" shape.
+// ---------------------------------------------------------------------------
+
+let currentAdminEdit: { itemId: number; title: string; handle: Library.FileInsertHandle } | null = null;
+
+function updateAdminLibraryUI(): void {
+  const addRow = document.getElementById("adminAddRow");
+  const editRow = document.getElementById("adminEditRow");
+  if (addRow) (addRow as HTMLElement).style.display = currentAdminEdit ? "none" : "";
+  if (editRow) (editRow as HTMLElement).style.display = currentAdminEdit ? "block" : "none";
+}
+
+/** Shows/hides the whole admin-only section — same on/off signal as updateAuthButtons' Open Admin button, plus the exportAsBase64/getImageAsBase64 requirement-set check (PowerPointApi 1.8) those two actions actually need. */
+function refreshAdminLibrarySection(user: SessionUser | null): void {
+  const visible = !!user?.isAdmin && Library.isAdminLibraryEditSupported();
+  const section = document.getElementById("sectionAdminLibrary");
+  if (section) (section as HTMLElement).style.display = visible ? "" : "none";
+  if (!visible) {
+    currentAdminEdit = null;
+    updateAdminLibraryUI();
+  }
+}
+
+async function beginAdminEdit(item: Library.CatalogItem): Promise<void> {
+  if (currentAdminEdit) {
+    notify("Finish or cancel the current edit first.", "error");
+    return;
+  }
+  if (item.insertMode === "unicode-char") {
+    notify("Character items have no graphic to edit.", "error");
+    return;
+  }
+  const handle =
+    item.insertMode === "file"
+      ? await Library.insertFileItem(item.id)
+      : await Library.insertReconstructedItemOnTempSlide(item.reconstructSpec!);
+  currentAdminEdit = { itemId: item.id, title: item.title, handle };
+  const status = document.getElementById("adminEditStatus");
+  if (status) status.textContent = `Editing "${item.title}" — make your changes, then Save.`;
+  updateAdminLibraryUI();
+  notify(`Editing "${item.title}" on a temporary slide.`);
+}
+
+async function saveAdminEdit(): Promise<void> {
+  if (!currentAdminEdit) return;
+  const { itemId, title, handle } = currentAdminEdit;
+  const { pptxBase64, thumbnailBase64 } = await Library.exportSlideForAdmin(handle.tempSlideId);
+  const res = await fetchWithTimeout(`/api/admin/catalog/${itemId}/content`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pptxBase64, thumbnailBase64 }),
+  });
+  if (!res.ok) {
+    notify(`Couldn't save "${title}" to the library (${res.status}).`, "error");
+    return;
+  }
+  await Library.finishFileInsert(handle);
+  currentAdminEdit = null;
+  updateAdminLibraryUI();
+  notify(`Saved "${title}" to the library.`);
+}
+
+async function cancelAdminEdit(): Promise<void> {
+  if (!currentAdminEdit) return;
+  await Library.finishFileInsert(currentAdminEdit.handle);
+  currentAdminEdit = null;
+  updateAdminLibraryUI();
+}
+
+async function addSelectedSlideToLibrary(): Promise<void> {
+  if (
+    !confirm(
+      "This will add the current slide as a new library item — make sure it only has the content you want to add."
+    )
+  ) {
+    return;
+  }
+  const { pptxBase64, thumbnailBase64 } = await Library.exportCurrentSlideForAdmin();
+  const res = await fetchWithTimeout("/api/admin/catalog", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pptxBase64, thumbnailBase64 }),
+  });
+  if (!res.ok) {
+    notify(`Couldn't add to the library (${res.status}).`, "error");
+    return;
+  }
+  const { category } = await res.json();
+  window.open(`/admin?category=${category}`, "_blank");
+  notify("Added to the library — finish naming it in the Admin tab that just opened.");
+}
+
 /**
  * fetch() with a hard timeout. Without this, a hung request (this task
  * pane's first-ever same-origin fetch to its own backend, from inside the
@@ -442,11 +540,12 @@ function updateAuthButtons(user: SessionUser | null): void {
   if (openAdmin) openAdmin.style.display = user?.isAdmin ? "" : "none";
 }
 
-/** Applies a change in sign-in state everywhere it matters — the status line, the auth buttons, and the Content Library gate. */
+/** Applies a change in sign-in state everywhere it matters — the status line, the auth buttons, and the Content Library gates. */
 function applySessionState(user: SessionUser | null): void {
   updateSignInStatus(user);
   updateAuthButtons(user);
   refreshLibrarySection(user);
+  refreshAdminLibrarySection(user);
 }
 
 const SECTION_ORDER_STORAGE_KEY = "sectionOrder";
@@ -582,14 +681,19 @@ Office.onReady((info) => {
         dialog.addEventHandler(Office.EventType.DialogMessageReceived, (args) => {
           if (!("message" in args)) return; // the other possible event is DialogEventReceived (closed/unloaded) — nothing to do here
           dialog.close();
-          let item: Library.CatalogItem;
+          let payload: { action?: string; item: Library.CatalogItem };
           try {
-            item = JSON.parse(args.message);
+            const parsed = JSON.parse(args.message);
+            // { action, item } as of Task Pane Phase 12 — tolerate a bare
+            // item too (the old shape), defaulting to "insert", in case
+            // anything still sends that.
+            payload = "item" in parsed ? parsed : { action: "insert", item: parsed };
           } catch (err) {
             notify(`Couldn't read the selected item: ${err instanceof Error ? err.message : String(err)}`, "error");
             return;
           }
-          insertPickedItem(item).catch((err) =>
+          const action = payload.action === "edit" ? beginAdminEdit : insertPickedItem;
+          action(payload.item).catch((err) =>
             notify(`Error: ${err instanceof Error ? err.message : String(err)}`, "error")
           );
         });
@@ -604,6 +708,11 @@ Office.onReady((info) => {
     showLibraryFinishRow(false);
     notify("Done — temporary slide removed.");
   });
+
+  bindButton("btnAdminAddToLibrary", addSelectedSlideToLibrary);
+  bindButton("btnAdminSaveEdit", saveAdminEdit);
+  bindButton("btnAdminCancelEdit", cancelAdminEdit);
+
   applySessionState(null); // starting state — the background check below updates this once it resolves, however long that takes
 
   // Default swatch colour comes from config/theme.json, not hardcoded in the HTML.
