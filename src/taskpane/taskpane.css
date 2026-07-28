@@ -1,14 +1,56 @@
+:root {
+  --bg: #ffffff;
+  --bg-alt: #fafafa;
+  --bg-hover: #f0f0f0;
+  --bg-subtle: #eef1f5;
+  --text: #222;
+  --text-muted: #666;
+  --text-faint: #999;
+  --heading: #444;
+  --border: #c8c8c8;
+  --border-light: #ddd;
+  --accent: #1a5fb4;
+  --panel-bg: #fff;
+  --panel-shadow: rgba(0, 0, 0, 0.18);
+  --error-bg: #fdeaea;
+  --error-text: #a12525;
+  --success-text: #1a7a3c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1e;
+    --bg-alt: #2b2b2b;
+    --bg-hover: #383838;
+    --bg-subtle: #26313c;
+    --text: #e8e8e8;
+    --text-muted: #aaa;
+    --text-faint: #888;
+    --heading: #ccc;
+    --border: #555;
+    --border-light: #3a3a3a;
+    --accent: #4c8fd6;
+    --panel-bg: #2b2b2b;
+    --panel-shadow: rgba(0, 0, 0, 0.5);
+    --error-bg: #4a2222;
+    --error-text: #ff8f8f;
+    --success-text: #4ade80;
+  }
+}
+
 body {
   font-family: -apple-system, "Segoe UI", sans-serif;
   margin: 0;
   padding: 12px;
   font-size: 13px;
-  color: #222;
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: light dark;
 }
 
 .build-info {
   font-size: 10px;
-  color: #999;
+  color: var(--text-faint);
   text-align: right;
   margin-bottom: 4px;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
@@ -19,8 +61,8 @@ h2 {
   margin: 16px 0 6px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #444;
-  border-bottom: 1px solid #ddd;
+  color: var(--heading);
+  border-bottom: 1px solid var(--border-light);
   padding-bottom: 4px;
 }
 
@@ -37,7 +79,7 @@ section:first-of-type h2 {
 .drag-handle {
   cursor: grab;
   margin-right: 6px;
-  color: #999;
+  color: var(--text-faint);
   user-select: none;
 }
 
@@ -91,9 +133,10 @@ section.dragging {
 .color-row input[type="number"] {
   padding: 4px 6px;
   font-size: 12px;
-  border: 1px solid #c8c8c8;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: #fafafa;
+  background: var(--bg-alt);
+  color: var(--text);
   flex: 1 1 auto;
 }
 
@@ -101,7 +144,7 @@ section.dragging {
   width: 36px;
   height: 26px;
   padding: 0;
-  border: 1px solid #c8c8c8;
+  border: 1px solid var(--border);
   border-right: none;
   border-radius: 4px 0 0 4px;
   cursor: pointer;
@@ -112,7 +155,7 @@ section.dragging {
   width: 24px;
   height: 26px;
   padding: 0;
-  border: 1px solid #c8c8c8;
+  border: 1px solid var(--border);
   border-radius: 0 4px 4px 0;
   cursor: pointer;
   flex: 0 0 auto;
@@ -121,7 +164,8 @@ section.dragging {
   justify-content: center;
   font-size: 14px;
   line-height: 1;
-  background: #fafafa;
+  background: var(--bg-alt);
+  color: var(--text);
 }
 
 /*
@@ -152,13 +196,14 @@ button {
   padding: 6px 8px;
   font-size: 12px;
   cursor: pointer;
-  border: 1px solid #c8c8c8;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: #fafafa;
+  background: var(--bg-alt);
+  color: var(--text);
 }
 
 button:hover:not(:disabled) {
-  background: #f0f0f0;
+  background: var(--bg-hover);
 }
 
 button:disabled {
@@ -193,11 +238,12 @@ button:disabled {
   position: fixed;
   z-index: 1000;
   width: 258px;
-  background: #fff;
-  border: 1px solid #c8c8c8;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 10px var(--panel-shadow);
   padding: 8px;
+  color: var(--text);
 }
 
 /* First item in the panel, matching PowerPoint's own Fill/Line dropdown — shown/labeled per control kind by openColorPickerPanel in taskpane.ts. */
@@ -212,7 +258,7 @@ button:disabled {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  color: #888;
+  color: var(--text-faint);
   margin-bottom: 4px;
 }
 
@@ -241,7 +287,7 @@ button:disabled {
   width: 20px;
   height: 20px;
   padding: 0;
-  border: 1px solid #c8c8c8;
+  border: 1px solid var(--border);
   border-radius: 3px;
   cursor: pointer;
   flex: none;
@@ -250,7 +296,7 @@ button:disabled {
 .color-picker-more {
   width: 100%;
   font-size: 11px;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .status {
@@ -258,34 +304,34 @@ button:disabled {
   padding: 6px 8px;
   margin-bottom: 8px;
   border-radius: 4px;
-  background: #eef1f5;
-  color: #333;
+  background: var(--bg-subtle);
+  color: var(--text);
 }
 
 .status-error {
-  background: #fdeaea;
-  color: #a12525;
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 .unsupported-note {
   display: none;
   font-size: 11px;
-  color: #a12525;
+  color: var(--error-text);
   margin: 0 0 6px;
 }
 
 .sign-in-status {
   font-size: 11px;
-  color: #555;
+  color: var(--text-muted);
   margin: 0 0 6px;
 }
 
 .sign-in-status.signed-in {
-  color: #1a7a3c;
+  color: var(--success-text);
 }
 
 .library-finish-row {
-  background: #eef1f5;
+  background: var(--bg-subtle);
   border-radius: 4px;
   padding: 8px;
 }

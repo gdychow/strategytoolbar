@@ -1,9 +1,49 @@
+:root {
+  --bg: #ffffff;
+  --bg-alt: #fafafa;
+  --bg-hover: #f0f0f0;
+  --bg-item-hover: #f5f5f5;
+  --text: #1a1a1a;
+  --text-muted: #666;
+  --heading: #444;
+  --border: #c8c8c8;
+  --border-light: #ddd;
+  --border-lighter: #eee;
+  --accent: #1a5fb4;
+  --accent-hover: #154a8f;
+  --accent-bg: #eaf1fb;
+  --placeholder-bg: #f0f0f0;
+  --swatch-bg: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1e;
+    --bg-alt: #2b2b2b;
+    --bg-hover: #383838;
+    --bg-item-hover: #333;
+    --text: #e8e8e8;
+    --text-muted: #aaa;
+    --heading: #ccc;
+    --border: #555;
+    --border-light: #3a3a3a;
+    --border-lighter: #333;
+    --accent: #4c8fd6;
+    --accent-hover: #6fabe6;
+    --accent-bg: #1c3350;
+    --placeholder-bg: #2b2b2b;
+    --swatch-bg: #2b2b2b;
+  }
+}
+
 body {
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
-  color: #1a1a1a;
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: light dark;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -14,34 +54,35 @@ body {
   display: flex;
   gap: 4px;
   padding: 10px 12px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-light);
   flex: 0 0 auto;
   overflow-x: auto;
 }
 
 .gallery-tab {
   padding: 6px 14px;
-  border: 1px solid #c8c8c8;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: #fafafa;
+  background: var(--bg-alt);
+  color: var(--text);
   cursor: pointer;
   font-size: 12px;
   white-space: nowrap;
 }
 
 .gallery-tab:hover {
-  background: #f0f0f0;
+  background: var(--bg-hover);
 }
 
 .gallery-tab.active {
-  background: #1a5fb4;
+  background: var(--accent);
   color: #fff;
-  border-color: #1a5fb4;
+  border-color: var(--accent);
 }
 
 .gallery-search-row {
   padding: 10px 12px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-lighter);
   flex: 0 0 auto;
 }
 
@@ -49,15 +90,17 @@ body {
   width: 100%;
   padding: 7px 10px;
   font-size: 13px;
-  border: 1px solid #c8c8c8;
+  border: 1px solid var(--border);
   border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
   box-sizing: border-box;
 }
 
 .gallery-status {
   padding: 6px 12px;
   font-size: 12px;
-  color: #666;
+  color: var(--text-muted);
   flex: 0 0 auto;
 }
 
@@ -77,7 +120,7 @@ body {
   margin: 18px 0 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #444;
+  color: var(--heading);
 }
 
 .gallery-group-heading:first-child {
@@ -98,6 +141,7 @@ body {
   padding: 8px;
   font-size: 11px;
   text-align: center;
+  color: var(--text);
   border: 1px solid transparent;
   border-radius: 6px;
   background: none;
@@ -105,28 +149,28 @@ body {
 }
 
 .gallery-item:hover {
-  background: #f5f5f5;
+  background: var(--bg-item-hover);
 }
 
 .gallery-item.selected {
-  border-color: #1a5fb4;
-  background: #eaf1fb;
+  border-color: var(--accent);
+  background: var(--accent-bg);
 }
 
 .gallery-item img {
   width: 100%;
   max-height: 120px;
   object-fit: contain;
-  background: #fff;
-  border: 1px solid #c8c8c8;
+  background: var(--swatch-bg);
+  border: 1px solid var(--border);
   border-radius: 4px;
 }
 
 .gallery-item-placeholder {
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #f0f0f0;
-  border: 1px solid #c8c8c8;
+  background: var(--placeholder-bg);
+  border: 1px solid var(--border);
   border-radius: 4px;
 }
 
@@ -137,20 +181,21 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 36px;
-  background: #fff;
-  border: 1px solid #c8c8c8;
+  background: var(--swatch-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 4px;
 }
 
 .gallery-empty {
-  color: #666;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .preview-panel {
   width: 220px;
   flex: 0 0 auto;
-  border-left: 1px solid #ddd;
+  border-left: 1px solid var(--border-light);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -173,18 +218,19 @@ body {
   margin: 0;
   font-size: 14px;
   text-align: center;
+  color: var(--text);
 }
 
 .preview-panel button {
   padding: 8px 20px;
   font-size: 13px;
   cursor: pointer;
-  border: 1px solid #1a5fb4;
-  background: #1a5fb4;
+  border: 1px solid var(--accent);
+  background: var(--accent);
   color: #fff;
   border-radius: 4px;
 }
 
 .preview-panel button:hover {
-  background: #154a8f;
+  background: var(--accent-hover);
 }
