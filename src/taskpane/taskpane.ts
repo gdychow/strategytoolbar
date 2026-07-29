@@ -689,15 +689,16 @@ async function getSessionUser(): Promise<SessionUser | null> {
 
 function updateSignInStatus(user: SessionUser | null): void {
   const el = document.getElementById("signInStatus");
-  if (!el) return;
+  const textEl = el?.querySelector(".sign-in-status-text");
+  if (!el || !textEl) return;
   if (user && !user.isRegistered) {
-    el.textContent = `Signed in as ${user.email ?? user.displayName ?? "unknown user"} — finish creating your account.`;
+    textEl.textContent = `Signed in as ${user.email ?? user.displayName ?? "unknown user"} — finish creating your account.`;
     el.classList.remove("signed-in");
   } else if (user) {
-    el.textContent = `Signed in as ${user.email ?? user.displayName ?? "unknown user"}${user.isAdmin ? " (admin)" : ""}.`;
+    textEl.textContent = `Signed in as ${user.email ?? user.displayName ?? "unknown user"}${user.isAdmin ? " (admin)" : ""}.`;
     el.classList.add("signed-in");
   } else {
-    el.textContent = "Not signed in.";
+    textEl.textContent = "Not signed in.";
     el.classList.remove("signed-in");
   }
 }

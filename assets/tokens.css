@@ -1,0 +1,53 @@
+/* Deckcelerate design tokens — adapted from the design handoff's css/tokens.css.
+   That file gated dark values via [data-theme="dark"]; this app has no manual
+   theme toggle and relies purely on the OS's prefers-color-scheme, so dark
+   values are moved into a media query instead. --dc-accent-700 was in the
+   original handoff README but dropped from tokens.css in favor of
+   --dc-accent-tint; kept here since it's the correct light-mode "accent text
+   on a light fill" color (accent-tint is a light pink meant for that same
+   role on a *dark* fill instead — see --error-text's mapping in each
+   stylesheet's own :root block). */
+
+:root {
+  --dc-bg: #f3f2f2;
+  --dc-surface: #eae9e9;
+  --dc-text: #201e1d;
+  --dc-divider: color-mix(in srgb, #201e1d 40%, transparent);
+  --dc-neutral-100: #f8f4f4;
+  --dc-neutral-200: #eae7e7;
+  --dc-neutral-300: #d7d3d3;
+  --dc-neutral-400: #bab6b6;
+  --dc-neutral-500: #9b9797;
+  --dc-neutral-600: #7d7979;
+  --dc-neutral-700: #605d5d;
+  --dc-neutral-800: #444141;
+  --dc-neutral-900: #2d2b2b;
+  --dc-accent: #ec3013;
+  --dc-accent-700: #ae1800;
+  --dc-accent-tint: #ffc4b8;
+  --dc-shadow: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+  /* Not theme-driven: the fill/line/text swatch preview and both logo marks
+     stay fixed ink/accent regardless of app theme. */
+  --dc-swatch-fixed: #201e1d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dc-bg: #2b2929;
+    --dc-surface: #3a3737;
+    --dc-text: #f3f2f2;
+    --dc-divider: color-mix(in srgb, #f3f2f2 30%, transparent);
+    --dc-neutral-100: #2b2929;
+    --dc-neutral-200: #3a3737;
+    --dc-neutral-300: #4c4949;
+    --dc-neutral-400: #605d5d;
+    --dc-neutral-500: #7d7979;
+    --dc-neutral-600: #9b9797;
+    --dc-neutral-700: #bab6b6;
+    --dc-neutral-800: #d7d3d3;
+    --dc-neutral-900: #f8f4f4;
+    --dc-accent: #ff563c;
+    --dc-shadow: 0 12px 32px color-mix(in srgb, #000000 45%, transparent);
+    --dc-swatch-fixed: #201e1d;
+  }
+}

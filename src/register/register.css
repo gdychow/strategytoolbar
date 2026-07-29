@@ -1,33 +1,31 @@
+/*
+ * Deckcelerate visual rebrand — local variable names point at the shared
+ * --dc-* primitives in /assets/tokens.css (light in :root, dark media-gated
+ * there); only the values moved, every selector below is unchanged.
+ */
 :root {
-  --bg: #ffffff;
-  --bg-alt: #fafafa;
-  --text: #1a1a1a;
-  --text-muted: #666;
-  --border: #c8c8c8;
-  --accent: #1a5fb4;
-  --accent-hover: #154a8f;
-  --error-bg: #fdeaea;
-  --error-text: #a12525;
+  --bg: var(--dc-bg);
+  --bg-alt: var(--dc-surface);
+  --text: var(--dc-text);
+  --text-muted: var(--dc-neutral-700);
+  --border: var(--dc-neutral-300);
+  --accent: var(--dc-accent);
+  --accent-hover: color-mix(in srgb, var(--dc-accent) 85%, black);
+  --error-bg: color-mix(in srgb, var(--dc-accent) 10%, var(--dc-bg));
+  --error-text: var(--dc-accent-700);
+  --font-family: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1e1e1e;
-    --bg-alt: #2b2b2b;
-    --text: #e8e8e8;
-    --text-muted: #aaa;
-    --border: #555;
-    --accent: #4c8fd6;
-    --accent-hover: #6fabe6;
-    --error-bg: #4a2222;
-    --error-text: #ff8f8f;
+    --error-text: var(--dc-accent-tint);
   }
 }
 
 body {
   margin: 0;
   padding: 20px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-family);
   font-size: 13px;
   color: var(--text);
   background: var(--bg);
@@ -37,6 +35,7 @@ body {
 h2 {
   margin: 0 0 12px;
   font-size: 16px;
+  font-weight: 700;
 }
 
 #status {
@@ -62,14 +61,14 @@ input[type="text"] {
   padding: 7px 10px;
   font-size: 13px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--bg);
   color: var(--text);
 }
 
 fieldset {
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 0;
   padding: 8px 10px;
 }
 
@@ -100,7 +99,7 @@ label.checkbox {
   color: var(--error-text);
   background: var(--error-bg);
   padding: 6px 8px;
-  border-radius: 4px;
+  border-radius: 0;
   margin-bottom: 12px;
 }
 
@@ -112,7 +111,7 @@ button {
   border: 1px solid var(--accent);
   background: var(--accent);
   color: #fff;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 button:hover {

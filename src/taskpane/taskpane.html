@@ -2,25 +2,35 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Strategy Toolbar</title>
+  <title>Deckcelerate</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/tokens.css?v=__CACHE_BUST__" />
   <link rel="stylesheet" href="/taskpane.css?v=__CACHE_BUST__" />
 </head>
 <body>
+  <div class="dc-header">
+    <img class="dc-mark dc-mark-light" src="/assets/logo/mark-on-light.svg" alt="" width="30" height="30" />
+    <img class="dc-mark dc-mark-dark" src="/assets/logo/mark-on-dark.svg" alt="" width="30" height="30" />
+    <div class="dc-wordmark">Deck<span class="dc-accent-text">celerate</span></div>
+  </div>
+
   <section id="sectionAuth">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Sign In</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
       <button id="btnSignIn">Sign In</button>
     </div>
-    <pre id="authClaims" style="font-size: 11px; background: #f5f5f5; padding: 6px; border-radius: 4px; white-space: pre-wrap; display: none;"></pre>
+    <pre id="authClaims" style="font-size: 11px; background: #f5f5f5; padding: 6px; white-space: pre-wrap; display: none;"></pre>
   </section>
 
   <section id="sectionLibrary">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Content Library</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
-      <button id="btnBrowseLibrary">Browse Library…</button>
+      <button id="btnBrowseLibrary"><img class="btn-icon btn-icon-light" src="/assets/icons/browse-library.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/browse-library.svg" alt="" /><span class="btn-label">Browse Library…</span></button>
       <button id="btnBrowseTemplates">Template Library…</button>
     </div>
     <div id="libraryFinishRow" class="library-finish-row" style="display: none;">
@@ -35,7 +45,7 @@
   <section id="sectionMyLibrary" style="display: none;">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>My Library</h2>
     <div id="openAdminRow" class="btn-row">
-      <button id="btnOpenAdmin">Open Admin…</button>
+      <button id="btnOpenAdmin"><img class="btn-icon btn-icon-light" src="/assets/icons/open-admin.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/open-admin.svg" alt="" /><span class="btn-label">Open Admin…</span></button>
     </div>
     <p id="libraryUnsupportedNote" class="unsupported-note"></p>
     <div id="libraryAddRow" class="btn-row">
@@ -58,7 +68,7 @@
         <label for="fillColorSwatch">Fill</label>
         <span class="color-swatch-group">
           <button type="button" id="fillColorSwatch" class="color-swatch" title="Apply fill color"></button>
-          <button type="button" id="fillColorCaret" class="color-caret" aria-label="Choose fill color">▾</button>
+          <button type="button" id="fillColorCaret" class="color-caret" aria-label="Choose fill color"><img class="btn-icon btn-icon-light" src="/assets/icons/caret-down.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/caret-down.svg" alt="" /></button>
         </span>
         <input type="color" id="fillColorInput" class="color-input-hidden" tabindex="-1" />
       </div>
@@ -66,7 +76,7 @@
         <label for="lineColorSwatch">Line</label>
         <span class="color-swatch-group">
           <button type="button" id="lineColorSwatch" class="color-swatch" title="Apply line color"></button>
-          <button type="button" id="lineColorCaret" class="color-caret" aria-label="Choose line color">▾</button>
+          <button type="button" id="lineColorCaret" class="color-caret" aria-label="Choose line color"><img class="btn-icon btn-icon-light" src="/assets/icons/caret-down.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/caret-down.svg" alt="" /></button>
         </span>
         <input type="color" id="lineColorInput" class="color-input-hidden" tabindex="-1" />
       </div>
@@ -74,7 +84,7 @@
         <label for="textColorSwatch">Text</label>
         <span class="color-swatch-group">
           <button type="button" id="textColorSwatch" class="color-swatch" title="Apply text color"></button>
-          <button type="button" id="textColorCaret" class="color-caret" aria-label="Choose text color">▾</button>
+          <button type="button" id="textColorCaret" class="color-caret" aria-label="Choose text color"><img class="btn-icon btn-icon-light" src="/assets/icons/caret-down.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/caret-down.svg" alt="" /></button>
         </span>
         <input type="color" id="textColorInput" class="color-input-hidden" tabindex="-1" />
       </div>
@@ -84,36 +94,36 @@
   <section id="sectionPosition">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Position &amp; Size</h2>
     <div class="btn-row">
-      <button id="btnGetPosition"><img class="btn-icon" src="/assets/icons/LayoutGetPosition.png" alt="" /><span class="btn-label">Get Position</span></button>
-      <button id="btnSetPosition"><img class="btn-icon" src="/assets/icons/LayoutSetPosition.png" alt="" /><span class="btn-label">Set Position</span></button>
+      <button id="btnGetPosition"><img class="btn-icon btn-icon-light" src="/assets/icons/get-position.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/get-position.svg" alt="" /><span class="btn-label">Get Position</span></button>
+      <button id="btnSetPosition"><img class="btn-icon btn-icon-light" src="/assets/icons/set-position.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/set-position.svg" alt="" /><span class="btn-label">Set Position</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnGetPositionBottom"><img class="btn-icon" src="/assets/icons/GetPositionbottom.png" alt="" /><span class="btn-label">Get Position (Bottom)</span></button>
-      <button id="btnSetPositionBottom"><img class="btn-icon" src="/assets/icons/SetPositionbottom.png" alt="" /><span class="btn-label">Set Position (Bottom)</span></button>
+      <button id="btnGetPositionBottom"><img class="btn-icon btn-icon-light" src="/assets/icons/get-position-bottom.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/get-position-bottom.svg" alt="" /><span class="btn-label">Get Position (Bottom)</span></button>
+      <button id="btnSetPositionBottom"><img class="btn-icon btn-icon-light" src="/assets/icons/set-position-bottom.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/set-position-bottom.svg" alt="" /><span class="btn-label">Set Position (Bottom)</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnFixSize"><img class="btn-icon" src="/assets/icons/LayoutFixSize.png" alt="" /><span class="btn-label">Fix Size</span></button>
-      <button id="btnFixWidth"><img class="btn-icon" src="/assets/icons/LayoutFixWidth.png" alt="" /><span class="btn-label">Fix Width</span></button>
-      <button id="btnFixHeight"><img class="btn-icon" src="/assets/icons/LayoutFixHeight.png" alt="" /><span class="btn-label">Fix Height</span></button>
+      <button id="btnFixSize"><img class="btn-icon btn-icon-light" src="/assets/icons/fix-size.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/fix-size.svg" alt="" /><span class="btn-label">Fix Size</span></button>
+      <button id="btnFixWidth"><img class="btn-icon btn-icon-light" src="/assets/icons/fix-width.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/fix-width.svg" alt="" /><span class="btn-label">Fix Width</span></button>
+      <button id="btnFixHeight"><img class="btn-icon btn-icon-light" src="/assets/icons/fix-height.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/fix-height.svg" alt="" /><span class="btn-label">Fix Height</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnSwitchPositions"><img class="btn-icon" src="/assets/icons/LayoutSwitch.png" alt="" /><span class="btn-label">Switch Positions</span></button>
+      <button id="btnSwitchPositions"><img class="btn-icon btn-icon-light" src="/assets/icons/switch-positions.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/switch-positions.svg" alt="" /><span class="btn-label">Switch Positions</span></button>
     </div>
   </section>
 
   <section id="sectionAlign">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Align &amp; Distribute</h2>
     <div class="btn-row">
-      <button id="btnHvAlign"><img class="btn-icon" src="/assets/icons/LayoutHV_Align.png" alt="" /><span class="btn-label">Grid Align</span></button>
-      <button id="btnHvDistribute"><img class="btn-icon" src="/assets/icons/LayoutHV_Distribute.png" alt="" /><span class="btn-label">Grid Distribute</span></button>
+      <button id="btnHvAlign"><img class="btn-icon btn-icon-light" src="/assets/icons/grid-align.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/grid-align.svg" alt="" /><span class="btn-label">Grid Align</span></button>
+      <button id="btnHvDistribute"><img class="btn-icon btn-icon-light" src="/assets/icons/grid-distribute.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/grid-distribute.svg" alt="" /><span class="btn-label">Grid Distribute</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnDistributeH"><img class="btn-icon" src="/assets/icons/DistributeHorizontal.png" alt="" /><span class="btn-label">Distribute Horizontally</span></button>
-      <button id="btnDistributeV"><img class="btn-icon" src="/assets/icons/DistributeVertical.png" alt="" /><span class="btn-label">Distribute Vertically</span></button>
+      <button id="btnDistributeH"><img class="btn-icon btn-icon-light" src="/assets/icons/distribute-horizontal.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/distribute-horizontal.svg" alt="" /><span class="btn-label">Distribute Horizontally</span></button>
+      <button id="btnDistributeV"><img class="btn-icon btn-icon-light" src="/assets/icons/distribute-vertical.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/distribute-vertical.svg" alt="" /><span class="btn-label">Distribute Vertically</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnEdgeJoinH"><img class="btn-icon" src="/assets/icons/join_horizontal.png" alt="" /><span class="btn-label">Edge Join (Horizontal)</span></button>
-      <button id="btnEdgeJoinV"><img class="btn-icon" src="/assets/icons/join_vertical.png" alt="" /><span class="btn-label">Edge Join (Vertical)</span></button>
+      <button id="btnEdgeJoinH"><img class="btn-icon btn-icon-light" src="/assets/icons/edge-join-h.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/edge-join-h.svg" alt="" /><span class="btn-label">Edge Join (Horizontal)</span></button>
+      <button id="btnEdgeJoinV"><img class="btn-icon btn-icon-light" src="/assets/icons/edge-join-v.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/edge-join-v.svg" alt="" /><span class="btn-label">Edge Join (Vertical)</span></button>
     </div>
   </section>
 
@@ -121,16 +131,16 @@
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Group &amp; Order</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
-      <button id="btnGroupShapes">Group</button>
-      <button id="btnUngroupShapes">Ungroup</button>
+      <button id="btnGroupShapes"><img class="btn-icon btn-icon-light" src="/assets/icons/group.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/group.svg" alt="" /><span class="btn-label">Group</span></button>
+      <button id="btnUngroupShapes"><img class="btn-icon btn-icon-light" src="/assets/icons/ungroup.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/ungroup.svg" alt="" /><span class="btn-label">Ungroup</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnBringToFront">Bring to Front</button>
-      <button id="btnSendToBack">Send to Back</button>
+      <button id="btnBringToFront"><img class="btn-icon btn-icon-light" src="/assets/icons/bring-to-front.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/bring-to-front.svg" alt="" /><span class="btn-label">Bring to Front</span></button>
+      <button id="btnSendToBack"><img class="btn-icon btn-icon-light" src="/assets/icons/send-to-back.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/send-to-back.svg" alt="" /><span class="btn-label">Send to Back</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnBringForward">Bring Forward</button>
-      <button id="btnSendBackward">Send Backward</button>
+      <button id="btnBringForward"><img class="btn-icon btn-icon-light" src="/assets/icons/bring-forward.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/bring-forward.svg" alt="" /><span class="btn-label">Bring Forward</span></button>
+      <button id="btnSendBackward"><img class="btn-icon btn-icon-light" src="/assets/icons/send-backward.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/send-backward.svg" alt="" /><span class="btn-label">Send Backward</span></button>
     </div>
   </section>
 
@@ -138,17 +148,17 @@
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Centre on Slide</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
-      <button id="btnCentreH"><img class="btn-icon" src="/assets/icons/LayoutCenteronSlideHorizontal.png" alt="" /><span class="btn-label">Centre Horizontal</span></button>
-      <button id="btnCentreV"><img class="btn-icon" src="/assets/icons/LayoutCenteronSlideVertical.png" alt="" /><span class="btn-label">Centre Vertical</span></button>
-      <button id="btnCentreHV"><img class="btn-icon" src="/assets/icons/LayoutCenteronSlide.png" alt="" /><span class="btn-label">Centre Both</span></button>
+      <button id="btnCentreH"><img class="btn-icon btn-icon-light" src="/assets/icons/centre-horizontal.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/centre-horizontal.svg" alt="" /><span class="btn-label">Centre Horizontal</span></button>
+      <button id="btnCentreV"><img class="btn-icon btn-icon-light" src="/assets/icons/centre-vertical.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/centre-vertical.svg" alt="" /><span class="btn-label">Centre Vertical</span></button>
+      <button id="btnCentreHV"><img class="btn-icon btn-icon-light" src="/assets/icons/centre-both.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/centre-both.svg" alt="" /><span class="btn-label">Centre Both</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnTwoUpLeft"><img class="btn-icon" src="/assets/icons/TextTwoUpTitleLeft.png" alt="" /><span class="btn-label">Two-Up: Left</span></button>
-      <button id="btnTwoUpRight"><img class="btn-icon" src="/assets/icons/TextTwoUpTitleRight.png" alt="" /><span class="btn-label">Two-Up: Right</span></button>
+      <button id="btnTwoUpLeft"><img class="btn-icon btn-icon-light" src="/assets/icons/two-up-left.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/two-up-left.svg" alt="" /><span class="btn-label">Two-Up: Left</span></button>
+      <button id="btnTwoUpRight"><img class="btn-icon btn-icon-light" src="/assets/icons/two-up-right.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/two-up-right.svg" alt="" /><span class="btn-label">Two-Up: Right</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnHalfSlideLeft"><img class="btn-icon" src="/assets/icons/AlignCentreLeft.png" alt="" /><span class="btn-label">Half-Slide: Left</span></button>
-      <button id="btnHalfSlideRight"><img class="btn-icon" src="/assets/icons/AlignCentreRight.png" alt="" /><span class="btn-label">Half-Slide: Right</span></button>
+      <button id="btnHalfSlideLeft"><img class="btn-icon btn-icon-light" src="/assets/icons/half-slide-left.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/half-slide-left.svg" alt="" /><span class="btn-label">Half-Slide: Left</span></button>
+      <button id="btnHalfSlideRight"><img class="btn-icon btn-icon-light" src="/assets/icons/half-slide-right.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/half-slide-right.svg" alt="" /><span class="btn-label">Half-Slide: Right</span></button>
     </div>
     <div class="btn-row" style="display: none;">
       <button id="btnResetMargins">Reset Template Margins</button>
@@ -159,16 +169,16 @@
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Chevron Tools</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
-      <button id="btnAlignAngles"><img class="btn-icon" src="/assets/icons/LayoutAlignAngles.png" alt="" /><span class="btn-label">Align Angles</span></button>
-      <button id="btnChevronAlign"><img class="btn-icon" src="/assets/icons/ChevronAlign.png" alt="" /><span class="btn-label">Chevron Align</span></button>
+      <button id="btnAlignAngles"><img class="btn-icon btn-icon-light" src="/assets/icons/align-angles.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/align-angles.svg" alt="" /><span class="btn-label">Align Angles</span></button>
+      <button id="btnChevronAlign"><img class="btn-icon btn-icon-light" src="/assets/icons/chevron-align.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/chevron-align.svg" alt="" /><span class="btn-label">Chevron Align</span></button>
     </div>
   </section>
 
   <section id="sectionOtherTweaks">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Text Tweaks</h2>
     <div class="btn-row">
-      <button id="btnToggleWordWrap"><img class="btn-icon" src="/assets/icons/Tweaksword_wrapon.png" alt="" /><span class="btn-label">Toggle Word Wrap</span></button>
-      <button id="btnToggleAutoSize"><img class="btn-icon" src="/assets/icons/TweaksAutosizeshapeon.png" alt="" /><span class="btn-label">Toggle Autosize</span></button>
+      <button id="btnToggleWordWrap"><img class="btn-icon btn-icon-light" src="/assets/icons/word-wrap.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/word-wrap.svg" alt="" /><span class="btn-label">Toggle Word Wrap</span></button>
+      <button id="btnToggleAutoSize"><img class="btn-icon btn-icon-light" src="/assets/icons/autosize.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/autosize.svg" alt="" /><span class="btn-label">Toggle Autosize</span></button>
     </div>
     <div class="color-row">
       <label for="marginInput" class="margin-label">Margin</label>
@@ -176,12 +186,12 @@
       <button id="btnSetMargins">Set Margins</button>
     </div>
     <div class="btn-row">
-      <button id="btnClearText"><img class="btn-icon" src="/assets/icons/TweaksClear.png" alt="" /><span class="btn-label">Clear Text</span></button>
-      <button id="btnPasteAsText"><img class="btn-icon" src="/assets/icons/TweaksPaste_Text.png" alt="" /><span class="btn-label">Paste as Text</span></button>
+      <button id="btnClearText"><img class="btn-icon btn-icon-light" src="/assets/icons/clear-text.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/clear-text.svg" alt="" /><span class="btn-label">Clear Text</span></button>
+      <button id="btnPasteAsText"><img class="btn-icon btn-icon-light" src="/assets/icons/paste-as-text.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/paste-as-text.svg" alt="" /><span class="btn-label">Paste as Text</span></button>
     </div>
     <div class="btn-row">
-      <button id="btnBulletsOn"><img class="btn-icon" src="/assets/icons/BulletsOn.png" alt="" /><span class="btn-label">Bullets On</span></button>
-      <button id="btnBulletsOff"><img class="btn-icon" src="/assets/icons/BulletsOff.png" alt="" /><span class="btn-label">Bullets Off</span></button>
+      <button id="btnBulletsOn"><img class="btn-icon btn-icon-light" src="/assets/icons/bullets-on.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/bullets-on.svg" alt="" /><span class="btn-label">Bullets On</span></button>
+      <button id="btnBulletsOff"><img class="btn-icon btn-icon-light" src="/assets/icons/bullets-off.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/bullets-off.svg" alt="" /><span class="btn-label">Bullets Off</span></button>
     </div>
   </section>
 
@@ -189,8 +199,8 @@
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Table AutoFormat</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
-      <button id="btnTableHeaderRow"><img class="btn-icon" src="/assets/icons/TablesAddTable.png" alt="" /><span class="btn-label">Header Row Style</span></button>
-      <button id="btnTableHeaderRowCol"><img class="btn-icon" src="/assets/icons/TablesAddTableOpen.png" alt="" /><span class="btn-label">Header Row + Column Style</span></button>
+      <button id="btnTableHeaderRow"><img class="btn-icon btn-icon-light" src="/assets/icons/header-row-style.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/header-row-style.svg" alt="" /><span class="btn-label">Header Row Style</span></button>
+      <button id="btnTableHeaderRowCol"><img class="btn-icon btn-icon-light" src="/assets/icons/header-row-column.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/header-row-column.svg" alt="" /><span class="btn-label">Header Row + Column Style</span></button>
     </div>
   </section>
 
@@ -228,7 +238,10 @@
        check independent of whatever's wrong with the rest of the page.
        Kept at the bottom, out of the way of the actual tools above. -->
   <div id="pageFooter" class="page-footer">
-    <p id="signInStatus" class="sign-in-status">Not signed in.</p>
+    <p id="signInStatus" class="sign-in-status">
+      <span class="sign-in-check-icon"><img class="btn-icon btn-icon-light" src="/assets/icons/sign-in-check.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/sign-in-check.svg" alt="" /></span>
+      <span class="sign-in-status-text">Not signed in.</span>
+    </p>
     <div id="status" class="status">Loading...</div>
     <div id="buildInfo" class="build-info">__BUILD_INFO__</div>
   </div>
