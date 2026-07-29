@@ -38,7 +38,15 @@ services:
     env_file:
       - .env
     volumes:
-      - catalog_files:/app/data/catalog
+      # A plain host directory, not a Docker-managed named volume — chosen
+      # specifically so backup/restore and moving to a new server is just
+      # "copy this folder" (rsync/tar) rather than needing `docker volume`
+      # commands or a throwaway container to reach the files at all. Was a
+      # named volume through 2026-07-29; migrated by copying its contents
+      # here (ownership already matched — both were UID/GID 1000, the
+      # container's `node` user) via a one-off `docker run` with both the
+      # old volume and this new path bind-mounted in, then `cp -a`.
+      - ./data/catalog:/app/data/catalog
     depends_on:
       db:
         condition: service_healthy
@@ -61,4 +69,3 @@ services:
 
 volumes:
   pgdata:
-  catalog_files:
