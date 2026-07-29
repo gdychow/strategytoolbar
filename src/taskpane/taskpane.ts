@@ -862,36 +862,6 @@ Office.onReady((info) => {
   const statusEl = document.getElementById("status");
   if (statusEl) bindStatusElement(statusEl);
 
-  // TEMPORARY — verifying PowerPoint.createPresentation() before Task Pane
-  // Phase 20. Remove once confirmed.
-  {
-    const debugStatus = document.getElementById("debugCreatePresentationStatus");
-    const setStatus = (msg: string) => {
-      if (debugStatus) debugStatus.textContent = msg;
-      console.log("[debug createPresentation]", msg);
-    };
-    bindButton("btnDebugCreatePresentation", async () => {
-      setStatus("Fetching test .potx bytes…");
-      const res = await fetch("/debug/template-test-file2");
-      if (!res.ok) {
-        setStatus(`Fetch failed: HTTP ${res.status}`);
-        return;
-      }
-      const buffer = await res.arrayBuffer();
-      setStatus(`Got ${buffer.byteLength} bytes, encoding to base64…`);
-      const bytes = new Uint8Array(buffer);
-      let binary = "";
-      const chunkSize = 0x8000;
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-      }
-      const base64 = btoa(binary);
-      setStatus(`Encoded (${base64.length} chars). Calling PowerPoint.createPresentation()…`);
-      await PowerPoint.createPresentation(base64);
-      setStatus("createPresentation() resolved — check if a new presentation opened.");
-    });
-  }
-
   // Task Pane Phase 15: a returning-but-unregistered visitor already has a
   // valid session (checked first, cheaply) — that skips straight to the
   // registration dialog with no Microsoft popup at all. Only a visitor

@@ -1741,17 +1741,6 @@ app.post("/admin/groups/:id/delete", async (req, res) => {
   res.redirect(303, backTo);
 });
 
-// TEMPORARY — verifying PowerPoint.createPresentation() with real .potx
-// bytes before committing Task Pane Phase 20's design to it. Removed once
-// confirmed. Plain authenticated same-origin fetch from the task pane —
-// no cross-context/system-browser complexity needed this time.
-app.get("/debug/template-test-file2", async (req, res) => {
-  if (!req.user) return res.status(401).send("Sign in first.");
-  const filePath = path.join(PERSONAL_ADDED_DIR, "debug-test.potx");
-  if (!fs.existsSync(filePath)) return res.status(404).send("Test file not uploaded yet.");
-  res.sendFile(filePath);
-});
-
 // Catches multer's file-size/type rejections (fileFilter's cb(new Error(...)))
 // so a bad upload gets a clean redirect instead of Express's default HTML
 // 500 page. Must have 4 params for Express to recognize it as error-handling
