@@ -862,27 +862,6 @@ Office.onReady((info) => {
   const statusEl = document.getElementById("status");
   if (statusEl) bindStatusElement(statusEl);
 
-  // TEMPORARY — Task Pane Phase 19 de-risk harness. Remove once the four
-  // checks in the plan file are confirmed.
-  {
-    const debugStatus = document.getElementById("debugTemplateStatus");
-    const runDebugTest = async (mode: "new" | "edit") => {
-      if (debugStatus) debugStatus.textContent = "Requesting link…";
-      const supported = Office.context.requirements.isSetSupported("OpenBrowserWindowApi", "1.1");
-      if (debugStatus) debugStatus.textContent = `OpenBrowserWindowApi 1.1 supported: ${supported}. Requesting link…`;
-      const res = await fetch(`/debug/template-test-link?mode=${mode}`);
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        if (debugStatus) debugStatus.textContent = `Error: ${body.error || res.status}`;
-        return;
-      }
-      if (debugStatus) debugStatus.textContent = `Got link, calling openBrowserWindow… ${body.url}`;
-      Office.context.ui.openBrowserWindow(body.url);
-    };
-    bindButton("btnDebugTestNew", () => runDebugTest("new"));
-    bindButton("btnDebugTestEdit", () => runDebugTest("edit"));
-  }
-
   // Task Pane Phase 15: a returning-but-unregistered visitor already has a
   // valid session (checked first, cheaply) — that skips straight to the
   // registration dialog with no Microsoft popup at all. Only a visitor

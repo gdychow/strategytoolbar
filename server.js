@@ -1741,46 +1741,6 @@ app.post("/admin/groups/:id/delete", async (req, res) => {
   res.redirect(303, backTo);
 });
 
-// ---------------------------------------------------------------------------
-// TEMPORARY — Task Pane Phase 19 de-risk harness. Not part of the real
-// Template Library feature; deleted once the four checks in the plan file
-// are confirmed. Tests: openBrowserWindow reachability, a real .potx
-// creating a new document when downloaded (not double-clicked), the SAME
-// bytes served with a .pptx filename opening directly for editing instead,
-// and a short-lived signed token being accepted with no session cookie
-// (proving the system-browser download path can work at all, given the
-// embedded task pane webview's cookie jar is isolated from it).
-// ---------------------------------------------------------------------------
-{
-  const { SignJWT: DebugSignJWT, jwtVerify: debugJwtVerify } = require("jose");
-  const DEBUG_TEST_FILE = path.join(PERSONAL_ADDED_DIR, "debug-test.potx");
-  const debugSecret = new TextEncoder().encode(process.env.SESSION_SECRET);
-
-  app.get("/debug/template-test-link", async (req, res) => {
-    if (!req.user) return res.status(401).json({ error: "Sign in first." });
-    const mode = req.query.mode === "edit" ? "edit" : "new";
-    const token = await new DebugSignJWT({ mode })
-      .setProtectedHeader({ alg: "HS256" })
-      .setExpirationTime("5m")
-      .sign(debugSecret);
-    res.json({ url: `https://toolbar.gavinchow.me/debug/template-test-file?mode=${mode}&token=${token}` });
-  });
-
-  app.get("/debug/template-test-file", async (req, res) => {
-    const token = req.query.token;
-    if (!token) return res.status(401).send("No token.");
-    let payload;
-    try {
-      ({ payload } = await debugJwtVerify(token, debugSecret));
-    } catch {
-      return res.status(401).send("Invalid or expired token.");
-    }
-    if (!fs.existsSync(DEBUG_TEST_FILE)) return res.status(404).send("Test file not uploaded to the server yet.");
-    const mode = payload.mode === "edit" ? "edit" : "new";
-    res.download(DEBUG_TEST_FILE, mode === "edit" ? "test-template.pptx" : "test-template.potx");
-  });
-}
-
 // Catches multer's file-size/type rejections (fileFilter's cb(new Error(...)))
 // so a bad upload gets a clean redirect instead of Express's default HTML
 // 500 page. Must have 4 params for Express to recognize it as error-handling
