@@ -10,8 +10,8 @@
   <Version>0.1.0.2</Version>
   <ProviderName>Strategy Toolbar Redux</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Strategy Toolbar" />
-  <Description DefaultValue="Strategy Toolbar - formatting, layout, and content tools for PowerPoint." />
+  <DisplayName DefaultValue="Deckcelerate" />
+  <Description DefaultValue="Deckcelerate - formatting, layout, and content tools for PowerPoint." />
   <IconUrl DefaultValue="https://__DOMAIN__/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://__DOMAIN__/assets/icon-64.png" />
   <SupportUrl DefaultValue="https://__DOMAIN__/taskpane.html" />
@@ -74,11 +74,11 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://__DOMAIN__/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="StrategyToolbarGroup.Label" DefaultValue="Strategy Toolbar" />
-        <bt:String id="OpenPaneButton.Label" DefaultValue="Strategy Toolbar" />
+        <bt:String id="StrategyToolbarGroup.Label" DefaultValue="Deckcelerate" />
+        <bt:String id="OpenPaneButton.Label" DefaultValue="Deckcelerate" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="OpenPaneButton.Tooltip" DefaultValue="Open the Strategy Toolbar task pane." />
+        <bt:String id="OpenPaneButton.Tooltip" DefaultValue="Open the Deckcelerate task pane." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
