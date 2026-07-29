@@ -418,3 +418,15 @@ button:disabled {
   margin: 0 0 6px;
   font-size: 11px;
 }
+
+/*
+ * .btn-row's default align-items (stretch) leaves this row's label sitting
+ * at the top of its stretched box instead of level with the select next to
+ * it, since plain text has no way to center itself within a stretched
+ * height on its own. Centered explicitly here rather than changing
+ * .btn-row globally, since every other .btn-row only ever holds
+ * same-height buttons where stretch and center already look identical.
+ */
+#libraryTargetRow {
+  align-items: center;
+}

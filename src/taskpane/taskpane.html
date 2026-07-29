@@ -33,25 +33,32 @@
       <button id="btnBrowseLibrary"><img class="btn-icon btn-icon-light" src="/assets/icons/browse-library.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/browse-library.svg" alt="" /><span class="btn-label">Browse Library…</span></button>
       <button id="btnBrowseTemplates">Template Library…</button>
     </div>
+    <!-- Admin/company-admin only (see refreshLibrarySection in taskpane.ts)
+         — everyone else's "Add to Library" click always saves to their own
+         personal library, with no scope to pick. -->
+    <div id="libraryTargetRow" class="btn-row" style="display: none;">
+      <label for="libraryTarget">Save to</label>
+      <select id="libraryTarget"></select>
+    </div>
+    <p id="libraryAddUnsupportedNote" class="unsupported-note"></p>
+    <div class="btn-row">
+      <button id="btnLibraryAdd">Add to Library</button>
+    </div>
     <div id="libraryFinishRow" class="library-finish-row" style="display: none;">
       <p>Content added and selected on a temporary slide. Copy it (Ctrl/Cmd+C), click your slide, paste (Ctrl/Cmd+V), then click Finish.</p>
       <button id="btnLibraryFinish">Finish</button>
     </div>
   </section>
 
-  <!-- Task Pane Phase 13: visible to every signed-in user (not admin-only
-       any more — see refreshMyLibrarySection in taskpane.ts). "Open Admin…"
-       and the "Global Catalog" target option below stay admin-only. -->
+  <!-- Admin-only by default (see updateAdminSectionVisibility in
+       taskpane.ts) — but forced visible for any registered user, admin or
+       not, while an in-place graphic edit (started from the gallery's Edit
+       button) is in progress, since #libraryEditRow's Save/Cancel controls
+       live here regardless of who owns the item being edited. -->
   <section id="sectionMyLibrary" style="display: none;">
-    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>My Library</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Administration</h2>
     <div id="openAdminRow" class="btn-row">
       <button id="btnOpenAdmin"><img class="btn-icon btn-icon-light" src="/assets/icons/open-admin.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/open-admin.svg" alt="" /><span class="btn-label">Open Admin…</span></button>
-    </div>
-    <p id="libraryUnsupportedNote" class="unsupported-note"></p>
-    <div id="libraryAddRow" class="btn-row">
-      <label for="libraryTarget">Save to</label>
-      <select id="libraryTarget"></select>
-      <button id="btnLibraryAdd">Add Selected Slide</button>
     </div>
     <div id="libraryEditRow" class="library-finish-row" style="display: none;">
       <p id="libraryEditStatus"></p>

@@ -396,6 +396,47 @@ function refreshLibrarySection(user: SessionUser | null): void {
     showLibraryFinishRow(false);
     currentFileInsertHandle = null;
   }
+
+  // "Save to" scope picker: admin/company-admin only — everyone else's
+  // "Add to Library" always saves to their own personal library, so there's
+  // nothing for them to pick (see TARGET_ENDPOINTS/currentLibraryTarget,
+  // which already default to "personal" when the select has no other
+  // option selected).
+  const targetRow = document.getElementById("libraryTargetRow");
+  const showTargetRow = unlocked && (!!user?.isAdmin || !!user?.isCompanyAdmin);
+  if (targetRow) (targetRow as HTMLElement).style.display = showTargetRow ? "" : "none";
+
+  const targetSelect = document.getElementById("libraryTarget") as HTMLSelectElement | null;
+  if (targetSelect) {
+    const previous = targetSelect.value;
+    targetSelect.innerHTML = "";
+    const addOption = (value: LibraryTarget, label: string) => {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = label;
+      targetSelect.appendChild(opt);
+    };
+    addOption("personal", "My Items");
+    if (user?.companyDomain && user?.isCompanyAdmin) addOption("company", user.companyDomain);
+    if (user?.isAdmin) addOption("global", "Global Catalog");
+    if (Array.from(targetSelect.options).some((o) => o.value === previous)) targetSelect.value = previous;
+  }
+
+  // Add-to-library needs a higher requirement set (PowerPointApi 1.8, for
+  // exportAsBase64/getImageAsBase64) than the rest of this section (1.2) —
+  // disabled with its own note instead of folding into the blanket
+  // setSectionEnabled check above, which would incorrectly gate Browse
+  // Library too.
+  const editSupported = Library.isAdminLibraryEditSupported();
+  const addBtn = document.getElementById("btnLibraryAdd") as HTMLButtonElement | null;
+  if (addBtn) addBtn.disabled = !unlocked || !editSupported;
+  const addNote = document.getElementById("libraryAddUnsupportedNote");
+  if (addNote) {
+    (addNote as HTMLElement).style.display = unlocked && !editSupported ? "block" : "none";
+    if (unlocked && !editSupported) {
+      addNote.textContent = "Adding to the library requires a newer PowerPoint build (PowerPointApi 1.8) than this one has.";
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -431,66 +472,46 @@ function currentLibraryTarget(): LibraryTarget {
 let currentLibraryEdit: { itemId: number; title: string; handle: Library.FileInsertHandle; isPersonal: boolean } | null =
   null;
 
+// Cached purely so updateAdminSectionVisibility (called from the
+// begin/save/cancel edit handlers, not just refreshMyLibrarySection) knows
+// the current user's admin status without needing a fresh async fetch.
+let lastKnownUser: SessionUser | null = null;
+
+/**
+ * The Administration section is admin-only by default, but a non-admin
+ * editing their own personal item's graphic (via the gallery's Edit
+ * button) still needs to see #libraryEditRow's Save/Cancel controls — so
+ * visibility is "isAdmin OR an edit is currently in progress", not a flat
+ * isAdmin gate.
+ */
+function updateAdminSectionVisibility(): void {
+  const section = document.getElementById("sectionMyLibrary");
+  const show = !!lastKnownUser?.isRegistered && (!!lastKnownUser?.isAdmin || !!currentLibraryEdit);
+  if (section) (section as HTMLElement).style.display = show ? "" : "none";
+}
+
 function updateLibraryEditUI(): void {
-  const addRow = document.getElementById("libraryAddRow");
   const editRow = document.getElementById("libraryEditRow");
-  if (addRow) (addRow as HTMLElement).style.display = currentLibraryEdit ? "none" : "";
   if (editRow) (editRow as HTMLElement).style.display = currentLibraryEdit ? "block" : "none";
   const titleInput = document.getElementById("libraryEditTitle") as HTMLInputElement | null;
   if (titleInput && !currentLibraryEdit) titleInput.style.display = "none";
+  updateAdminSectionVisibility();
 }
 
 /**
- * Shows the section for every signed-in user (Phase 13 — was admin-only).
- * "Open Admin…" and the "Global Catalog" target option stay admin-only,
- * toggled independently below rather than gating the whole section, since
- * "Open Admin…" has no PowerPoint API dependency at all and should stay
- * reachable regardless of platform. Only the add/edit actions need the
- * exportAsBase64/getImageAsBase64 requirement set (PowerPointApi 1.8) —
- * those get disabled with an explanatory note instead of hiding the
- * section over it.
+ * "Open Admin…" is the only thing left in this section that's unconditionally
+ * admin-only — see updateAdminSectionVisibility for the section's own
+ * (admin-or-editing) gate.
  */
 function refreshMyLibrarySection(user: SessionUser | null): void {
-  // Task Pane Phase 15: gated on isRegistered, same reasoning as
-  // refreshLibrarySection above — an unregistered user is still signed
-  // in, but has no access to My Library until registration completes.
-  const unlocked = !!user?.isRegistered;
-  const section = document.getElementById("sectionMyLibrary");
-  if (section) (section as HTMLElement).style.display = unlocked ? "" : "none";
-  if (!unlocked) {
+  lastKnownUser = user;
+  if (!user?.isRegistered) {
     currentLibraryEdit = null;
-    updateLibraryEditUI();
   }
 
   const openAdminRow = document.getElementById("openAdminRow");
   if (openAdminRow) (openAdminRow as HTMLElement).style.display = user?.isAdmin ? "" : "none";
-
-  const targetSelect = document.getElementById("libraryTarget") as HTMLSelectElement | null;
-  if (targetSelect) {
-    const previous = targetSelect.value;
-    targetSelect.innerHTML = "";
-    const addOption = (value: LibraryTarget, label: string) => {
-      const opt = document.createElement("option");
-      opt.value = value;
-      opt.textContent = label;
-      targetSelect.appendChild(opt);
-    };
-    addOption("personal", "My Items");
-    if (user?.companyDomain && user?.isCompanyAdmin) addOption("company", user.companyDomain);
-    if (user?.isAdmin) addOption("global", "Global Catalog");
-    if (Array.from(targetSelect.options).some((o) => o.value === previous)) targetSelect.value = previous;
-  }
-
-  const editSupported = Library.isAdminLibraryEditSupported();
-  const addBtn = document.getElementById("btnLibraryAdd") as HTMLButtonElement | null;
-  if (addBtn) addBtn.disabled = !editSupported;
-  const note = document.getElementById("libraryUnsupportedNote");
-  if (note) {
-    (note as HTMLElement).style.display = editSupported ? "none" : "block";
-    if (!editSupported) {
-      note.textContent = "Adding/editing library content requires a newer PowerPoint build (PowerPointApi 1.8) than this one has.";
-    }
-  }
+  updateLibraryEditUI(); // also updates section visibility via updateAdminSectionVisibility
 }
 
 /**
@@ -587,7 +608,7 @@ async function cancelLibraryEdit(): Promise<void> {
 let addToLibraryArmed = false;
 let addToLibraryArmedTimer: number | undefined;
 
-const ADD_TO_LIBRARY_LABEL = "Add Selected Slide";
+const ADD_TO_LIBRARY_LABEL = "Add to Library";
 const ADD_TO_LIBRARY_CONFIRM_LABEL = "Click again to confirm — adds the current slide";
 
 async function addSelectedSlideToLibrary(): Promise<void> {
