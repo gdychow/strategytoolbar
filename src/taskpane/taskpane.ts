@@ -707,21 +707,25 @@ function updateSignInStatus(user: SessionUser | null): void {
  * "Sign In"; a session that exists but hasn't finished registering shows
  * "Create Account" (clicking it opens the registration dialog directly,
  * see bindButton("btnSignIn", ...) below — no second Microsoft auth
- * needed); a fully registered session hides the button entirely. The
+ * needed); a fully registered session hides the whole section, not just
+ * the button — there's nothing else in it worth keeping on-screen once
+ * signed in (the actual "Signed in as…" status now lives in the page
+ * footer, see updateSignInStatus, so it stays visible either way). The
  * admin-only Open Admin link lives in sectionMyLibrary (see
  * refreshMyLibrarySection), not here.
  */
 function updateAuthButtons(user: SessionUser | null): void {
+  const section = document.getElementById("sectionAuth");
   const signIn = document.getElementById("btnSignIn") as HTMLButtonElement | null;
   if (!signIn) return;
   if (!user) {
-    signIn.style.display = "";
+    if (section) section.style.display = "";
     signIn.textContent = "Sign In";
   } else if (!user.isRegistered) {
-    signIn.style.display = "";
+    if (section) section.style.display = "";
     signIn.textContent = "Create Account";
-  } else {
-    signIn.style.display = "none";
+  } else if (section) {
+    section.style.display = "none";
   }
 }
 

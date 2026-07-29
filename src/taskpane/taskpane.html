@@ -7,17 +7,9 @@
   <link rel="stylesheet" href="/taskpane.css?v=__CACHE_BUST__" />
 </head>
 <body>
-  <!-- Plain static HTML, not JS-driven: visible immediately on page load even
-       if Office.js/taskpane.js never finish initializing, so it's usable as a
-       "did the browser actually load the latest deploy" check independent of
-       whatever's wrong with the rest of the page. -->
-  <div id="buildInfo" class="build-info">__BUILD_INFO__</div>
-  <div id="status" class="status">Loading...</div>
-
   <section id="sectionAuth">
-    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Sign In (prototype)</h2>
+    <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Sign In</h2>
     <p class="unsupported-note"></p>
-    <p id="signInStatus" class="sign-in-status">Not signed in.</p>
     <div class="btn-row">
       <button id="btnSignIn">Sign In</button>
     </div>
@@ -228,6 +220,17 @@
     </div>
     <button type="button" id="colorPickerMore" class="color-picker-more"></button>
     <button type="button" id="colorPickerEyedropper" class="color-picker-more" style="display: none;">Pick color from screen…</button>
+  </div>
+
+  <!-- Plain static HTML, not JS-driven: #buildInfo is visible immediately on
+       page load even if Office.js/taskpane.js never finish initializing, so
+       it's usable as a "did the browser actually load the latest deploy"
+       check independent of whatever's wrong with the rest of the page.
+       Kept at the bottom, out of the way of the actual tools above. -->
+  <div id="pageFooter" class="page-footer">
+    <p id="signInStatus" class="sign-in-status">Not signed in.</p>
+    <div id="status" class="status">Loading...</div>
+    <div id="buildInfo" class="build-info">__BUILD_INFO__</div>
   </div>
 
   <script src="/taskpane.js?v=__CACHE_BUST__"></script>

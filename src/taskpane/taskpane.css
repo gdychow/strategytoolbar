@@ -48,11 +48,16 @@ body {
   color-scheme: light dark;
 }
 
+.page-footer {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
+
 .build-info {
   font-size: 10px;
   color: var(--text-faint);
   text-align: right;
-  margin-bottom: 4px;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
