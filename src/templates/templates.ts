@@ -199,16 +199,10 @@ async function deleteSelected(): Promise<void> {
   }
 }
 
-async function handleUpload(): Promise<void> {
-  const titleInput = document.getElementById("uploadTitle") as HTMLInputElement | null;
-  const fileInput = document.getElementById("uploadFile") as HTMLInputElement | null;
+/** Title comes straight from the filename — there's no separate naming step before upload, only rename-after via the preview panel's existing Save action. */
+async function handleUpload(file: File): Promise<void> {
   const status = statusEl();
-  const file = fileInput?.files?.[0];
-  if (!file) {
-    if (status) status.textContent = "Choose a .potx file first.";
-    return;
-  }
-  const title = titleInput?.value.trim() || file.name.replace(/\.potx$/i, "");
+  const title = file.name.replace(/\.potx$/i, "");
   if (status) status.textContent = "Uploading…";
   try {
     const created = await Templates.uploadTemplate(activeScope, file, title);
@@ -216,8 +210,6 @@ async function handleUpload(): Promise<void> {
     items.push(created);
     cache.set(activeScope, items);
     rerenderGrid();
-    if (titleInput) titleInput.value = "";
-    if (fileInput) fileInput.value = "";
     if (status) status.textContent = "";
   } catch (err) {
     if (status) status.textContent = `Error: ${err instanceof Error ? err.message : String(err)}`;
@@ -255,7 +247,20 @@ Office.onReady(async () => {
   document.getElementById("btnDelete")?.addEventListener("click", () => {
     deleteSelected().catch(() => {});
   });
+  // Single button — clicking it just opens the native file picker; the
+  // upload itself fires immediately once a file is chosen, no separate
+  // "Upload" click needed.
   document.getElementById("btnUpload")?.addEventListener("click", () => {
-    handleUpload().catch(() => {});
+    (document.getElementById("uploadFile") as HTMLInputElement | null)?.click();
+  });
+  document.getElementById("uploadFile")?.addEventListener("change", () => {
+    const fileInput = document.getElementById("uploadFile") as HTMLInputElement | null;
+    const file = fileInput?.files?.[0];
+    if (!file) return;
+    handleUpload(file)
+      .catch(() => {})
+      .finally(() => {
+        if (fileInput) fileInput.value = ""; // reset so picking the same file again still fires "change"
+      });
   });
 });
