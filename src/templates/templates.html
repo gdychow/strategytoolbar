@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Template Library</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="/templates.css?v=__CACHE_BUST__" />
+</head>
+<body>
+  <div id="tabs" class="template-tabs"></div>
+  <div id="status" class="template-status"></div>
+  <div id="uploadRow" class="template-upload-row" style="display: none;">
+    <input type="text" id="uploadTitle" placeholder="Title" />
+    <input type="file" id="uploadFile" accept=".potx" />
+    <button type="button" id="btnUpload">Upload Template</button>
+  </div>
+  <div class="template-main">
+    <div id="templateGrid" class="template-grid"></div>
+    <div id="previewPanel" class="template-preview" style="display: none;">
+      <h3 id="previewTitle"></h3>
+      <button id="btnUse" type="button">Use This Template</button>
+      <div id="manageRow" class="template-manage-row" style="display: none;">
+        <label>Title <input type="text" id="editTitle" /></label>
+        <label>Description <textarea id="editDescription" placeholder="Optional"></textarea></label>
+        <div class="btn-row">
+          <button type="button" id="btnSave">Save</button>
+          <button type="button" id="btnDelete">Delete</button>
+        </div>
+      </div>
+      <p id="previewError" class="error" style="display: none;"></p>
+    </div>
+  </div>
+  <script src="/templates.js?v=__CACHE_BUST__"></script>
+</body>
+</html>

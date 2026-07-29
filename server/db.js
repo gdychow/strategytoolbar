@@ -603,6 +603,99 @@ async function deleteOwnedCatalogItem(id, oid, tid) {
   return result.rows[0] ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Task Pane Phase 20 — whole .potx templates. Own small table, not folded
+// into catalog_items (no category/insert_mode/groups/tags to carry). Same
+// personal-owned-vs-shared-unscoped split as the catalog_items functions
+// above: personal rows are SQL-scoped by owner_oid/owner_tid; company/
+// global rows are fetched/mutated unscoped, with authorization (canManageRow
+// for managing, canAccessTemplate for browsing/using) checked at the route
+// layer in server.js against the row this file already returns.
+// ---------------------------------------------------------------------------
+
+async function listPersonalTemplates(oid, tid) {
+  const result = await pool.query(
+    `SELECT id, title, description, sort_order FROM templates WHERE owner_oid = $1 AND owner_tid = $2 ORDER BY sort_order, id`,
+    [oid, tid]
+  );
+  return result.rows;
+}
+
+async function listCompanyTemplates(companyDomain) {
+  const result = await pool.query(
+    `SELECT id, title, description, sort_order FROM templates WHERE company_domain = $1 ORDER BY sort_order, id`,
+    [companyDomain]
+  );
+  return result.rows;
+}
+
+async function listGlobalTemplates() {
+  const result = await pool.query(
+    `SELECT id, title, description, sort_order FROM templates WHERE owner_oid IS NULL AND company_domain IS NULL ORDER BY sort_order, id`
+  );
+  return result.rows;
+}
+
+/** A single template by ID, any scope — used both to check canAccessTemplate/canManageRow against the row and to resolve source_file for the create-payload route. */
+async function getTemplate(id) {
+  const result = await pool.query(
+    `SELECT id, owner_oid, owner_tid, company_domain, title, description, source_file, sort_order FROM templates WHERE id = $1`,
+    [id]
+  );
+  return result.rows[0] ?? null;
+}
+
+async function insertTemplate({ ownerOid, ownerTid, companyDomain, title, description, sourceFile, sortOrder }) {
+  const result = await pool.query(
+    `INSERT INTO templates (owner_oid, owner_tid, company_domain, title, description, source_file, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, title, description`,
+    [ownerOid ?? null, ownerTid ?? null, companyDomain ?? null, title, description ?? null, sourceFile, sortOrder ?? 0]
+  );
+  return result.rows[0];
+}
+
+async function getOwnedTemplate(id, oid, tid) {
+  const result = await pool.query(
+    `SELECT id, title, description, source_file FROM templates WHERE id = $1 AND owner_oid = $2 AND owner_tid = $3`,
+    [id, oid, tid]
+  );
+  return result.rows[0] ?? null;
+}
+
+async function renameOwnedTemplate({ id, oid, tid, title, description }) {
+  const result = await pool.query(
+    `UPDATE templates SET title = $4, description = $5, updated_at = now() WHERE id = $1 AND owner_oid = $2 AND owner_tid = $3 RETURNING id`,
+    [id, oid, tid, title, description ?? null]
+  );
+  return result.rows[0] ?? null;
+}
+
+async function deleteOwnedTemplate(id, oid, tid) {
+  const result = await pool.query(`DELETE FROM templates WHERE id = $1 AND owner_oid = $2 AND owner_tid = $3 RETURNING id`, [
+    id,
+    oid,
+    tid,
+  ]);
+  return result.rows[0] ?? null;
+}
+
+/** Unscoped rename, used for company/global templates once the route layer has already checked canManageRow against the fetched row. */
+async function renameTemplate({ id, title, description }) {
+  const result = await pool.query(`UPDATE templates SET title = $2, description = $3, updated_at = now() WHERE id = $1 RETURNING id`, [
+    id,
+    title,
+    description ?? null,
+  ]);
+  return result.rows[0] ?? null;
+}
+
+/** Unscoped delete, used for company/global templates once the route layer has already checked canManageRow. */
+async function deleteTemplate(id) {
+  const result = await pool.query(`DELETE FROM templates WHERE id = $1 RETURNING id`, [id]);
+  return result.rows[0] ?? null;
+}
+
 module.exports = {
   pool,
   waitForDatabase,
@@ -637,4 +730,14 @@ module.exports = {
   updateOwnedCatalogItemContent,
   renameOwnedCatalogItem,
   deleteOwnedCatalogItem,
+  listPersonalTemplates,
+  listCompanyTemplates,
+  listGlobalTemplates,
+  getTemplate,
+  insertTemplate,
+  getOwnedTemplate,
+  renameOwnedTemplate,
+  deleteOwnedTemplate,
+  renameTemplate,
+  deleteTemplate,
 };

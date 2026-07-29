@@ -37,9 +37,28 @@ const {
   updateOwnedCatalogItemContent,
   renameOwnedCatalogItem,
   deleteOwnedCatalogItem,
+  listPersonalTemplates,
+  listCompanyTemplates,
+  listGlobalTemplates,
+  getTemplate,
+  insertTemplate,
+  getOwnedTemplate,
+  renameOwnedTemplate,
+  deleteOwnedTemplate,
+  renameTemplate,
+  deleteTemplate,
 } = require("./server/db");
 const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken } = require("./server/auth");
-const { THUMBNAILS_DIR, ADMIN_ADDED_DIR, PERSONAL_ADDED_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath } = require("./server/catalog");
+const {
+  THUMBNAILS_DIR,
+  ADMIN_ADDED_DIR,
+  PERSONAL_ADDED_DIR,
+  TEMPLATES_DIR,
+  CATALOG_CATEGORIES,
+  resolveCatalogFilePath,
+  resolveTemplateFilePath,
+} = require("./server/catalog");
+const { convertPotxToPresentationBytes } = require("./server/potxConvert");
 const { deriveCompanyDomain } = require("./server/consumerDomains");
 // Same clientId/authority the task pane's NAA client uses (src/auth/msal.ts)
 // — reused as-is by /admin's separate, standard-MSAL browser sign-in flow
@@ -557,6 +576,164 @@ app.post("/api/personal/catalog/:id/delete", async (req, res) => {
   if (existing.thumbnail_path) await fs.promises.unlink(path.join(THUMBNAILS_DIR, existing.thumbnail_path)).catch(() => {});
 
   res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Task Pane Phase 20: a genuine file picker, not a live-document capture —
+// larger limit than images (real templates carry embedded fonts/images).
+// Both mimetype and filename extension are checked; browsers' MIME-type
+// reporting for Office formats isn't perfectly consistent.
+const uploadTemplate = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const validMime = file.mimetype === "application/vnd.openxmlformats-officedocument.presentationml.template";
+    const validExt = /\.potx$/i.test(file.originalname);
+    if (!validMime || !validExt) return cb(new Error("File must be a .potx template."));
+    cb(null, true);
+  },
+});
+
+/**
+ * Whether the signed-in user can browse/use a template — broader than
+ * canManageRow, since any company member can use their company's
+ * templates (not just company admins), and any registered user can use a
+ * global one. Managing (upload/rename/delete) still goes through
+ * canManageRow, unchanged.
+ */
+function canAccessTemplate(user, template) {
+  if (template.owner_oid) return template.owner_oid === user.oid && template.owner_tid === user.tid;
+  if (template.company_domain) return user.companyDomain === template.company_domain || user.isAdmin;
+  return true;
+}
+
+// Task Pane Phase 20 — Template Library. Whole .potx files, not individual
+// slide content — browsed/uploaded from the new src/templates/ dialog, not
+// the task pane itself (no persistent management section for this).
+// ---------------------------------------------------------------------------
+
+app.get("/api/templates/personal", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  const templates = await listPersonalTemplates(req.user.oid, req.user.tid);
+  res.json({ templates });
+});
+
+app.get("/api/templates/company", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  if (!req.user.companyDomain) return res.status(403).json({ error: "You're not part of a company." });
+  const templates = await listCompanyTemplates(req.user.companyDomain);
+  res.json({ templates });
+});
+
+app.get("/api/templates/global", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  const templates = await listGlobalTemplates();
+  res.json({ templates });
+});
+
+app.post("/api/templates/personal", uploadTemplate.single("file"), async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  if (!req.file) return res.status(400).json({ error: "No file uploaded." });
+  const title = typeof req.body.title === "string" && req.body.title.trim() ? req.body.title.trim() : "Untitled template";
+
+  const sourceFile = `${crypto.randomUUID()}.potx`;
+  await fs.promises.writeFile(resolveTemplateFilePath(sourceFile), req.file.buffer);
+  const created = await insertTemplate({ ownerOid: req.user.oid, ownerTid: req.user.tid, title, sourceFile });
+  res.json({ template: created });
+});
+
+app.post("/api/templates/company", uploadTemplate.single("file"), async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  if (!req.user.isCompanyAdmin && !req.user.isAdmin) return res.status(403).json({ error: "Not a company admin." });
+  if (!req.user.companyDomain) return res.status(403).json({ error: "You're not part of a company." });
+  if (!req.file) return res.status(400).json({ error: "No file uploaded." });
+  const title = typeof req.body.title === "string" && req.body.title.trim() ? req.body.title.trim() : "Untitled template";
+
+  const sourceFile = `${crypto.randomUUID()}.potx`;
+  await fs.promises.writeFile(resolveTemplateFilePath(sourceFile), req.file.buffer);
+  const created = await insertTemplate({ companyDomain: req.user.companyDomain, title, sourceFile });
+  res.json({ template: created });
+});
+
+app.post("/api/templates/global", uploadTemplate.single("file"), async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  if (!req.user.isAdmin) return res.status(403).json({ error: "Not an admin." });
+  if (!req.file) return res.status(400).json({ error: "No file uploaded." });
+  const title = typeof req.body.title === "string" && req.body.title.trim() ? req.body.title.trim() : "Untitled template";
+
+  const sourceFile = `${crypto.randomUUID()}.potx`;
+  await fs.promises.writeFile(resolveTemplateFilePath(sourceFile), req.file.buffer);
+  const created = await insertTemplate({ title, sourceFile });
+  res.json({ template: created });
+});
+
+app.post("/api/templates/:id", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid template id." });
+  const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
+  if (!title) return res.status(400).json({ error: "Title can't be empty." });
+  const description = typeof req.body.description === "string" ? req.body.description : null;
+
+  const existing = await getTemplate(id);
+  if (!existing) return res.status(404).json({ error: "Template not found." });
+
+  const updated = existing.owner_oid
+    ? existing.owner_oid === req.user.oid && existing.owner_tid === req.user.tid
+      ? await renameOwnedTemplate({ id, oid: req.user.oid, tid: req.user.tid, title, description })
+      : null
+    : canManageRow(req.user, existing)
+      ? await renameTemplate({ id, title, description })
+      : null;
+  if (!updated) return res.status(403).json({ error: "Not allowed to edit this template." });
+  res.json({ ok: true });
+});
+
+app.post("/api/templates/:id/delete", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid template id." });
+
+  const existing = await getTemplate(id);
+  if (!existing) return res.status(404).json({ error: "Template not found." });
+
+  const isOwner = existing.owner_oid && existing.owner_oid === req.user.oid && existing.owner_tid === req.user.tid;
+  if (!isOwner && !canManageRow(req.user, existing)) return res.status(403).json({ error: "Not allowed to delete this template." });
+
+  const deleted = isOwner
+    ? await deleteOwnedTemplate(id, req.user.oid, req.user.tid)
+    : await deleteTemplate(id);
+  if (!deleted) return res.status(404).json({ error: "Template not found." });
+
+  await fs.promises.unlink(resolveTemplateFilePath(existing.source_file)).catch(() => {});
+  res.json({ ok: true });
+});
+
+// Converts the stored .potx to createPresentation-compatible bytes on
+// every request (cheap — a millisecond-scale string replace inside a
+// re-zip) rather than caching a converted copy, so the canonical stored
+// file always stays a genuine, untouched .potx.
+app.get("/api/templates/:id/create-payload", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Not signed in." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid template id." });
+
+  const template = await getTemplate(id);
+  if (!template) return res.status(404).json({ error: "Template not found." });
+  if (!canAccessTemplate(req.user, template)) return res.status(403).json({ error: "Not allowed to use this template." });
+
+  const potxBuffer = await fs.promises.readFile(resolveTemplateFilePath(template.source_file));
+  const converted = convertPotxToPresentationBytes(potxBuffer);
+  res.json({ base64: Buffer.from(converted).toString("base64") });
 });
 
 function requireAdmin(req, res, next) {
@@ -1749,6 +1926,9 @@ app.post("/admin/groups/:id/delete", async (req, res) => {
 app.use((err, req, res, next) => {
   if (req.path.startsWith("/admin/catalog/")) {
     return res.redirect(303, "/admin?error=" + encodeURIComponent(err.message || "Upload failed."));
+  }
+  if (req.path.startsWith("/api/templates/")) {
+    return res.status(400).json({ error: err.message || "Upload failed." });
   }
   console.error(err);
   res.status(500).send("Server error.");

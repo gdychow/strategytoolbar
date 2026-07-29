@@ -30,6 +30,14 @@ fs.mkdirSync(PERSONAL_ADDED_DIR, { recursive: true });
 // clean 400 instead of a raw constraint-violation error page.
 const CATALOG_CATEGORIES = ["text", "objects", "shapes", "stamps", "tables", "symbols", "diagrams", "maps", "clipart", "frameworks", "flags"];
 
+// Task Pane Phase 20: whole .potx template files — a structurally
+// different entity from catalog_items (no category-prefixed or
+// admin/personal-added split needed, since every template is a real
+// uploaded file regardless of scope; scope itself lives on the DB row,
+// not the directory layout).
+const TEMPLATES_DIR = path.join(CATALOG_DIR, "templates");
+fs.mkdirSync(TEMPLATES_DIR, { recursive: true });
+
 /**
  * Resolves a catalog item's source_file (as stored in the DB, e.g.
  * "text/text-010.pptx") to an absolute path under CATALOG_DIR. The client
@@ -45,4 +53,22 @@ function resolveCatalogFilePath(sourceFile) {
   return resolved;
 }
 
-module.exports = { CATALOG_DIR, THUMBNAILS_DIR, ADMIN_ADDED_DIR, PERSONAL_ADDED_DIR, CATALOG_CATEGORIES, resolveCatalogFilePath };
+/** Same never-escape-the-directory defense as resolveCatalogFilePath, scoped to TEMPLATES_DIR instead. */
+function resolveTemplateFilePath(sourceFile) {
+  const resolved = path.resolve(TEMPLATES_DIR, sourceFile);
+  if (resolved !== TEMPLATES_DIR && !resolved.startsWith(TEMPLATES_DIR + path.sep)) {
+    throw new Error("Refusing to resolve a template file outside TEMPLATES_DIR.");
+  }
+  return resolved;
+}
+
+module.exports = {
+  CATALOG_DIR,
+  THUMBNAILS_DIR,
+  ADMIN_ADDED_DIR,
+  PERSONAL_ADDED_DIR,
+  TEMPLATES_DIR,
+  CATALOG_CATEGORIES,
+  resolveCatalogFilePath,
+  resolveTemplateFilePath,
+};

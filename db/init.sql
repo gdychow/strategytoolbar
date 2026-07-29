@@ -187,3 +187,30 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   UNIQUE (owner_oid, owner_tid),
   FOREIGN KEY (owner_oid, owner_tid) REFERENCES users (oid, tid)
 );
+
+-- Task Pane Phase 20: whole .potx presentation templates (not individual
+-- slide content — no category/insert_mode/groups/tags, a materially
+-- simpler shape than catalog_items). Same three-way scope as catalog_items
+-- (personal/company/global) but only two scoping columns needed — there's
+-- no separate "shared, no owner, no company, but still has a category"
+-- case here, so both-null just means global directly, no third column.
+-- No thumbnail_path: upload is a plain file picker with no PowerPoint API
+-- involvement, so there's no live-document capture to generate one from;
+-- the column can be added additively later if real thumbnails are wanted.
+CREATE TABLE IF NOT EXISTS templates (
+  id SERIAL PRIMARY KEY,
+  owner_oid TEXT,
+  owner_tid TEXT,
+  company_domain TEXT,
+  title TEXT NOT NULL,
+  description TEXT,
+  source_file TEXT NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  FOREIGN KEY (owner_oid, owner_tid) REFERENCES users (oid, tid),
+  CHECK (owner_oid IS NULL OR company_domain IS NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_templates_owner ON templates (owner_oid, owner_tid, sort_order) WHERE owner_oid IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_templates_company ON templates (company_domain, sort_order) WHERE company_domain IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_templates_global ON templates (sort_order) WHERE owner_oid IS NULL AND company_domain IS NULL;

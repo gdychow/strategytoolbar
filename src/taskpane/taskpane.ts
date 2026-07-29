@@ -7,6 +7,7 @@ import * as CustomColors from "../features/customColors";
 import * as OtherTweaks from "../features/otherTweaks";
 import * as TableFormat from "../features/tableFormat";
 import * as Library from "../features/libraryInsert";
+import * as Templates from "../features/templates";
 import * as Auth from "../auth/msal";
 import theme from "../config/theme.json";
 
@@ -935,6 +936,40 @@ Office.onReady((info) => {
           action(payload.item).catch((err) =>
             notify(`Error: ${err instanceof Error ? err.message : String(err)}`, "error")
           );
+        });
+      }
+    );
+  });
+
+  // Task Pane Phase 20 — Template Library. Same displayDialogAsync/
+  // messageParent shape as btnBrowseLibrary above, kept as its own
+  // handler (different dialog, different message shape) rather than
+  // merged into that one. "Use This Template" is the dialog's only
+  // outward action — everything else (browse/upload/rename/delete)
+  // happens via plain fetch calls made directly from inside the dialog,
+  // no PowerPoint API involved, so no round-trip needed for those.
+  document.getElementById("btnBrowseTemplates")?.addEventListener("click", () => {
+    Office.context.ui.displayDialogAsync(
+      `${window.location.origin}/templates.html?v=${Date.now()}`,
+      { height: 80, width: 70 },
+      (result) => {
+        if (result.status === Office.AsyncResultStatus.Failed) {
+          notify(`Failed to open the template library: ${result.error.message}`, "error");
+          return;
+        }
+        const dialog = result.value;
+        dialog.addEventHandler(Office.EventType.DialogMessageReceived, (args) => {
+          if (!("message" in args)) return;
+          dialog.close();
+          try {
+            const payload = JSON.parse(args.message) as { action: string; templateId: number };
+            if (payload.action !== "use-template") return;
+            Templates.createFromTemplate(payload.templateId).catch((err) =>
+              notify(`Error: ${err instanceof Error ? err.message : String(err)}`, "error")
+            );
+          } catch (err) {
+            notify(`Couldn't read the selected template: ${err instanceof Error ? err.message : String(err)}`, "error");
+          }
         });
       }
     );
