@@ -225,7 +225,16 @@ section.dragging {
 }
 
 button {
-  flex: 1 1 auto;
+  /*
+   * flex-basis 0 (not the default "auto") is what makes this the fix — with
+   * "auto" each button's share of the row starts from its own label's
+   * content width before growing, so a row of differently-worded buttons
+   * (e.g. "Fix Size" / "Fix Width" / "Fix Height") never actually lands on
+   * even thirds. Basis 0 makes flex-grow the only input, so every button in
+   * a .btn-row always splits the row evenly — 100% alone, 50/50 in a pair,
+   * 33/33/33 in a trio — regardless of label length.
+   */
+  flex: 1 1 0%;
   display: flex;
   align-items: center;
   justify-content: flex-start;
