@@ -257,6 +257,18 @@ Office.onReady(async () => {
     const fileInput = document.getElementById("uploadFile") as HTMLInputElement | null;
     const file = fileInput?.files?.[0];
     if (!file) return;
+    // The picker's accept=".potx" is only a hint — different OS/browser
+    // combinations enforce it differently (some show an "All Files"
+    // toggle regardless), so this is a real check, not decoration. The
+    // server re-validates by mimetype + extension regardless; this just
+    // gives instant feedback instead of a round trip for an obviously
+    // wrong file.
+    if (!/\.potx$/i.test(file.name)) {
+      const status = statusEl();
+      if (status) status.textContent = `"${file.name}" isn't a .potx file.`;
+      if (fileInput) fileInput.value = "";
+      return;
+    }
     handleUpload(file)
       .catch(() => {})
       .finally(() => {
