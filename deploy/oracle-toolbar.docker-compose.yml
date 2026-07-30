@@ -1,0 +1,116 @@
+# Deckcelerate production — toolbar.deckcelerate.com, on the Oracle Cloud
+# Ubuntu/Docker host (fronted by Cloudflare).
+#
+# USAGE: this file is meant to be the root docker-compose.yml of its OWN
+# separate git checkout — e.g. `git clone <repo> ~/apps/deckcelerate-toolbar`
+# — not run from inside this repo's deploy/ folder. Its relative paths
+# (build context ".", "./db/init.sql", "./data/catalog") all assume that
+# placement. Copy this file to <checkout>/docker-compose.yml, copy
+# oracle-toolbar.env.example to <checkout>/.env and fill it in, then run
+# <checkout>/deploy.sh (already in the repo, unchanged) exactly like the
+# existing gavin-admin production box does.
+#
+# Runs as its own fully independent stack — own Postgres, own named
+# volume, own catalog_files bind mount — deliberately NOT sharing a
+# database with the beta.deckcelerate.com stack (see
+# deploy/oracle-beta.docker-compose.yml), which should live in its own
+# separate checkout on this same host. Compose namespaces containers/
+# networks/volumes by the containing directory's name, so as long as the
+# two checkouts are in differently-named directories (e.g.
+# deckcelerate-toolbar vs. deckcelerate-beta), both stacks' `db` services
+# coexist on the same host with zero extra config — nothing here needs to
+# know the other stack exists.
+#
+# Requires a .env file in the same directory as this file (gitignored —
+# never commit it) with exactly these variables — see
+# oracle-toolbar.env.example:
+#
+#   DOMAIN              toolbar.deckcelerate.com — not a secret, just kept
+#                       in .env alongside everything else so this one file
+#                       covers every value that differs from the beta
+#                       instance's .env, instead of splitting per-instance
+#                       config across two places.
+#   MANIFEST_ID         a fresh GUID, distinct from both the beta
+#                       instance's and the original gavinchow.me
+#                       deployment's — Office identifies an add-in by this
+#                       Id, not by domain, so a shared Id would mean
+#                       toolbar/beta/old-prod could never be sideloaded or
+#                       installed side by side, only ever as "the same
+#                       add-in, different source." Also not a secret, same
+#                       reasoning as DOMAIN above for why it lives in .env
+#                       anyway. docker-entrypoint.sh bakes both this and
+#                       DOMAIN into the manifest at container startup.
+#   ADMIN_EMAILS       comma-separated, case-insensitive — whoever's email
+#                       matches gets isAdmin=true
+#   SESSION_SECRET      random string signing session cookies — MUST be
+#                       different from beta's, or a beta session cookie
+#                       would verify as valid here too. Generate with:
+#                       node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+#   POSTGRES_PASSWORD   used both by the db service and by the app's
+#                       DATABASE_URL below — should also differ from
+#                       beta's, though the two Postgres containers are
+#                       already isolated on separate Docker networks
+#                       regardless.
+#
+# There is deliberately no AZURE_CLIENT_ID here (an earlier version of
+# this file had one, but nothing in the app actually reads it — the real
+# Azure App Registration client ID comes from src/config/auth.json, baked
+# into the image at build time and used by both the server and the client
+# bundle). Before this instance's sign-in will work, that Azure App
+# Registration needs https://toolbar.deckcelerate.com's redirect URIs
+# added — see the setup notes given alongside this file.
+#
+# Cloudflare (Tunnel or proxied DNS — set up on the Cloudflare side, not
+# here) is expected to route https://toolbar.deckcelerate.com to this
+# host's port 8080.
+services:
+  strategy-toolbar:
+    build:
+      context: .
+      args:
+        # Stamped onto the task pane as plain static HTML so it's visible
+        # even when Office.js fails to initialize. deploy.sh already sets
+        # this from `git rev-parse --short HEAD` in this checkout; defaults
+        # to "unknown" if built any other way.
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: deckcelerate-toolbar:latest
+    ports:
+      - "8080:8080"
+    environment:
+      # DOMAIN and MANIFEST_ID come from .env (env_file below), not here —
+      # see the header comment above for why.
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@db:5432/strategytoolbar
+      - CATALOG_DIR=/app/data/catalog
+    env_file:
+      - .env
+    volumes:
+      # Plain host directory, not a Docker-managed named volume — makes
+      # backup/restore and moving to yet another host just "copy this
+      # folder" rather than needing `docker volume` commands.
+      - ./data/catalog:/app/data/catalog
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=strategytoolbar
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Only runs on a genuinely fresh/empty data directory (Postgres's own
+      # docker-entrypoint-initdb.d behavior) — bootstraps the full current
+      # schema in one pass, no manual hand-run migration steps needed for
+      # a brand-new instance like this one.
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
