@@ -1,4 +1,4 @@
-import { bindStatusElement, notify, withErrorHandling } from "../core/ui";
+import { bindStatusElement, notify, withErrorHandling, extractErrorMessage } from "../core/ui";
 import { darken, THEME_SHADE_PERCENTS } from "../core/colorMath";
 import * as Layout from "../features/layout";
 import * as ObjectOrder from "../features/objectOrder";
@@ -694,7 +694,10 @@ async function establishSession(idToken: string): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ idToken }),
   });
-  if (!res.ok) throw new Error(`Failed to establish session (${res.status}).`);
+  // The server already knows exactly why a sign-in was refused (suspended,
+  // deleted, an invalid token) and says so in the response body — surface
+  // that instead of a bare status code, which told the user nothing.
+  if (!res.ok) throw new Error(await extractErrorMessage(res, `Failed to sign in (${res.status}).`));
 }
 
 /** Checks whether the session cookie from a previous sign-in is still valid, without forcing an interactive prompt. Never throws — a failed/timed-out check just means "not signed in". */
@@ -901,10 +904,15 @@ Office.onReady((info) => {
     let user = await getSessionUser();
     if (!user) {
       const msalUser = await Auth.signIn((step) => notify(step));
-      const claimsEl = document.getElementById("authClaims") as HTMLElement;
-      claimsEl.style.display = "block";
-      claimsEl.textContent = JSON.stringify(msalUser, null, 2);
       if (!msalUser.email) {
+        // The one case where dumping raw claims is actually useful — an
+        // admin misconfiguring the Azure app registration's optional
+        // claims needs to see what Microsoft actually sent back. Never
+        // shown on a normal sign-in (it would otherwise expose the live
+        // idToken in the visible UI for no reason).
+        const claimsEl = document.getElementById("authClaims") as HTMLElement;
+        claimsEl.style.display = "block";
+        claimsEl.textContent = JSON.stringify(msalUser, null, 2);
         notify("Signed in, but no email claim was returned — check the Azure app registration's optional claims.", "error");
         return;
       }

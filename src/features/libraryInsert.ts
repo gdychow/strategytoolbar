@@ -18,6 +18,8 @@
  *   up the temporary slide once they're done.
  */
 
+import { extractErrorMessage } from "../core/ui";
+
 export interface TextRunSpec {
   text: string;
   bold: boolean | null;
@@ -98,7 +100,7 @@ export function isLibraryInsertSupported(): boolean {
  */
 export async function fetchCatalog(category: string): Promise<CatalogResponse> {
   const res = await fetch(`/api/catalog/${category}`);
-  if (!res.ok) throw new Error(`Failed to load the "${category}" library (${res.status}).`);
+  if (!res.ok) throw new Error(await extractErrorMessage(res, `Failed to load the "${category}" library (${res.status}).`));
   return res.json();
 }
 
@@ -124,7 +126,7 @@ async function fetchFileBase64(itemId: number): Promise<string> {
   if (cached) return cached;
 
   const res = await fetch(`/api/catalog/file/${itemId}`);
-  if (!res.ok) throw new Error(`Failed to fetch that item (${res.status}).`);
+  if (!res.ok) throw new Error(await extractErrorMessage(res, `Failed to fetch that item (${res.status}).`));
   const base64 = arrayBufferToBase64(await res.arrayBuffer());
   fileCache.set(itemId, base64);
   return base64;
