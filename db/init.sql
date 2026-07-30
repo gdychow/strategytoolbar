@@ -214,3 +214,47 @@ CREATE TABLE IF NOT EXISTS templates (
 CREATE INDEX IF NOT EXISTS idx_templates_owner ON templates (owner_oid, owner_tid, sort_order) WHERE owner_oid IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_templates_company ON templates (company_domain, sort_order) WHERE company_domain IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_templates_global ON templates (sort_order) WHERE owner_oid IS NULL AND company_domain IS NULL;
+
+-- Admin UI Phase 22: user administration. is_global_admin is separate from
+-- (and OR'd with) the ADMIN_EMAILS env-var check in isAdminEmail() —
+-- env-file admins stay admin regardless of this column and can never be
+-- demoted via the UI; this column is only for admins granted through the
+-- UI, which *are* revocable. is_suspended/deleted_at are enforced at
+-- session-issuance/refresh time (see server.js), not per-request.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_global_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
+-- A deleted user's row is never actually removed (catalog_items/templates/
+-- subscriptions all FK-reference users with no cascade) — deleted_at set +
+-- PII columns scrubbed by softDeleteUser() is the real "delete."
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- "Free access tier" reuses the existing subscriptions table (already has
+-- the Stripe placeholder columns for real billing later) rather than a new
+-- users column — one source of truth for "what access level does this
+-- user have." A free-tier user gets plan='free', status='active'.
+ALTER TABLE subscriptions DROP CONSTRAINT subscriptions_plan_check;
+ALTER TABLE subscriptions ADD CONSTRAINT subscriptions_plan_check CHECK (plan IN ('monthly', 'annual', 'free'));
+
+-- actor_email/target_email are captured at write-time, not joined live, so
+-- the log stays legible even after a target's PII is scrubbed by a later
+-- delete. Real FKs are safe here since rows are only ever soft-deleted.
+CREATE TABLE IF NOT EXISTS admin_actions (
+  id SERIAL PRIMARY KEY,
+  actor_oid TEXT NOT NULL,
+  actor_tid TEXT NOT NULL,
+  actor_email TEXT,
+  action TEXT NOT NULL CHECK (action IN (
+    'promote_company_admin', 'demote_company_admin',
+    'promote_global_admin', 'demote_global_admin',
+    'suspend', 'unsuspend', 'delete', 'set_free_tier', 'unset_free_tier'
+  )),
+  target_oid TEXT NOT NULL,
+  target_tid TEXT NOT NULL,
+  target_email TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  FOREIGN KEY (actor_oid, actor_tid) REFERENCES users (oid, tid),
+  FOREIGN KEY (target_oid, target_tid) REFERENCES users (oid, tid)
+);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_target ON admin_actions (target_oid, target_tid);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_created ON admin_actions (created_at DESC);

@@ -69,14 +69,18 @@ function isAdminEmail(email) {
 // (Task Pane Phase 15) are all sourced from the caller (the DB row),
 // unlike isAdmin — they're real mutable state (set by promote/demote
 // actions or by completeRegistration), not something cheaply re-derivable
-// from an env var on every call the way isAdminEmail is.
+// from an env var on every call the way isAdminEmail is. isAdmin itself
+// (Admin UI Phase 22) is now the OR of two independent sources: the
+// env-file allowlist (isAdminEmail, permanent, never revocable via the UI)
+// and user.isGlobalAdmin (a real DB column, set/cleared by the Users admin
+// page's promote/demote-global-admin actions).
 async function createSessionToken(user, sessionStart = Date.now()) {
   return new SignJWT({
     oid: user.oid,
     tid: user.tid,
     email: user.email,
     displayName: user.displayName,
-    isAdmin: isAdminEmail(user.email),
+    isAdmin: isAdminEmail(user.email) || !!user.isGlobalAdmin,
     companyDomain: user.companyDomain ?? null,
     isCompanyAdmin: !!user.isCompanyAdmin,
     isRegistered: !!user.isRegistered,

@@ -14,6 +14,15 @@ const {
   completeRegistration,
   listUsersByCompanyDomain,
   setCompanyAdmin,
+  listAllUsers,
+  listCompanyDomains,
+  countCompanyAdmins,
+  setGlobalAdmin,
+  setSuspended,
+  softDeleteUser,
+  setFreeTier,
+  logAdminAction,
+  listRecentAdminActions,
   listSharedCatalogItems,
   listCompanyCatalogItems,
   getCatalogItem,
@@ -48,7 +57,7 @@ const {
   renameTemplate,
   deleteTemplate,
 } = require("./server/db");
-const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken } = require("./server/auth");
+const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken, isAdminEmail } = require("./server/auth");
 const {
   THUMBNAILS_DIR,
   ADMIN_ADDED_DIR,
@@ -145,11 +154,22 @@ app.use(async (req, res, next) => {
     // re-fetched from the DB here (not just carried over from the old JWT
     // claims the way oid/tid/email/displayName are) so a promote/demote
     // or a just-completed registration takes effect within one refresh
-    // cycle (~12h) instead of requiring a full sign-out — all three are
-    // real mutable state, unlike isAdmin, which stays purely env-var-
-    // derived and is safe to recompute cheaply inside createSessionToken
-    // on every reissue.
+    // cycle (~12h) instead of requiring a full sign-out — isAdmin itself
+    // stays cheap to recompute inside createSessionToken on every reissue
+    // (env-file check plus the freshly-fetched isGlobalAdmin below).
     const dbUser = await getUserByKey(verified.claims.oid, verified.claims.tid);
+
+    // Admin UI Phase 22: suspension/deletion are enforced here, not on
+    // every request — same ~12h worst-case latency isRegistered/
+    // isCompanyAdmin already have. A blocked user's session is dropped
+    // outright rather than reissued with the block baked into the token,
+    // so there's nothing for a stale cached token to keep asserting.
+    if (dbUser?.deleted_at || dbUser?.is_suspended) {
+      res.clearCookie(SESSION_COOKIE, cookieOptions);
+      req.user = undefined;
+      return next();
+    }
+
     const fresh = await createSessionToken(
       {
         oid: verified.claims.oid,
@@ -159,6 +179,7 @@ app.use(async (req, res, next) => {
         companyDomain: dbUser?.company_domain ?? null,
         isCompanyAdmin: dbUser?.is_company_admin ?? false,
         isRegistered: dbUser?.is_registered ?? false,
+        isGlobalAdmin: dbUser?.is_global_admin ?? false,
       },
       verified.claims.sessionStart
     );
@@ -183,11 +204,23 @@ app.post("/api/auth/session", async (req, res) => {
 
   const companyDomain = deriveCompanyDomain(identity.email);
   const user = await upsertUser({ ...identity, companyDomain });
+
+  // Admin UI Phase 22: no session is ever issued for a suspended/deleted
+  // account — checked here (not just at refresh time) so a blocked user
+  // can't get a fresh session simply by signing out and back in.
+  if (user.deleted_at) {
+    return res.status(403).json({ error: "This account has been deleted." });
+  }
+  if (user.is_suspended) {
+    return res.status(403).json({ error: "This account has been suspended." });
+  }
+
   const sessionToken = await createSessionToken({
     ...identity,
     companyDomain: user.company_domain,
     isCompanyAdmin: user.is_company_admin,
     isRegistered: user.is_registered,
+    isGlobalAdmin: user.is_global_admin,
   });
   res.cookie(SESSION_COOKIE, sessionToken, cookieOptions);
   res.json({
@@ -245,6 +278,7 @@ app.post("/api/auth/register", async (req, res) => {
       companyDomain: updated.company_domain,
       isCompanyAdmin: updated.is_company_admin,
       isRegistered: updated.is_registered,
+      isGlobalAdmin: updated.is_global_admin,
     },
     req.user.sessionStart
   );
@@ -774,44 +808,14 @@ function canManageRow(user, row) {
   return false;
 }
 
-// Lists everyone at one company_domain with a promote/demote button per
-// row — reachable from GET /admin's company-scope nav (see below).
-// domain defaults to the viewer's own company when they aren't a global
-// admin, so a company admin can't even construct a URL into a domain
-// they don't belong to (canAdminCompany would 403 it anyway; this just
-// avoids showing a dead link).
-app.get("/admin/company-admins", async (req, res) => {
-  if (!req.user) return res.status(401).send("Sign in first.");
-  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
-  const domain = typeof req.query.domain === "string" && req.query.domain ? req.query.domain : req.user.companyDomain;
-  if (!domain) return res.status(400).send("No company to show.");
-  if (!canAdminCompany(req.user, domain)) return res.status(403).send("Not an admin for this company.");
-
-  const users = await listUsersByCompanyDomain(domain);
-  const rows = users
-    .map(
-      (u) => `
-      <tr>
-        <td>${escapeHtml(u.email ?? "(no email)")}</td>
-        <td>${u.is_company_admin ? "Yes" : "No"}</td>
-        <td>
-          <form method="POST" action="/admin/company-admins/${encodeURIComponent(u.oid)}/${encodeURIComponent(u.tid)}/${u.is_company_admin ? "demote" : "promote"}">
-            <button type="submit">${u.is_company_admin ? "Demote" : "Promote"}</button>
-          </form>
-        </td>
-      </tr>`
-    )
-    .join("");
-
-  res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
-    <h1>Company Admins</h1>
-    <h2>${escapeHtml(domain)}</h2>
-    <p><a href="/admin?scope=company:${encodeURIComponent(domain)}">&larr; Back to library</a></p>
-    <table>
-      <thead><tr><th>Email</th><th>Company Admin</th><th></th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </body></html>`);
+// Admin UI Phase 22: superseded by GET /admin/users (a richer view — every
+// user, not just admins, plus dates, suspend/delete/global-admin/free-tier
+// actions). Kept as a redirect so old bookmarks/links still work, same
+// precedent as GET /admin/groups's own redirect after Phase 11 folded
+// group management into the main /admin page.
+app.get("/admin/company-admins", (req, res) => {
+  const domain = typeof req.query.domain === "string" ? req.query.domain : "";
+  res.redirect(301, `/admin/users${domain ? `?domain=${encodeURIComponent(domain)}` : ""}`);
 });
 
 app.post("/admin/company-admins/:oid/:tid/promote", async (req, res) => {
@@ -823,13 +827,30 @@ app.post("/admin/company-admins/:oid/:tid/promote", async (req, res) => {
   if (!canAdminCompany(req.user, target.company_domain)) return res.status(403).send("Not an admin for this company.");
 
   await setCompanyAdmin(oid, tid, true);
-  res.redirect(303, `/admin/company-admins?domain=${encodeURIComponent(target.company_domain)}`);
+  await logAdminAction({
+    actorOid: req.user.oid,
+    actorTid: req.user.tid,
+    actorEmail: req.user.email,
+    action: "promote_company_admin",
+    targetOid: oid,
+    targetTid: tid,
+    targetEmail: target.email,
+  });
+  res.redirect(303, `/admin/users?domain=${encodeURIComponent(target.company_domain)}`);
 });
 
-// The self-removal guard lives here, server-side — not just a disabled
-// button client-side — so a company can't be talked down to zero admins
-// by its own admins via a raw request. Global admins are exempt: they're
-// the backstop if a company ever does end up with none.
+// Guards, in order: (1) can't touch an env-file admin's company-admin
+// status via the UI at all (isAdminEmail) — mirrors the same "server-config
+// admin, not revocable here" rule the new global-admin routes use below;
+// (2) no self-demotion, ever, for anyone — including a global admin
+// demoting their own company-admin status, which used to be allowed (see
+// the removed `&& !req.user.isAdmin` exemption this replaces); (3) always
+// at least one company admin per domain — blocks demoting the last one,
+// for everyone including global admins (a global admin who genuinely needs
+// to zero out a company's admins would promote a replacement first;
+// promote has no such restriction). All three are enforced here,
+// server-side, not just as a disabled button client-side, so a raw request
+// can't bypass them.
 app.post("/admin/company-admins/:oid/:tid/demote", async (req, res) => {
   if (!req.user) return res.status(401).send("Sign in first.");
   if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
@@ -837,12 +858,352 @@ app.post("/admin/company-admins/:oid/:tid/demote", async (req, res) => {
   const target = await getUserByKey(oid, tid);
   if (!target || !target.company_domain) return res.status(404).send("User not found.");
   if (!canAdminCompany(req.user, target.company_domain)) return res.status(403).send("Not an admin for this company.");
-  if (oid === req.user.oid && tid === req.user.tid && !req.user.isAdmin) {
-    return res.status(403).send("You can't remove your own company-admin status — ask another company admin or a global admin.");
+  if (isAdminEmail(target.email)) {
+    return res.status(403).send("This user's admin access comes from server configuration and can't be revoked here.");
+  }
+  if (oid === req.user.oid && tid === req.user.tid) {
+    return res.status(403).send("You can't remove your own admin status — ask another admin.");
+  }
+  if ((await countCompanyAdmins(target.company_domain)) <= 1) {
+    return res.status(403).send("This is the only company admin left — promote someone else first.");
   }
 
   await setCompanyAdmin(oid, tid, false);
-  res.redirect(303, `/admin/company-admins?domain=${encodeURIComponent(target.company_domain)}`);
+  await logAdminAction({
+    actorOid: req.user.oid,
+    actorTid: req.user.tid,
+    actorEmail: req.user.email,
+    action: "demote_company_admin",
+    targetOid: oid,
+    targetTid: tid,
+    targetEmail: target.email,
+  });
+  res.redirect(303, `/admin/users?domain=${encodeURIComponent(target.company_domain)}`);
+});
+
+/**
+ * Every action route below redirects back here, targeting the affected
+ * user's own company_domain when they have one (or the unscoped view when
+ * they don't — a global admin with no company of their own, the only case
+ * that happens in practice). Consistent, predictable, and matches exactly
+ * what the pre-existing company-admin promote/demote routes already do —
+ * not worth threading the viewer's *current* page state through just to
+ * avoid the occasional jump into the target's own domain view.
+ */
+function usersRedirectTarget(target) {
+  return target.company_domain ? `/admin/users?domain=${encodeURIComponent(target.company_domain)}` : "/admin/users";
+}
+
+// Admin UI Phase 22: the user administration page. A global admin with no
+// ?domain= sees every user across every company; ?domain= (own company for
+// a company admin, any company for a global admin) scopes to one company —
+// same domain-resolution shape /admin/company-admins used, just richer
+// (dates, badges, suspend/delete/global-admin/free-tier actions, and a
+// recent-activity log).
+app.get("/admin/users", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
+  if (!req.user.isAdmin && !req.user.isCompanyAdmin) return res.status(403).send("Not an admin.");
+
+  const requestedDomain = typeof req.query.domain === "string" && req.query.domain ? req.query.domain : null;
+  let domain = null;
+  if (requestedDomain) {
+    if (!canAdminCompany(req.user, requestedDomain)) return res.status(403).send("Not an admin for this company.");
+    domain = requestedDomain;
+  } else if (!req.user.isAdmin) {
+    domain = req.user.companyDomain;
+    if (!domain) return res.status(400).send("No company to show.");
+  }
+  // domain stays null only for a global admin deliberately viewing everyone.
+
+  const [users, companyDomains, recentActions] = await Promise.all([
+    domain ? listUsersByCompanyDomain(domain) : listAllUsers(),
+    req.user.isAdmin && !domain ? listCompanyDomains() : Promise.resolve([]),
+    listRecentAdminActions({ domain }),
+  ]);
+
+  const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
+
+  const companyPicker =
+    req.user.isAdmin && !domain && companyDomains.length
+      ? `<p>Companies: ${companyDomains
+          .map(
+            (c) =>
+              `<a href="/admin/users?domain=${encodeURIComponent(c.company_domain)}">${escapeHtml(c.company_domain)} (${c.user_count})</a>`
+          )
+          .join(" &middot; ")}</p>`
+      : "";
+
+  const dateOnly = (ts) => (ts ? new Date(ts).toISOString().slice(0, 10) : "—");
+
+  const rows = users
+    .map((u) => {
+      const isEnvAdmin = isAdminEmail(u.email);
+      const isEffectiveGlobalAdmin = isEnvAdmin || u.is_global_admin;
+      const isSelf = u.oid === req.user.oid && u.tid === req.user.tid;
+
+      // Mirrors the guards each action route enforces server-side (see
+      // below) — this only controls which buttons render, never the real
+      // authorization, which every route re-checks independently.
+      const canDemoteCompanyAdmin = u.is_company_admin && !isSelf && !isEnvAdmin;
+      const canToggleGlobalAdmin = req.user.isAdmin && !isSelf && !(u.is_global_admin && isEnvAdmin);
+      const canSuspendOrDelete =
+        !isSelf && !isEnvAdmin && (req.user.isAdmin || (!isEffectiveGlobalAdmin && !u.is_company_admin));
+
+      const badges = [
+        isEnvAdmin ? "Global Admin (server config)" : u.is_global_admin ? "Global Admin" : "",
+        u.is_company_admin ? "Company Admin" : "",
+        u.plan === "free" ? "Free Tier" : "",
+        u.is_suspended ? "Suspended" : "",
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      const form = (action, label, allowed, confirmMsg) => {
+        if (!allowed) return "";
+        const confirmAttr = confirmMsg ? ` onsubmit="return confirm('${confirmMsg.replace(/'/g, "\\'")}')"` : "";
+        return `<form method="POST" action="/admin/users/${encodeURIComponent(u.oid)}/${encodeURIComponent(u.tid)}/${action}" style="display:inline;"${confirmAttr}><button type="submit">${label}</button></form>`;
+      };
+
+      const companyAdminForm = u.is_company_admin
+        ? `<form method="POST" action="/admin/company-admins/${encodeURIComponent(u.oid)}/${encodeURIComponent(u.tid)}/demote" style="display:inline;">${canDemoteCompanyAdmin ? '<button type="submit">Demote</button>' : ""}</form>`
+        : `<form method="POST" action="/admin/company-admins/${encodeURIComponent(u.oid)}/${encodeURIComponent(u.tid)}/promote" style="display:inline;"><button type="submit">Promote</button></form>`;
+      // u.is_company_admin's Demote branch above intentionally renders no
+      // button at all when !canDemoteCompanyAdmin (self/env-admin) — same
+      // "hide, don't just disable" treatment as every other guarded action.
+      const companyActions = u.is_company_admin && !canDemoteCompanyAdmin ? "" : companyAdminForm;
+
+      const globalActions = form(
+        u.is_global_admin ? "demote-global-admin" : "promote-global-admin",
+        u.is_global_admin ? "Demote Global" : "Promote Global",
+        u.is_global_admin ? canToggleGlobalAdmin : req.user.isAdmin && !isSelf
+      );
+      const suspendAction = form(u.is_suspended ? "unsuspend" : "suspend", u.is_suspended ? "Unsuspend" : "Suspend", canSuspendOrDelete);
+      const deleteAction = form(
+        "delete",
+        "Delete",
+        canSuspendOrDelete,
+        `Permanently delete ${(u.email ?? "this user").replace(/'/g, "")}? This cannot be undone.`
+      );
+      const freeTierAction = req.user.isAdmin
+        ? form(u.plan === "free" ? "unset-free-tier" : "set-free-tier", u.plan === "free" ? "Remove Free Tier" : "Set Free Tier", true)
+        : "";
+
+      return `<tr>
+        <td>${escapeHtml(u.email ?? "(no email)")}</td>
+        ${!domain ? `<td>${escapeHtml(u.company_domain ?? "")}</td>` : ""}
+        <td>${escapeHtml(badges)}</td>
+        <td>${dateOnly(u.registered_at)}</td>
+        <td>${dateOnly(u.last_seen_at)}</td>
+        <td>${companyActions} ${globalActions} ${freeTierAction} ${suspendAction} ${deleteAction}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const activityRows = recentActions
+    .map(
+      (a) =>
+        `<tr><td>${new Date(a.created_at).toLocaleString()}</td><td>${escapeHtml(a.actor_email ?? "?")}</td><td>${escapeHtml(a.action)}</td><td>${escapeHtml(a.target_email ?? "?")}</td></tr>`
+    )
+    .join("");
+
+  res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
+    <h1>Users</h1>
+    <p>${domain ? `Viewing ${escapeHtml(domain)}.` : "Viewing every company."} <a href="/admin">&larr; Back to library</a></p>
+    ${companyPicker}
+    ${errorMsg ? `<p class="admin-error">${escapeHtml(errorMsg)}</p>` : ""}
+    <table>
+      <thead><tr><th>Email</th>${!domain ? "<th>Company</th>" : ""}<th>Roles</th><th>Registered</th><th>Last Active</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6">No users.</td></tr>`}</tbody>
+    </table>
+    <h2>Recent Activity</h2>
+    <table>
+      <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th></tr></thead>
+      <tbody>${activityRows || `<tr><td colspan="4">No activity yet.</td></tr>`}</tbody>
+    </table>
+  </body></html>`);
+});
+
+app.post("/admin/users/:oid/:tid/promote-global-admin", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
+  if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
+  const { oid, tid } = req.params;
+  const target = await getUserByKey(oid, tid);
+  if (!target) return res.status(404).send("User not found.");
+
+  await setGlobalAdmin(oid, tid, true);
+  await logAdminAction({
+    actorOid: req.user.oid,
+    actorTid: req.user.tid,
+    actorEmail: req.user.email,
+    action: "promote_global_admin",
+    targetOid: oid,
+    targetTid: tid,
+    targetEmail: target.email,
+  });
+  res.redirect(303, usersRedirectTarget(target));
+});
+
+// Guards: can't revoke an env-file admin's access here (isAdminEmail — that
+// admin status is server-config, not DB state); no self-demotion, ever,
+// for anyone (matches the identical rule on the company-admin demote
+// route above — no exemption for global admins demoting themselves,
+// deliberately, per the same reasoning).
+app.post("/admin/users/:oid/:tid/demote-global-admin", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
+  if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
+  const { oid, tid } = req.params;
+  const target = await getUserByKey(oid, tid);
+  if (!target) return res.status(404).send("User not found.");
+  if (isAdminEmail(target.email)) {
+    return redirectWithError(res, usersRedirectTarget(target), "This user's admin access comes from server configuration and can't be revoked here.");
+  }
+  if (oid === req.user.oid && tid === req.user.tid) {
+    return redirectWithError(res, usersRedirectTarget(target), "You can't remove your own admin status — ask another admin.");
+  }
+
+  await setGlobalAdmin(oid, tid, false);
+  await logAdminAction({
+    actorOid: req.user.oid,
+    actorTid: req.user.tid,
+    actorEmail: req.user.email,
+    action: "demote_global_admin",
+    targetOid: oid,
+    targetTid: tid,
+    targetEmail: target.email,
+  });
+  res.redirect(303, usersRedirectTarget(target));
+});
+
+/**
+ * Shared guard for suspend/unsuspend/delete: a company admin may only act
+ * on ordinary members of their own company (never any admin, global or
+ * company, and never outside their domain); a global admin may act on
+ * anyone except themselves and except an env-file admin (whose access is
+ * server-config, not revocable via this UI at all). Returns an error
+ * string, or null if allowed.
+ */
+function checkCanModerateUser(actor, target) {
+  if (!target) return "User not found.";
+  if (isAdminEmail(target.email)) return "This user's admin access comes from server configuration and can't be changed here.";
+  if (target.oid === actor.oid && target.tid === actor.tid) return "You can't do that to your own account.";
+  if (actor.isAdmin) return null;
+  if (!canAdminCompany(actor, target.company_domain)) return "Not an admin for this company.";
+  if (target.is_global_admin || target.is_company_admin) return "Company admins can't modify another admin's account.";
+  return null;
+}
+
+app.post("/admin/users/:oid/:tid/suspend", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
+  const { oid, tid } = req.params;
+  const target = await getUserByKey(oid, tid);
+  const error = checkCanModerateUser(req.user, target);
+  if (error) return redirectWithError(res, target ? usersRedirectTarget(target) : "/admin/users", error);
+
+  await setSuspended(oid, tid, true);
+  await logAdminAction({
+    actorOid: req.user.oid,
+    actorTid: req.user.tid,
+    actorEmail: req.user.email,
+    action: "suspend",
+    targetOid: oid,
+    targetTid: tid,
+    targetEmail: target.email,
+  });
+  res.redirect(303, usersRedirectTarget(target));
+});
+
+app.post("/admin/users/:oid/:tid/unsuspend", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
+  const { oid, tid } = req.params;
+  const target = await getUserByKey(oid, tid);
+  const error = checkCanModerateUser(req.user, target);
+  if (error) return redirectWithError(res, target ? usersRedirectTarget(target) : "/admin/users", error);
+
+  await setSuspended(oid, tid, false);
+  await logAdminAction({
+    actorOid: req.user.oid,
+    actorTid: req.user.tid,
+    actorEmail: req.user.email,
+    action: "unsuspend",
+    targetOid: oid,
+    targetTid: tid,
+    targetEmail: target.email,
+  });
+  res.redirect(303, usersRedirectTarget(target));
+});
+
+// The one genuinely irreversible action here — softDeleteUser scrubs PII
+// and the account can never sign in again (see server/db.js). The Users
+// page's Delete button carries its own confirm() (an ordinary browser
+// context, unlike the task pane, so confirm() works fine — same reasoning
+// every other destructive /admin action already relies on).
+app.post("/admin/users/:oid/:tid/delete", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
+  const { oid, tid } = req.params;
+  const target = await getUserByKey(oid, tid);
+  const error = checkCanModerateUser(req.user, target);
+  if (error) return redirectWithError(res, target ? usersRedirectTarget(target) : "/admin/users", error);
+
+  const redirectTarget = usersRedirectTarget(target);
+  await softDeleteUser(oid, tid);
+  await logAdminAction({
+    actorOid: req.user.oid,
+    actorTid: req.user.tid,
+    actorEmail: req.user.email,
+    action: "delete",
+    targetOid: oid,
+    targetTid: tid,
+    targetEmail: target.email,
+  });
+  res.redirect(303, redirectTarget);
+});
+
+app.post("/admin/users/:oid/:tid/set-free-tier", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
+  if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
+  const { oid, tid } = req.params;
+  const target = await getUserByKey(oid, tid);
+  if (!target) return res.status(404).send("User not found.");
+
+  await setFreeTier(oid, tid, true);
+  await logAdminAction({
+    actorOid: req.user.oid,
+    actorTid: req.user.tid,
+    actorEmail: req.user.email,
+    action: "set_free_tier",
+    targetOid: oid,
+    targetTid: tid,
+    targetEmail: target.email,
+  });
+  res.redirect(303, usersRedirectTarget(target));
+});
+
+app.post("/admin/users/:oid/:tid/unset-free-tier", async (req, res) => {
+  if (!req.user) return res.status(401).send("Sign in first.");
+  if (!req.user.isRegistered) return res.status(403).send("Finish creating your account first.");
+  if (!req.user.isAdmin) return res.status(403).send("Not an admin.");
+  const { oid, tid } = req.params;
+  const target = await getUserByKey(oid, tid);
+  if (!target) return res.status(404).send("User not found.");
+
+  await setFreeTier(oid, tid, false);
+  await logAdminAction({
+    actorOid: req.user.oid,
+    actorTid: req.user.tid,
+    actorEmail: req.user.email,
+    action: "unset_free_tier",
+    targetOid: oid,
+    targetTid: tid,
+    targetEmail: target.email,
+  });
+  res.redirect(303, usersRedirectTarget(target));
 });
 
 function escapeHtml(str) {
@@ -1193,6 +1554,10 @@ app.get("/admin", async (req, res) => {
     req.user.companyDomain && canAdminCompany(req.user, req.user.companyDomain)
       ? `<a href="/admin?scope=company:${encodeURIComponent(req.user.companyDomain)}"${isCompanyScope ? ' class="active"' : ""}>${escapeHtml(req.user.companyDomain)}</a>`
       : "";
+  // Admin UI Phase 22 — the only entry point into user administration is
+  // this link, reached from /admin (itself only reachable via the task
+  // pane's "Open Admin…" button) — deliberately not a new toolbar control.
+  const usersNavLink = req.user.isAdmin || req.user.isCompanyAdmin ? `<a href="/admin/users">Users</a>` : "";
   const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
   // Set by taskpane.ts's addSelectedSlideToLibrary after creating a new
   // item — lets this page scroll straight to it instead of leaving the
@@ -1207,9 +1572,9 @@ app.get("/admin", async (req, res) => {
     </div>
     <h1>Welcome, admin</h1>
     <p>Signed in as ${escapeHtml(req.user.email)}.<span id="admin-reorder-status" class="admin-reorder-status"></span></p>
-    ${isCompanyScope ? `<p>Viewing ${escapeHtml(companyScopeDomain)}'s library. <a href="/admin/company-admins?domain=${encodeURIComponent(companyScopeDomain)}">Manage company admins</a></p>` : ""}
+    ${isCompanyScope ? `<p>Viewing ${escapeHtml(companyScopeDomain)}'s library. <a href="/admin/users?domain=${encodeURIComponent(companyScopeDomain)}">Manage users</a></p>` : ""}
     ${errorMsg ? `<p class="admin-error">${escapeHtml(errorMsg)}</p>` : ""}
-    <nav class="admin-category-nav">${categoryNav}${companyNavLink}</nav>
+    <nav class="admin-category-nav">${categoryNav}${companyNavLink}${usersNavLink}</nav>
     <div id="adminClusters">${clusterSections}</div>
     <div id="adminLightbox" class="admin-lightbox"><img id="adminLightboxImg" alt=""></div>
     <script>
