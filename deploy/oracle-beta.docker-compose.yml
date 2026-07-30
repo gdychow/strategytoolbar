@@ -18,6 +18,9 @@
 # for why: Office identifies an add-in by this Id, not by domain, so beta
 # needs its own to be sideloadable/installable alongside the toolbar
 # instance rather than colliding as "the same add-in, different source";
+# AZURE_CLIENT_ID can be the same as toolbar's if you want both on one App
+# Registration, or different if you registered separate apps per domain —
+# see the toolbar compose file's header for the full explanation;
 # SESSION_SECRET and POSTGRES_PASSWORD should NOT be reused from the
 # toolbar stack's .env either), host port (8081, not 8080 — avoids
 # colliding with the toolbar stack on the same host), and image name.

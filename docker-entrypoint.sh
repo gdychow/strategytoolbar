@@ -17,6 +17,19 @@ sed -i "s#__DOMAIN__#${DOMAIN}#g" /app/dist/manifest.xml
 MANIFEST_ID="${MANIFEST_ID:-15e2608e-07d9-4f12-8a7c-18158275f61b}"
 sed -i "s#__MANIFEST_ID__#${MANIFEST_ID}#g" /app/dist/manifest.xml
 
+# Same pattern again for the Azure App Registration client ID — NOT a
+# secret, but IS environment-specific (different domains can be registered
+# under different App Registrations). Two targets: src/config/auth.json
+# (read fresh at Node startup by server.js's require()) and dist/
+# taskpane.js (esbuild bakes auth.json's clientId in as a literal string
+# at build time, via src/auth/msal.ts's import — so this one's a source-
+# code substitution, not just a data file). Defaults to the original
+# gavinchow.me App Registration's client ID, so any existing deployment
+# that never sets AZURE_CLIENT_ID keeps authenticating against the same
+# app it always has.
+AZURE_CLIENT_ID="${AZURE_CLIENT_ID:-2d499447-2b3d-4da8-ba78-ff5d1b1699b1}"
+sed -i "s#__AZURE_CLIENT_ID__#${AZURE_CLIENT_ID}#g" /app/src/config/auth.json /app/dist/taskpane.js
+
 # One-time seed of the persistent catalog volume's thumbnails/ dir from the
 # image's baked-in copy (dist/assets/catalog/thumbnails, put there by
 # build.mjs). Guarded on the dir not already existing, so this only fires

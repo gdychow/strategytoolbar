@@ -40,6 +40,21 @@
 #                       reasoning as DOMAIN above for why it lives in .env
 #                       anyway. docker-entrypoint.sh bakes both this and
 #                       DOMAIN into the manifest at container startup.
+#   AZURE_CLIENT_ID      not a secret, but IS environment-specific — the
+#                       Azure App Registration's client ID. Same
+#                       __PLACEHOLDER__-then-sed-at-startup mechanism as
+#                       DOMAIN/MANIFEST_ID (see docker-entrypoint.sh),
+#                       baked into both src/config/auth.json (read at Node
+#                       startup) and dist/taskpane.js (esbuild bakes
+#                       auth.json's clientId in as a literal string at
+#                       build time). Defaults to the original gavinchow.me
+#                       App Registration's client ID if unset, so that
+#                       deployment needs no .env change. Set this to your
+#                       new App Registration's client ID if toolbar and
+#                       beta are meant to share one (recommended, since
+#                       src/config/auth.json is one file shared by every
+#                       checkout) — or give beta a different value if you
+#                       registered separate apps per domain.
 #   ADMIN_EMAILS       comma-separated, case-insensitive — whoever's email
 #                       matches gets isAdmin=true
 #   SESSION_SECRET      random string signing session cookies — MUST be
@@ -52,12 +67,8 @@
 #                       already isolated on separate Docker networks
 #                       regardless.
 #
-# There is deliberately no AZURE_CLIENT_ID here (an earlier version of
-# this file had one, but nothing in the app actually reads it — the real
-# Azure App Registration client ID comes from src/config/auth.json, baked
-# into the image at build time and used by both the server and the client
-# bundle). Before this instance's sign-in will work, that Azure App
-# Registration needs https://toolbar.deckcelerate.com's redirect URIs
+# Before this instance's sign-in will work, your Azure App Registration
+# needs https://toolbar.deckcelerate.com's redirect URIs
 # added — see the setup notes given alongside this file.
 #
 # Cloudflare (Tunnel or proxied DNS — set up on the Cloudflare side, not
