@@ -145,32 +145,40 @@ async function getTargetSlide(context: PowerPoint.RequestContext): Promise<Power
   return slides.items[slides.items.length - 1];
 }
 
+/** Shared by insertFileItem and insertFileItemAsNewSlide — inserts the item's slide immediately after the current one and locates it, without deciding what happens to it afterward. */
+async function insertFileSlideAfterCurrent(
+  context: PowerPoint.RequestContext,
+  base64: string
+): Promise<{ originalSlideId: string; newSlide: PowerPoint.Slide }> {
+  const originalSlide = await getTargetSlide(context);
+  originalSlide.load("id");
+  await context.sync();
+  const originalSlideId = originalSlide.id;
+
+  context.presentation.insertSlidesFromBase64(base64, {
+    formatting: PowerPoint.InsertSlideFormatting.keepSourceFormatting,
+    targetSlideId: originalSlideId,
+  });
+  await context.sync();
+
+  // insertSlidesFromBase64 always places the new slide immediately after
+  // targetSlideId — there's no way to learn the new slide's ID ahead of
+  // time, so re-locate it by position once the collection reflects it.
+  const slides = context.presentation.slides;
+  slides.load("items/id");
+  await context.sync();
+  const originalIndex = slides.items.findIndex((s) => s.id === originalSlideId);
+  if (originalIndex === -1 || originalIndex + 1 >= slides.items.length) {
+    throw new Error("Couldn't locate the newly inserted slide.");
+  }
+  return { originalSlideId, newSlide: slides.items[originalIndex + 1] };
+}
+
 export async function insertFileItem(itemId: number): Promise<FileInsertHandle> {
   const base64 = await fetchFileBase64(itemId);
 
   return PowerPoint.run(async (context) => {
-    const originalSlide = await getTargetSlide(context);
-    originalSlide.load("id");
-    await context.sync();
-    const originalSlideId = originalSlide.id;
-
-    context.presentation.insertSlidesFromBase64(base64, {
-      formatting: PowerPoint.InsertSlideFormatting.keepSourceFormatting,
-      targetSlideId: originalSlideId,
-    });
-    await context.sync();
-
-    // insertSlidesFromBase64 always places the new slide immediately after
-    // targetSlideId — there's no way to learn the new slide's ID ahead of
-    // time, so re-locate it by position once the collection reflects it.
-    const slides = context.presentation.slides;
-    slides.load("items/id");
-    await context.sync();
-    const originalIndex = slides.items.findIndex((s) => s.id === originalSlideId);
-    if (originalIndex === -1 || originalIndex + 1 >= slides.items.length) {
-      throw new Error("Couldn't locate the newly inserted slide.");
-    }
-    const tempSlide = slides.items[originalIndex + 1];
+    const { originalSlideId, newSlide: tempSlide } = await insertFileSlideAfterCurrent(context, base64);
 
     tempSlide.shapes.load("items/id");
     await context.sync();
@@ -182,12 +190,37 @@ export async function insertFileItem(itemId: number): Promise<FileInsertHandle> 
   });
 }
 
-export async function finishFileInsert(handle: FileInsertHandle): Promise<void> {
+/**
+ * The direct-insert route for 'file'-mode items: skips the temp-slide/
+ * copy-paste/Finish dance entirely — the inserted slide is the permanent
+ * result, exactly like a plain "insert new slide" action. No handle is
+ * returned since there's nothing left to clean up.
+ */
+export async function insertFileItemAsNewSlide(itemId: number): Promise<void> {
+  const base64 = await fetchFileBase64(itemId);
+
   await PowerPoint.run(async (context) => {
-    const tempSlide = context.presentation.slides.getItemOrNullObject(handle.tempSlideId);
+    const { newSlide } = await insertFileSlideAfterCurrent(context, base64);
+    context.presentation.setSelectedSlides([newSlide.id]);
     await context.sync();
-    if (!tempSlide.isNullObject) {
-      tempSlide.delete();
+  });
+}
+
+/**
+ * `keep: true` ("Finish and Keep") leaves the temp slide in the deck as a
+ * permanent one instead of deleting it — for when the copy/paste has
+ * already been done and the user decides the extra slide is worth keeping
+ * too, not just scratch space. Either way, selection returns to the
+ * slide the user started on.
+ */
+export async function finishFileInsert(handle: FileInsertHandle, options: { keep?: boolean } = {}): Promise<void> {
+  await PowerPoint.run(async (context) => {
+    if (!options.keep) {
+      const tempSlide = context.presentation.slides.getItemOrNullObject(handle.tempSlideId);
+      await context.sync();
+      if (!tempSlide.isNullObject) {
+        tempSlide.delete();
+      }
     }
     context.presentation.setSelectedSlides([handle.originalSlideId]);
     await context.sync();

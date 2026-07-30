@@ -135,22 +135,22 @@ section.dragging {
 .color-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   margin-bottom: 6px;
   flex-wrap: wrap;
 }
 
 .color-row label {
-  min-width: 32px;
+  min-width: 26px;
   flex: 0 0 auto;
 }
 
-/* Fill/Line/Text share one .color-row (see taskpane.html) — each is its own label+swatch+caret group so the row's 14px gap separates the three controls, not the swatch from its own caret. */
+/* Fill/Line/Text share one .color-row (see taskpane.html) — each is its own label+swatch+caret group, compact enough that all three still fit on one line at the task pane's minimum width. */
 .color-control {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 /* Zero gap here (unlike .color-row/.color-control above) so the caret sits flush against the swatch — the two share a hairline border and read as one control. */
@@ -158,7 +158,7 @@ section.dragging {
   display: flex;
 }
 
-/* "Margin" is wider than the 32px that fits "Fill"/"Line"/"Text" fine on its own — min-width above already covers it, this just gives it a bit more breathing room from the input next to it. */
+/* "Margin" is wider than the 26px that fits "Fill"/"Line"/"Text" fine on its own — min-width is just a floor, this just gives it a bit more breathing room from the input next to it. */
 .margin-label {
   margin-right: 2px;
 }
@@ -175,7 +175,7 @@ section.dragging {
 }
 
 .color-swatch {
-  width: 30px;
+  width: 26px;
   height: 26px;
   padding: 0;
   border: 1px solid var(--border);
@@ -186,7 +186,7 @@ section.dragging {
 }
 
 .color-caret {
-  width: 22px;
+  width: 18px;
   height: 26px;
   padding: 0;
   border: 1px solid var(--border);

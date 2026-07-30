@@ -369,10 +369,25 @@ async function insertPickedItem(item: Library.CatalogItem): Promise<void> {
   if (handle) {
     currentFileInsertHandle = handle;
     showLibraryFinishRow(true);
-    notify(`"${item.title}" added on a temporary slide — copy it across, then click Finish.`);
+    notify(`"${item.title}" added on a temporary slide — copy it across, then finish.`);
   } else {
     notify(`"${item.title}" inserted.`);
   }
+}
+
+/**
+ * The gallery's "Insert as New Slide" route (#btnInsertAsSlide there) —
+ * only ever sent for 'file'-mode items (the button is hidden for every
+ * other mode), which is the only mode insertFileItemAsNewSlide handles.
+ * Inserts directly as a permanent slide: no temp slide, no copy/paste, no
+ * Finish row.
+ */
+async function insertPickedItemAsSlide(item: Library.CatalogItem): Promise<void> {
+  if (item.insertMode !== "file") {
+    throw new Error(`"Insert as New Slide" isn't available for "${item.title}".`);
+  }
+  await Library.insertFileItemAsNewSlide(item.id);
+  notify(`"${item.title}" inserted as a new slide.`);
 }
 
 /**
@@ -397,17 +412,19 @@ function refreshLibrarySection(user: SessionUser | null): void {
     currentFileInsertHandle = null;
   }
 
-  // "Save to" scope picker: admin/company-admin only — everyone else's
-  // "Add to Library" always saves to their own personal library, so there's
-  // nothing for them to pick (see TARGET_ENDPOINTS/currentLibraryTarget,
-  // which already default to "personal" when the select has no other
-  // option selected).
-  const targetRow = document.getElementById("libraryTargetRow");
-  const showTargetRow = unlocked && (!!user?.isAdmin || !!user?.isCompanyAdmin);
-  if (targetRow) (targetRow as HTMLElement).style.display = showTargetRow ? "" : "none";
+  // Scope picker (label + select): admin/company-admin only — everyone
+  // else's Add click always saves to their own personal library, so
+  // there's nothing for them to pick (see TARGET_ENDPOINTS/
+  // currentLibraryTarget, which already default to "personal" when the
+  // select has no other option selected). The button itself always stays
+  // in this same row (see taskpane.html) — only its label text changes.
+  const showTargetPicker = unlocked && (!!user?.isAdmin || !!user?.isCompanyAdmin);
+  const targetLabel = document.getElementById("libraryTargetLabel");
+  if (targetLabel) (targetLabel as HTMLElement).style.display = showTargetPicker ? "" : "none";
 
   const targetSelect = document.getElementById("libraryTarget") as HTMLSelectElement | null;
   if (targetSelect) {
+    (targetSelect as HTMLElement).style.display = showTargetPicker ? "" : "none";
     const previous = targetSelect.value;
     targetSelect.innerHTML = "";
     const addOption = (value: LibraryTarget, label: string) => {
@@ -421,6 +438,10 @@ function refreshLibrarySection(user: SessionUser | null): void {
     if (user?.isAdmin) addOption("global", "Global Catalog");
     if (Array.from(targetSelect.options).some((o) => o.value === previous)) targetSelect.value = previous;
   }
+
+  // Admins/company admins get a picker, so the button just says "Add"; a
+  // plain user has no picker at all, so it spells out where content goes.
+  setAddToLibraryLabel(showTargetPicker ? ADD_TO_LIBRARY_LABEL_ADMIN : ADD_TO_LIBRARY_LABEL_PLAIN);
 
   // Add-to-library needs a higher requirement set (PowerPointApi 1.8, for
   // exportAsBase64/getImageAsBase64) than the rest of this section (1.2) —
@@ -613,24 +634,40 @@ async function cancelLibraryEdit(): Promise<void> {
 let addToLibraryArmed = false;
 let addToLibraryArmedTimer: number | undefined;
 
-const ADD_TO_LIBRARY_LABEL = "Add to Library";
+// Admins/company admins have a scope picker next to the button, so it just
+// says "Add"; a plain user has no picker at all, so the button spells out
+// where the content is going. Whichever applies is set by
+// refreshLibrarySection (via setAddToLibraryLabel) and remembered here so
+// the arm/confirm two-click below can restore the right one afterward,
+// rather than a single hardcoded constant.
+const ADD_TO_LIBRARY_LABEL_ADMIN = "Add";
+const ADD_TO_LIBRARY_LABEL_PLAIN = "Add to my library";
 const ADD_TO_LIBRARY_CONFIRM_LABEL = "Click again to confirm — adds the current slide";
+let currentAddToLibraryLabel = ADD_TO_LIBRARY_LABEL_PLAIN;
+
+/** Sets #btnLibraryAdd's visible text without touching its icon <img> pair (a plain btn.textContent= would wipe those out). */
+function setAddToLibraryLabel(label: string): void {
+  currentAddToLibraryLabel = label;
+  if (addToLibraryArmed) return; // don't clobber the "click again to confirm" prompt mid-arm
+  const labelEl = document.querySelector("#btnLibraryAdd .btn-label");
+  if (labelEl) labelEl.textContent = label;
+}
 
 async function addSelectedSlideToLibrary(): Promise<void> {
-  const btn = document.getElementById("btnLibraryAdd") as HTMLButtonElement | null;
+  const labelEl = document.querySelector("#btnLibraryAdd .btn-label");
   if (!addToLibraryArmed) {
     addToLibraryArmed = true;
-    if (btn) btn.textContent = ADD_TO_LIBRARY_CONFIRM_LABEL;
+    if (labelEl) labelEl.textContent = ADD_TO_LIBRARY_CONFIRM_LABEL;
     window.clearTimeout(addToLibraryArmedTimer);
     addToLibraryArmedTimer = window.setTimeout(() => {
       addToLibraryArmed = false;
-      if (btn) btn.textContent = ADD_TO_LIBRARY_LABEL;
+      if (labelEl) labelEl.textContent = currentAddToLibraryLabel;
     }, 4000);
     return;
   }
   addToLibraryArmed = false;
   window.clearTimeout(addToLibraryArmedTimer);
-  if (btn) btn.textContent = ADD_TO_LIBRARY_LABEL;
+  if (labelEl) labelEl.textContent = currentAddToLibraryLabel;
 
   const target = currentLibraryTarget();
   const { pptxBase64, thumbnailBase64 } = await Library.exportCurrentSlideForAdmin();
@@ -985,7 +1022,13 @@ Office.onReady((info) => {
             return;
           }
           const action =
-            payload.action === "edit" ? beginLibraryEdit : payload.action === "delete" ? deleteLibraryItem : insertPickedItem;
+            payload.action === "edit"
+              ? beginLibraryEdit
+              : payload.action === "delete"
+                ? deleteLibraryItem
+                : payload.action === "insert-as-slide"
+                  ? insertPickedItemAsSlide
+                  : insertPickedItem;
           action(payload.item).catch((err) =>
             notify(`Error: ${err instanceof Error ? err.message : String(err)}`, "error")
           );
@@ -1028,12 +1071,19 @@ Office.onReady((info) => {
     );
   });
 
-  bindButton("btnLibraryFinish", async () => {
+  bindButton("btnLibraryFinishDelete", async () => {
     if (!currentFileInsertHandle) return;
     await Library.finishFileInsert(currentFileInsertHandle);
     currentFileInsertHandle = null;
     showLibraryFinishRow(false);
     notify("Done — temporary slide removed.");
+  });
+  bindButton("btnLibraryFinishKeep", async () => {
+    if (!currentFileInsertHandle) return;
+    await Library.finishFileInsert(currentFileInsertHandle, { keep: true });
+    currentFileInsertHandle = null;
+    showLibraryFinishRow(false);
+    notify("Done — temporary slide kept.");
   });
 
   bindButton("btnLibraryAdd", addSelectedSlideToLibrary);

@@ -32,22 +32,26 @@
     <p class="unsupported-note"></p>
     <div class="btn-row">
       <button id="btnBrowseLibrary"><img class="btn-icon btn-icon-light" src="/assets/icons/browse-library.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/browse-library.svg" alt="" /><span class="btn-label">Browse Library…</span></button>
-      <button id="btnBrowseTemplates">Template Library…</button>
-    </div>
-    <!-- Admin/company-admin only (see refreshLibrarySection in taskpane.ts)
-         — everyone else's "Add to Library" click always saves to their own
-         personal library, with no scope to pick. -->
-    <div id="libraryTargetRow" class="btn-row" style="display: none;">
-      <label for="libraryTarget">Save to</label>
-      <select id="libraryTarget"></select>
+      <button id="btnBrowseTemplates"><img class="btn-icon btn-icon-light" src="/assets/icons/template-library.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/template-library.svg" alt="" /><span class="btn-label">Template Library…</span></button>
     </div>
     <p id="libraryAddUnsupportedNote" class="unsupported-note"></p>
-    <div class="btn-row">
-      <button id="btnLibraryAdd">Add to Library</button>
+    <!-- The label+select are admin/company-admin only (see
+         refreshLibrarySection in taskpane.ts) — everyone else's Add click
+         always saves to their own personal library, so there's nothing for
+         them to pick; the button itself always stays in this same row,
+         with its label text swapped ("Add" vs. "Add to my library")
+         depending on whether the picker is showing. -->
+    <div id="libraryTargetRow" class="btn-row">
+      <label id="libraryTargetLabel" for="libraryTarget" style="display: none;">Add to Library</label>
+      <select id="libraryTarget" style="display: none;"></select>
+      <button id="btnLibraryAdd"><img class="btn-icon btn-icon-light" src="/assets/icons/add-to-library.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/add-to-library.svg" alt="" /><span class="btn-label">Add to my library</span></button>
     </div>
     <div id="libraryFinishRow" class="library-finish-row" style="display: none;">
-      <p>Content added and selected on a temporary slide. Copy it (Ctrl/Cmd+C), click your slide, paste (Ctrl/Cmd+V), then click Finish.</p>
-      <button id="btnLibraryFinish">Finish</button>
+      <p>Content added and selected on a temporary slide. Copy it (Ctrl/Cmd+C), click your slide, paste (Ctrl/Cmd+V), then finish.</p>
+      <div class="btn-row">
+        <button id="btnLibraryFinishDelete" title="Removes the temporary slide once you've copied its content across.">Finish and Delete</button>
+        <button id="btnLibraryFinishKeep" title="Keeps the temporary slide as a permanent slide in the deck too.">Finish and Keep</button>
+      </div>
     </div>
   </section>
 
@@ -102,6 +106,9 @@
   <section id="sectionPosition">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Position &amp; Size</h2>
     <div class="btn-row">
+      <button id="btnSwitchPositions"><img class="btn-icon btn-icon-light" src="/assets/icons/switch-positions.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/switch-positions.svg" alt="" /><span class="btn-label">Switch Positions</span></button>
+    </div>
+    <div class="btn-row">
       <button id="btnGetPosition"><img class="btn-icon btn-icon-light" src="/assets/icons/get-position.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/get-position.svg" alt="" /><span class="btn-label">Get Position</span></button>
       <button id="btnSetPosition"><img class="btn-icon btn-icon-light" src="/assets/icons/set-position.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/set-position.svg" alt="" /><span class="btn-label">Set Position</span></button>
     </div>
@@ -114,17 +121,10 @@
       <button id="btnFixWidth"><img class="btn-icon btn-icon-light" src="/assets/icons/fix-width.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/fix-width.svg" alt="" /><span class="btn-label">Fix Width</span></button>
       <button id="btnFixHeight"><img class="btn-icon btn-icon-light" src="/assets/icons/fix-height.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/fix-height.svg" alt="" /><span class="btn-label">Fix Height</span></button>
     </div>
-    <div class="btn-row">
-      <button id="btnSwitchPositions"><img class="btn-icon btn-icon-light" src="/assets/icons/switch-positions.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/switch-positions.svg" alt="" /><span class="btn-label">Switch Positions</span></button>
-    </div>
   </section>
 
   <section id="sectionAlign">
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Align &amp; Distribute</h2>
-    <div class="btn-row">
-      <button id="btnHvAlign"><img class="btn-icon btn-icon-light" src="/assets/icons/grid-align.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/grid-align.svg" alt="" /><span class="btn-label">Grid Align</span></button>
-      <button id="btnHvDistribute"><img class="btn-icon btn-icon-light" src="/assets/icons/grid-distribute.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/grid-distribute.svg" alt="" /><span class="btn-label">Grid Distribute</span></button>
-    </div>
     <div class="btn-row">
       <button id="btnDistributeH"><img class="btn-icon btn-icon-light" src="/assets/icons/distribute-horizontal.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/distribute-horizontal.svg" alt="" /><span class="btn-label">Distribute Horizontally</span></button>
       <button id="btnDistributeV"><img class="btn-icon btn-icon-light" src="/assets/icons/distribute-vertical.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/distribute-vertical.svg" alt="" /><span class="btn-label">Distribute Vertically</span></button>
@@ -132,6 +132,10 @@
     <div class="btn-row">
       <button id="btnEdgeJoinH"><img class="btn-icon btn-icon-light" src="/assets/icons/edge-join-h.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/edge-join-h.svg" alt="" /><span class="btn-label">Edge Join (Horizontal)</span></button>
       <button id="btnEdgeJoinV"><img class="btn-icon btn-icon-light" src="/assets/icons/edge-join-v.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/edge-join-v.svg" alt="" /><span class="btn-label">Edge Join (Vertical)</span></button>
+    </div>
+    <div class="btn-row">
+      <button id="btnHvAlign"><img class="btn-icon btn-icon-light" src="/assets/icons/grid-align.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/grid-align.svg" alt="" /><span class="btn-label">Grid Align</span></button>
+      <button id="btnHvDistribute"><img class="btn-icon btn-icon-light" src="/assets/icons/grid-distribute.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/grid-distribute.svg" alt="" /><span class="btn-label">Grid Distribute</span></button>
     </div>
   </section>
 
@@ -177,8 +181,8 @@
     <h2><span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>Chevron Tools</h2>
     <p class="unsupported-note"></p>
     <div class="btn-row">
-      <button id="btnAlignAngles"><img class="btn-icon btn-icon-light" src="/assets/icons/align-angles.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/align-angles.svg" alt="" /><span class="btn-label">Align Angles</span></button>
-      <button id="btnChevronAlign"><img class="btn-icon btn-icon-light" src="/assets/icons/chevron-align.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/chevron-align.svg" alt="" /><span class="btn-label">Chevron Align</span></button>
+      <button id="btnAlignAngles"><img class="btn-icon btn-icon-light" src="/assets/icons/align-angles.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/align-angles.svg" alt="" /><span class="btn-label">Align Chevron Angles</span></button>
+      <button id="btnChevronAlign"><img class="btn-icon btn-icon-light" src="/assets/icons/chevron-align.svg" alt="" /><img class="btn-icon btn-icon-dark" src="/assets/icons/dark/chevron-align.svg" alt="" /><span class="btn-label">Join Chevrons</span></button>
     </div>
   </section>
 

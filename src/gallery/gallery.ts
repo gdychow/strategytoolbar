@@ -110,10 +110,16 @@ function showPreview(item: CatalogItem): void {
   const panel = document.getElementById("previewPanel");
   const img = document.getElementById("previewImg") as HTMLImageElement | null;
   const title = document.getElementById("previewTitle");
+  const insertAsSlideBtn = document.getElementById("btnInsertAsSlide");
   const editBtn = document.getElementById("btnEdit");
   const editDetailsBtn = document.getElementById("btnEditDetails");
   const deleteBtn = document.getElementById("btnDelete");
   if (!panel || !img || !title) return;
+  // Only 'file'-mode items go through the temp-slide/copy-paste/Finish
+  // dance at all — 'reconstruct'/'unicode-char' items already insert
+  // directly in one step, so a second "as new slide" route is meaningless
+  // for them.
+  if (insertAsSlideBtn) (insertAsSlideBtn as HTMLElement).style.display = item.insertMode === "file" ? "" : "none";
   closeEditDetails();
   const existingGlyph = panel.querySelector(".preview-glyph");
   if (existingGlyph) existingGlyph.remove();
@@ -312,6 +318,11 @@ async function handleEditGroupChange(): Promise<void> {
  */
 function insertItem(item: CatalogItem): void {
   Office.context.ui.messageParent(JSON.stringify({ action: "insert", item }));
+}
+
+/** The direct route for 'file'-mode items — see #btnInsertAsSlide's title text and insertFileItemAsNewSlide (libraryInsert.ts) for what this skips. */
+function insertItemAsSlide(item: CatalogItem): void {
+  Office.context.ui.messageParent(JSON.stringify({ action: "insert-as-slide", item }));
 }
 
 /**
@@ -578,6 +589,9 @@ Office.onReady(async () => {
 
   document.getElementById("btnInsert")?.addEventListener("click", () => {
     if (selectedItem) insertItem(selectedItem);
+  });
+  document.getElementById("btnInsertAsSlide")?.addEventListener("click", () => {
+    if (selectedItem) insertItemAsSlide(selectedItem);
   });
   document.getElementById("btnEdit")?.addEventListener("click", () => {
     if (selectedItem) editItem(selectedItem);

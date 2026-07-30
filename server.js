@@ -1576,8 +1576,19 @@ app.get("/admin", async (req, res) => {
   // ?category=-based behavior, unchanged. Kept as a separate query param
   // from ?category= rather than folding category into ?scope= too, since
   // every existing category link/reference stays valid with zero changes.
+  //
+  // Bug fix: a company admin (not a global admin) clicking the task pane's
+  // "Open Admin…" button landed on plain /admin with no ?scope= at all —
+  // which fell into the isAdmin-only branch below and got a bare "Not an
+  // admin." even though they're an admin of their own company. Mirrors
+  // GET /admin/users's existing fallback: no explicit scope + not a global
+  // admin defaults to the viewer's own company, instead of requiring them
+  // to already know to type ?scope=company:<domain>.
   const scopeParam = typeof req.query.scope === "string" ? req.query.scope : null;
-  const companyScopeDomain = scopeParam && scopeParam.startsWith("company:") ? scopeParam.slice("company:".length) : null;
+  let companyScopeDomain = scopeParam && scopeParam.startsWith("company:") ? scopeParam.slice("company:".length) : null;
+  if (!scopeParam && !req.user.isAdmin && req.user.companyDomain) {
+    companyScopeDomain = req.user.companyDomain;
+  }
   const isCompanyScope = !!companyScopeDomain;
 
   if (isCompanyScope) {
@@ -1667,9 +1678,17 @@ app.get("/admin", async (req, res) => {
 
   const clusterSections = clusters.map(renderCluster).join("");
 
-  const categoryNav = CATALOG_CATEGORIES.map(
-    (c) => `<a href="/admin?category=${c}"${!isCompanyScope && c === category ? ' class="active"' : ""}>${c}</a>`
-  ).join("");
+  // Global category browsing/editing is global-admin-only — hidden for a
+  // company-only admin, since they'd otherwise see live links into a scope
+  // GET /admin now silently redirects them away from (see the scope
+  // resolution above): a bare /admin always resolves to their own company
+  // for them, so a "/admin?category=text" link would just land back on
+  // their company view, not the category it names.
+  const categoryNav = req.user.isAdmin
+    ? CATALOG_CATEGORIES.map(
+        (c) => `<a href="/admin?category=${c}"${!isCompanyScope && c === category ? ' class="active"' : ""}>${c}</a>`
+      ).join("")
+    : "";
   // Task Pane Phase 14: one extra nav entry for the viewer's own company,
   // shown only when they're that company's admin (or a global admin) —
   // reaching a *different* company's library than your own is possible
