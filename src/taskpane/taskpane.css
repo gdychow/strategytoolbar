@@ -322,24 +322,26 @@ button:disabled {
   margin-bottom: 4px;
 }
 
+/* 10-per-row, no gap — matches PowerPoint's own Standard Colors row (adjacent swatches' own 1px borders are what separate them, not a gap). */
 .color-picker-swatches {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 0;
   margin-bottom: 8px;
 }
 
 /*
  * Shared by Theme Colors (10 base roles + 5 "Darker N%" shade rows, see
  * renderThemeColorGrid) and Custom Colors (see renderNamedColorSwatches) —
- * both use PowerPoint's own 10-per-row layout, distinct from Standard
- * Colors' 8-per-row grid above. Role/shade/name is on the hover tooltip,
- * same as every other swatch grid in this panel.
+ * both use PowerPoint's own 10-per-row, no-gap layout: adjacent swatches'
+ * own 1px borders read as the grid lines, same as the native menu, rather
+ * than a visible gap between them (or between the shade rows below the
+ * base theme colors).
  */
 .color-picker-grid-10 {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  gap: 2px;
+  gap: 0;
   margin-bottom: 8px;
 }
 
@@ -438,4 +440,10 @@ button:disabled {
  */
 #libraryTargetRow {
   align-items: center;
+}
+
+/* A <select>'s flex min-width defaults to its content size, not 0 — without this, a long option label can still force the row to wrap even with short fixed labels in place. */
+#libraryTarget {
+  min-width: 0;
+  flex: 1 1 auto;
 }

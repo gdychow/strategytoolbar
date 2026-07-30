@@ -434,8 +434,11 @@ function refreshLibrarySection(user: SessionUser | null): void {
       targetSelect.appendChild(opt);
     };
     addOption("personal", "My Items");
-    if (user?.companyDomain && user?.isCompanyAdmin) addOption("company", user.companyDomain);
-    if (user?.isAdmin) addOption("global", "Global Catalog");
+    // Fixed short labels, not the real company domain — a long domain name
+    // was pushing the Add button onto its own row (the row has nowhere
+    // else to shrink once the option text is that long).
+    if (user?.companyDomain && user?.isCompanyAdmin) addOption("company", "Company Library");
+    if (user?.isAdmin) addOption("global", "Global Library");
     if (Array.from(targetSelect.options).some((o) => o.value === previous)) targetSelect.value = previous;
   }
 
