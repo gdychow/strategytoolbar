@@ -6,9 +6,9 @@
     xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
     xsi:type="TaskPaneApp">
 
-  <Id>15e2608e-07d9-4f12-8a7c-18158275f61b</Id>
+  <Id>__MANIFEST_ID__</Id>
   <Version>0.1.0.2</Version>
-  <ProviderName>Strategy Toolbar Redux</ProviderName>
+  <ProviderName>Deckcelerate</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Deckcelerate" />
   <Description DefaultValue="Deckcelerate - formatting, layout, and content tools for PowerPoint." />
@@ -33,8 +33,8 @@
           <FunctionFile resid="Commands.Url" />
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabHome">
-              <Group id="StrategyToolbarGroup">
-                <Label resid="StrategyToolbarGroup.Label" />
+              <Group id="DeckcelerateGroup">
+                <Label resid="DeckcelerateGroup.Label" />
                 <Icon>
                   <bt:Image size="16" resid="Icon.16x16" />
                   <bt:Image size="32" resid="Icon.32x32" />
@@ -74,7 +74,7 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://__DOMAIN__/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="StrategyToolbarGroup.Label" DefaultValue="Deckcelerate" />
+        <bt:String id="DeckcelerateGroup.Label" DefaultValue="Deckcelerate" />
         <bt:String id="OpenPaneButton.Label" DefaultValue="Deckcelerate" />
       </bt:ShortStrings>
       <bt:LongStrings>

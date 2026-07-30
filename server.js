@@ -1507,7 +1507,7 @@ const upload = multer({
 // resulting idToken to the same POST /api/auth/session the task pane uses.
 function renderSignInPage() {
   return `<!doctype html><html><body>
-    <h1>Strategy Toolbar Admin</h1>
+    <h1>Deckcelerate Admin</h1>
     <p id="status">Not signed in.</p>
     <button id="btnSignIn">Sign In</button>
     <script src="/vendor/msal-browser.min.js"></script>
@@ -2451,11 +2451,11 @@ function startServer() {
       cert: fs.readFileSync(path.join(certDir, "localhost.crt")),
     };
     https.createServer(options, app).listen(PORT, () => {
-      console.log(`Strategy Toolbar dev server running at https://localhost:${PORT}/taskpane.html`);
+      console.log(`Deckcelerate dev server running at https://localhost:${PORT}/taskpane.html`);
     });
   } else {
     app.listen(PORT, () => {
-      console.log(`Strategy Toolbar server running on plain HTTP, port ${PORT} (TLS expected to terminate upstream)`);
+      console.log(`Deckcelerate server running on plain HTTP, port ${PORT} (TLS expected to terminate upstream)`);
     });
   }
 }
