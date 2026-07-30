@@ -23,6 +23,7 @@ const {
   setFreeTier,
   logAdminAction,
   listRecentAdminActions,
+  listBlockedUserKeys,
   listSharedCatalogItems,
   listCompanyCatalogItems,
   getCatalogItem,
@@ -57,7 +58,16 @@ const {
   renameTemplate,
   deleteTemplate,
 } = require("./server/db");
-const { verifyMicrosoftIdToken, createSessionToken, verifySessionToken, isAdminEmail } = require("./server/auth");
+const {
+  verifyMicrosoftIdToken,
+  createSessionToken,
+  verifySessionToken,
+  isAdminEmail,
+  isUserBlocked,
+  markUserBlocked,
+  markUserUnblocked,
+  loadBlockedUsersCache,
+} = require("./server/auth");
 const {
   THUMBNAILS_DIR,
   ADMIN_ADDED_DIR,
@@ -149,6 +159,20 @@ app.use(async (req, res, next) => {
   }
 
   req.user = verified.claims;
+
+  // Admin UI Phase 22: checked on *every* request, not just at refresh
+  // time — an admin clicking Suspend expects it to take effect on the
+  // suspended user's very next request, not up to ~12h later once their
+  // JWT happens to cross the refresh threshold. isUserBlocked is an
+  // in-memory Set lookup (see server/auth.js), so this costs nothing on
+  // the hot path; it's kept in sync by the suspend/unsuspend/delete routes
+  // below and seeded from the DB at startup.
+  if (isUserBlocked(req.user.oid, req.user.tid)) {
+    res.clearCookie(SESSION_COOKIE, cookieOptions);
+    req.user = undefined;
+    return next();
+  }
+
   if (verified.shouldRefresh) {
     // Task Pane Phase 14/15: companyDomain/isCompanyAdmin/isRegistered are
     // re-fetched from the DB here (not just carried over from the old JWT
@@ -159,12 +183,12 @@ app.use(async (req, res, next) => {
     // (env-file check plus the freshly-fetched isGlobalAdmin below).
     const dbUser = await getUserByKey(verified.claims.oid, verified.claims.tid);
 
-    // Admin UI Phase 22: suspension/deletion are enforced here, not on
-    // every request — same ~12h worst-case latency isRegistered/
-    // isCompanyAdmin already have. A blocked user's session is dropped
-    // outright rather than reissued with the block baked into the token,
-    // so there's nothing for a stale cached token to keep asserting.
+    // Belt-and-suspenders backstop, not the primary enforcement (that's
+    // the isUserBlocked check above, which runs unconditionally): if the
+    // in-memory cache and the DB ever disagree — e.g. a direct DB edit
+    // outside this app — this self-heals it and still drops the session.
     if (dbUser?.deleted_at || dbUser?.is_suspended) {
+      markUserBlocked(verified.claims.oid, verified.claims.tid);
       res.clearCookie(SESSION_COOKIE, cookieOptions);
       req.user = undefined;
       return next();
@@ -1104,6 +1128,7 @@ app.post("/admin/users/:oid/:tid/suspend", async (req, res) => {
   if (error) return redirectWithError(res, target ? usersRedirectTarget(target) : "/admin/users", error);
 
   await setSuspended(oid, tid, true);
+  markUserBlocked(oid, tid); // takes effect on the target's very next request — see the refresh middleware
   await logAdminAction({
     actorOid: req.user.oid,
     actorTid: req.user.tid,
@@ -1125,6 +1150,7 @@ app.post("/admin/users/:oid/:tid/unsuspend", async (req, res) => {
   if (error) return redirectWithError(res, target ? usersRedirectTarget(target) : "/admin/users", error);
 
   await setSuspended(oid, tid, false);
+  markUserUnblocked(oid, tid);
   await logAdminAction({
     actorOid: req.user.oid,
     actorTid: req.user.tid,
@@ -1152,6 +1178,7 @@ app.post("/admin/users/:oid/:tid/delete", async (req, res) => {
 
   const redirectTarget = usersRedirectTarget(target);
   await softDeleteUser(oid, tid);
+  markUserBlocked(oid, tid); // takes effect on the target's very next request — see the refresh middleware
   await logAdminAction({
     actorOid: req.user.oid,
     actorTid: req.user.tid,
@@ -2317,7 +2344,13 @@ function startServer() {
 }
 
 waitForDatabase()
-  .then(startServer)
+  .then(async () => {
+    // Seeds the in-memory suspended/deleted-users cache (see
+    // loadBlockedUsersCache in server/auth.js) so a restart can't
+    // temporarily un-block anyone already suspended/deleted.
+    loadBlockedUsersCache(await listBlockedUserKeys());
+    startServer();
+  })
   .catch((err) => {
     console.error("Failed to start:", err);
     process.exit(1);

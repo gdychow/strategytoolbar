@@ -206,6 +206,12 @@ async function setSuspended(oid, tid, isSuspended) {
   return result.rows[0] ?? null;
 }
 
+/** Startup-only: seeds the in-memory blocked-users cache (see loadBlockedUsersCache in server/auth.js) so a server restart can't temporarily un-block anyone already suspended/deleted. */
+async function listBlockedUserKeys() {
+  const result = await pool.query(`SELECT oid, tid FROM users WHERE is_suspended = true OR deleted_at IS NOT NULL`);
+  return result.rows;
+}
+
 /**
  * The real "delete" — the row itself is never removed (catalog_items/
  * templates/subscriptions all FK-reference users with no cascade, so a hard
@@ -847,6 +853,7 @@ module.exports = {
   setSuspended,
   softDeleteUser,
   setFreeTier,
+  listBlockedUserKeys,
   logAdminAction,
   listRecentAdminActions,
   listSharedCatalogItems,

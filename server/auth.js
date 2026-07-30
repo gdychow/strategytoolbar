@@ -9,6 +9,43 @@ const SESSION_TTL_SECONDS = 24 * 60 * 60; // 24h per issuance
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30d absolute backstop
 const REFRESH_THRESHOLD_SECONDS = 12 * 60 * 60; // reissue once more than half the TTL has elapsed
 
+// Admin UI Phase 22 fix: suspend/delete originally only took effect at the
+// next JWT refresh (~12h, REFRESH_THRESHOLD_SECONDS above) or the next
+// sign-in — surprising in practice for an admin who just clicked Suspend
+// and reasonably expects it to apply immediately. This in-memory cache of
+// blocked (oid,tid) pairs is checked unconditionally on every request (see
+// server.js's refresh middleware), not just at refresh time, so a
+// suspension/deletion takes effect on the very next request regardless of
+// how fresh the caller's session is. Rebuilt from the DB at startup
+// (loadBlockedUsersCache) so a restart can't reopen a gap for someone
+// already suspended; kept in sync afterward by the suspend/unsuspend/
+// delete routes in server.js calling markUserBlocked/markUserUnblocked
+// directly, since those actions and this cache live in the same single
+// Node process — this app isn't horizontally scaled today; if it ever is,
+// this cache would need to move to a shared store (e.g. Redis) instead.
+const blockedUsers = new Set();
+
+function userKey(oid, tid) {
+  return `${oid}:${tid}`;
+}
+
+function isUserBlocked(oid, tid) {
+  return blockedUsers.has(userKey(oid, tid));
+}
+
+function markUserBlocked(oid, tid) {
+  blockedUsers.add(userKey(oid, tid));
+}
+
+function markUserUnblocked(oid, tid) {
+  blockedUsers.delete(userKey(oid, tid));
+}
+
+/** Called once at server startup with the current suspended/deleted rows, so a restart doesn't temporarily un-block anyone. */
+function loadBlockedUsersCache(rows) {
+  for (const row of rows) blockedUsers.add(userKey(row.oid, row.tid));
+}
+
 function getSessionSecret() {
   const secret = process.env.SESSION_SECRET;
   if (!secret) {
@@ -118,4 +155,8 @@ module.exports = {
   createSessionToken,
   verifySessionToken,
   SESSION_MAX_AGE_SECONDS,
+  isUserBlocked,
+  markUserBlocked,
+  markUserUnblocked,
+  loadBlockedUsersCache,
 };
