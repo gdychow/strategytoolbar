@@ -169,6 +169,15 @@ async function listCompanyDomains() {
   return result.rows;
 }
 
+/** The first company admin's email for a domain, or null if none exist (or the email is scrubbed). Used to build a contact address for a suspended/deleted user of that company. */
+async function getCompanyAdminEmail(companyDomain) {
+  const result = await pool.query(
+    `SELECT email FROM users WHERE company_domain = $1 AND is_company_admin = true AND deleted_at IS NULL AND email IS NOT NULL ORDER BY email LIMIT 1`,
+    [companyDomain]
+  );
+  return result.rows[0]?.email ?? null;
+}
+
 /** Backs the "always at least one company admin" guard in the demote route. */
 async function countCompanyAdmins(companyDomain) {
   const result = await pool.query(
@@ -848,6 +857,7 @@ module.exports = {
   setCompanyAdmin,
   listAllUsers,
   listCompanyDomains,
+  getCompanyAdminEmail,
   countCompanyAdmins,
   setGlobalAdmin,
   setSuspended,

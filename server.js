@@ -57,12 +57,14 @@ const {
   deleteOwnedTemplate,
   renameTemplate,
   deleteTemplate,
+  getCompanyAdminEmail,
 } = require("./server/db");
 const {
   verifyMicrosoftIdToken,
   createSessionToken,
   verifySessionToken,
   isAdminEmail,
+  getPrimaryAdminEmail,
   isUserBlocked,
   markUserBlocked,
   markUserUnblocked,
@@ -212,6 +214,21 @@ app.use(async (req, res, next) => {
   next();
 });
 
+// Escalates a suspended/deleted account's rejection message with a real
+// contact address: the user's own company admin if they have a company and
+// aren't a company admin themselves (so a company admin who gets suspended
+// isn't told to email themselves), otherwise the global admin.
+async function buildAccountBlockedMessage(baseMessage, user) {
+  let contactEmail = null;
+  if (user.company_domain && !user.is_company_admin) {
+    contactEmail = await getCompanyAdminEmail(user.company_domain);
+  }
+  if (!contactEmail) {
+    contactEmail = getPrimaryAdminEmail();
+  }
+  return contactEmail ? `${baseMessage} Please contact ${contactEmail} for support.` : baseMessage;
+}
+
 app.post("/api/auth/session", async (req, res) => {
   const { idToken } = req.body ?? {};
   if (typeof idToken !== "string") {
@@ -233,10 +250,10 @@ app.post("/api/auth/session", async (req, res) => {
   // account — checked here (not just at refresh time) so a blocked user
   // can't get a fresh session simply by signing out and back in.
   if (user.deleted_at) {
-    return res.status(403).json({ error: "This account has been deleted." });
+    return res.status(403).json({ error: await buildAccountBlockedMessage("This account has been deleted.", user) });
   }
   if (user.is_suspended) {
-    return res.status(403).json({ error: "This account has been suspended." });
+    return res.status(403).json({ error: await buildAccountBlockedMessage("This account has been suspended.", user) });
   }
 
   const sessionToken = await createSessionToken({
@@ -943,7 +960,7 @@ app.get("/admin/users", async (req, res) => {
   const [users, companyDomains, recentActions] = await Promise.all([
     domain ? listUsersByCompanyDomain(domain) : listAllUsers(),
     req.user.isAdmin && !domain ? listCompanyDomains() : Promise.resolve([]),
-    listRecentAdminActions({ domain }),
+    listRecentAdminActions({ domain, limit: 10 }),
   ]);
 
   const errorMsg = typeof req.query.error === "string" ? req.query.error : null;
@@ -974,14 +991,16 @@ app.get("/admin/users", async (req, res) => {
       const canSuspendOrDelete =
         !isSelf && !isEnvAdmin && (req.user.isAdmin || (!isEffectiveGlobalAdmin && !u.is_company_admin));
 
-      const badges = [
+      const badgeList = [
         isEnvAdmin ? "Global Admin (server config)" : u.is_global_admin ? "Global Admin" : "",
         u.is_company_admin ? "Company Admin" : "",
         u.plan === "free" ? "Free Tier" : "",
         u.is_suspended ? "Suspended" : "",
-      ]
-        .filter(Boolean)
-        .join(", ");
+      ].filter(Boolean);
+      const badges = badgeList.map((b) => `<span class="admin-users-badge">${escapeHtml(b)}</span>`).join("");
+      const searchText = escapeHtml(
+        [u.email, u.company_domain, ...badgeList].filter(Boolean).join(" ").toLowerCase()
+      );
 
       const form = (action, label, allowed, confirmMsg) => {
         if (!allowed) return "";
@@ -1013,16 +1032,18 @@ app.get("/admin/users", async (req, res) => {
         ? form(u.plan === "free" ? "unset-free-tier" : "set-free-tier", u.plan === "free" ? "Remove Free Tier" : "Set Free Tier", true)
         : "";
 
-      return `<tr>
+      return `<tr class="admin-user-row" data-search="${searchText}">
         <td>${escapeHtml(u.email ?? "(no email)")}</td>
         ${!domain ? `<td>${escapeHtml(u.company_domain ?? "")}</td>` : ""}
-        <td>${escapeHtml(badges)}</td>
+        <td>${badges}</td>
         <td>${dateOnly(u.registered_at)}</td>
         <td>${dateOnly(u.last_seen_at)}</td>
-        <td>${companyActions} ${globalActions} ${freeTierAction} ${suspendAction} ${deleteAction}</td>
+        <td class="admin-users-actions">${companyActions} ${globalActions} ${freeTierAction} ${suspendAction} ${deleteAction}</td>
       </tr>`;
     })
     .join("");
+
+  const columnCount = domain ? 5 : 6;
 
   const activityRows = recentActions
     .map(
@@ -1031,20 +1052,78 @@ app.get("/admin/users", async (req, res) => {
     )
     .join("");
 
-  res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
+  res.send(`<!doctype html><html><head>${ADMIN_HEAD}</head><body>
     <h1>Users</h1>
     <p>${domain ? `Viewing ${escapeHtml(domain)}.` : "Viewing every company."} <a href="/admin">&larr; Back to library</a></p>
     ${companyPicker}
     ${errorMsg ? `<p class="admin-error">${escapeHtml(errorMsg)}</p>` : ""}
-    <table>
+    <div class="admin-users-toolbar">
+      <input id="adminUserSearch" type="search" placeholder="Search by email, company, or role…" />
+      <span class="admin-users-count" id="adminUserCount"></span>
+    </div>
+    <table class="admin-users-table">
       <thead><tr><th>Email</th>${!domain ? "<th>Company</th>" : ""}<th>Roles</th><th>Registered</th><th>Last Active</th><th></th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="6">No users.</td></tr>`}</tbody>
+      <tbody id="adminUserRows">${rows || `<tr><td colspan="${columnCount}">No users.</td></tr>`}</tbody>
     </table>
-    <h2>Recent Activity</h2>
-    <table>
-      <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th></tr></thead>
-      <tbody>${activityRows || `<tr><td colspan="4">No activity yet.</td></tr>`}</tbody>
-    </table>
+    <div class="admin-users-pagination" id="adminUserPagination"></div>
+
+    <div class="admin-activity-panel">
+      <h2>Recent Activity (last 10)</h2>
+      <table>
+        <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th></tr></thead>
+        <tbody>${activityRows || `<tr><td colspan="4">No activity yet.</td></tr>`}</tbody>
+      </table>
+    </div>
+
+    <script>
+      (function () {
+        var PAGE_SIZE = 25;
+        var searchEl = document.getElementById("adminUserSearch");
+        var countEl = document.getElementById("adminUserCount");
+        var paginationEl = document.getElementById("adminUserPagination");
+        var allRows = Array.prototype.slice.call(document.querySelectorAll(".admin-user-row"));
+        var page = 0;
+
+        function matches(row, query) {
+          if (!query) return true;
+          return row.getAttribute("data-search").indexOf(query) !== -1;
+        }
+
+        function render() {
+          var query = searchEl.value.trim().toLowerCase();
+          var filtered = allRows.filter(function (row) { return matches(row, query); });
+          var pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+          if (page >= pageCount) page = pageCount - 1;
+          var start = page * PAGE_SIZE;
+          var end = start + PAGE_SIZE;
+
+          allRows.forEach(function (row) { row.style.display = "none"; });
+          filtered.slice(start, end).forEach(function (row) { row.style.display = ""; });
+
+          countEl.textContent = filtered.length + (filtered.length === 1 ? " user" : " users") +
+            (pageCount > 1 ? " — page " + (page + 1) + " of " + pageCount : "");
+
+          paginationEl.innerHTML = "";
+          if (pageCount > 1) {
+            var prevBtn = document.createElement("button");
+            prevBtn.type = "button";
+            prevBtn.textContent = "← Previous";
+            prevBtn.disabled = page === 0;
+            prevBtn.addEventListener("click", function () { page -= 1; render(); });
+            var nextBtn = document.createElement("button");
+            nextBtn.type = "button";
+            nextBtn.textContent = "Next →";
+            nextBtn.disabled = page >= pageCount - 1;
+            nextBtn.addEventListener("click", function () { page += 1; render(); });
+            paginationEl.appendChild(prevBtn);
+            paginationEl.appendChild(nextBtn);
+          }
+        }
+
+        searchEl.addEventListener("input", function () { page = 0; render(); });
+        render();
+      })();
+    </script>
   </body></html>`);
 });
 
@@ -1273,63 +1352,50 @@ const MODE_INFO = {
 // Shared by every /admin* page (Admin UI Phase 10) — /admin stays plain
 // server-rendered HTML with no bundler, so this is one inline <style>
 // block reused verbatim rather than a separate stylesheet file/build step.
+// Deckcelerate rebrand (Task Pane Phase 21) covered the task pane and its
+// three dialogs but explicitly left /admin's pages alone — this maps this
+// file's existing local var names onto the shared --dc-* primitives
+// (assets/tokens.css, linked below) the same way every other stylesheet in
+// this project already does, rather than renaming every var(--name) call
+// site throughout ADMIN_STYLE's ~40 rules.
 const ADMIN_STYLE = `
   :root {
-    --bg: #ffffff;
-    --bg-alt: #fafafa;
-    --bg-hover: #f0f0f0;
-    --bg-subtle: #f5f5f5;
-    --text: #222;
-    --text-muted: #666;
-    --text-faint: #999;
-    --heading: #444;
-    --border: #c8c8c8;
-    --border-light: #ddd;
-    --border-lighter: #eee;
-    --accent: #1a5fb4;
-    --accent-shadow: rgba(26, 95, 180, 0.6);
-    --error-bg: #fdeaea;
-    --error-text: #a12525;
+    --bg: var(--dc-bg);
+    --bg-alt: var(--dc-surface);
+    --bg-hover: var(--dc-neutral-200);
+    --bg-subtle: var(--dc-neutral-100);
+    --text: var(--dc-text);
+    --text-muted: var(--dc-neutral-700);
+    --text-faint: var(--dc-neutral-500);
+    --heading: var(--dc-neutral-700);
+    --border: var(--dc-neutral-300);
+    --border-light: var(--dc-divider);
+    --border-lighter: var(--dc-neutral-200);
+    --accent: var(--dc-accent);
+    --accent-shadow: color-mix(in srgb, var(--dc-accent) 60%, transparent);
+    --error-bg: color-mix(in srgb, var(--dc-accent) 10%, var(--dc-bg));
+    --error-text: var(--dc-accent-700);
     --success-text: #1a7a3c;
-    --card-bg: #fff;
-    --nav-text: #333;
-    --disabled-bg: #f0f0f0;
-    --disabled-border: #ccc;
-    --disabled-text: #999;
+    --card-bg: var(--dc-surface);
+    --nav-text: var(--dc-text);
+    --disabled-bg: var(--dc-neutral-200);
+    --disabled-border: var(--dc-neutral-300);
+    --disabled-text: var(--dc-neutral-500);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #1e1e1e;
-      --bg-alt: #2b2b2b;
-      --bg-hover: #383838;
-      --bg-subtle: #333;
-      --text: #e8e8e8;
-      --text-muted: #aaa;
-      --text-faint: #888;
-      --heading: #ccc;
-      --border: #555;
-      --border-light: #3a3a3a;
-      --border-lighter: #333;
-      --accent: #4c8fd6;
-      --accent-shadow: rgba(76, 143, 214, 0.6);
-      --error-bg: #4a2222;
-      --error-text: #ff8f8f;
+      --error-text: var(--dc-accent-tint);
       --success-text: #4ade80;
-      --card-bg: #262626;
-      --nav-text: #ddd;
-      --disabled-bg: #333;
-      --disabled-border: #555;
-      --disabled-text: #888;
     }
   }
-  body { font-family: -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 16px 24px; color: var(--text); background: var(--bg); color-scheme: light dark; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  h2 { font-size: 15px; margin: 0 0 10px; }
+  body { font-family: "Archivo", -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 16px 24px; color: var(--text); background: var(--bg); color-scheme: light dark; }
+  h1 { font: 800 20px "Archivo", sans-serif; margin: 0 0 4px; }
+  h2 { font: 700 15px "Archivo", sans-serif; margin: 0 0 10px; }
   a { color: var(--accent); }
-  .admin-error { color: var(--error-text); background: var(--error-bg); padding: 8px 10px; border-radius: 4px; }
+  .admin-error { color: var(--error-text); background: var(--error-bg); padding: 8px 10px; border-radius: 0; border: 1px solid var(--accent); }
   .admin-reorder-status { font-size: 12px; color: var(--success-text); margin-left: 8px; }
   .admin-category-nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 14px 0; padding: 0; list-style: none; }
-  .admin-category-nav a { padding: 6px 12px; border: 1px solid var(--border); border-radius: 4px; text-decoration: none; color: var(--nav-text); font-size: 13px; text-transform: capitalize; }
+  .admin-category-nav a { padding: 6px 12px; border: 1px solid var(--border); border-radius: 0; text-decoration: none; color: var(--nav-text); font-size: 13px; text-transform: capitalize; }
   .admin-category-nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
   /* Sticky single Save bar (Admin UI Phase 11) — bleeds past body's own padding to span the full width while staying pinned during scroll. */
@@ -1340,7 +1406,7 @@ const ADMIN_STYLE = `
     background: var(--bg-alt); border-bottom: 1px solid var(--border-light); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   }
   #adminSaveStatus { font-size: 12px; color: var(--text-muted); }
-  #adminSaveAll { padding: 6px 16px; font-size: 13px; font-weight: 600; border: 1px solid var(--accent); border-radius: 4px; background: var(--accent); color: #fff; cursor: pointer; }
+  #adminSaveAll { padding: 6px 16px; font-size: 13px; font-weight: 600; border: 1px solid var(--accent); border-radius: 0; background: var(--accent); color: #fff; cursor: pointer; }
   #adminSaveAll:disabled { background: var(--disabled-bg); border-color: var(--disabled-border); color: var(--disabled-text); cursor: default; }
 
   .admin-cluster { margin-bottom: 8px; }
@@ -1353,7 +1419,7 @@ const ADMIN_STYLE = `
     font-size: 13px; font-weight: 600; color: var(--heading); text-transform: uppercase; letter-spacing: 0.02em;
   }
   .admin-group-heading-input {
-    border: 1px solid transparent; background: none; color: var(--heading); padding: 2px 4px; border-radius: 3px; flex: 0 1 auto; min-width: 40px;
+    border: 1px solid transparent; background: none; color: var(--heading); padding: 2px 4px; border-radius: 0; flex: 0 1 auto; min-width: 40px;
   }
   .admin-group-heading-input:hover { background: var(--bg-subtle); }
   .admin-group-heading-input:focus { border-color: var(--border); background: var(--card-bg); outline: none; }
@@ -1363,7 +1429,7 @@ const ADMIN_STYLE = `
   }
 
   .admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-  .admin-card-wrap { position: relative; border: 1px solid var(--border); border-radius: 6px; padding: 8px; background: var(--card-bg); display: flex; flex-direction: column; gap: 4px; }
+  .admin-card-wrap { position: relative; border: 1px solid var(--border); border-radius: 0; padding: 8px; background: var(--card-bg); display: flex; flex-direction: column; gap: 4px; }
   .admin-card-wrap.dragging { opacity: 0.4; }
   .admin-card-wrap.dirty { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
   @keyframes admin-card-highlight-pulse { from { box-shadow: 0 0 0 3px var(--accent-shadow); } to { box-shadow: 0 0 0 3px rgba(26, 95, 180, 0); } }
@@ -1371,25 +1437,57 @@ const ADMIN_STYLE = `
   .admin-card-drag { position: absolute; top: 4px; right: 6px; cursor: grab; color: var(--text-faint); font-size: 13px; user-select: none; line-height: 1; }
   .admin-card-drag:active { cursor: grabbing; }
   .admin-card { display: flex; flex-direction: column; gap: 4px; }
-  .admin-card-thumb { width: 100%; height: 100px; object-fit: contain; background: var(--bg-alt); border: 1px solid var(--border-lighter); border-radius: 4px; cursor: zoom-in; }
+  .admin-card-thumb { width: 100%; height: 100px; object-fit: contain; background: var(--bg-alt); border: 1px solid var(--border-lighter); border-radius: 0; cursor: zoom-in; }
   .admin-card-thumb-empty { display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 11px; cursor: default; }
   .admin-card-title, .admin-card-tags, .admin-card select, .admin-card input[type="file"] {
-    font-size: 11px; padding: 3px 5px; border: 1px solid var(--border); border-radius: 3px; width: 100%; box-sizing: border-box;
+    font-size: 11px; padding: 3px 5px; border: 1px solid var(--border); border-radius: 0; width: 100%; box-sizing: border-box;
     background: var(--card-bg); color: var(--text);
   }
   .admin-card-mode { font-size: 10px; color: var(--text-faint); text-transform: uppercase; align-self: flex-start; cursor: help; }
   .admin-card-error { font-size: 10px; color: var(--error-text); }
-  .admin-card-delete button { font-size: 11px; padding: 4px 8px; cursor: pointer; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-alt); color: var(--text); width: 100%; }
+  .admin-card-delete button { font-size: 11px; padding: 4px 8px; cursor: pointer; border: 1px solid var(--border); border-radius: 0; background: var(--bg-alt); color: var(--text); width: 100%; }
   .admin-card-delete { margin-top: -2px; }
   .admin-lightbox { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); align-items: center; justify-content: center; z-index: 2000; cursor: zoom-out; }
   .admin-lightbox img { max-width: 90vw; max-height: 90vh; }
   table { border-collapse: collapse; color: var(--text); }
   table input, table select { font-size: 12px; padding: 3px 5px; background: var(--card-bg); color: var(--text); border: 1px solid var(--border); }
+
+  /* Users page (Admin UI Phase 22 restyle): search box, real table, and a
+     separate, visually distinct Recent Activity panel capped at 10 rows. */
+  .admin-users-toolbar { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
+  #adminUserSearch { flex: 0 1 280px; padding: 6px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 0; background: var(--card-bg); color: var(--text); }
+  .admin-users-count { font-size: 12px; color: var(--text-muted); }
+  .admin-users-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .admin-users-table th, .admin-users-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-lighter); text-align: left; vertical-align: middle; }
+  .admin-users-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); border-bottom: 2px solid var(--border-light); }
+  .admin-users-table tbody tr:hover { background: var(--bg-hover); }
+  .admin-users-table td.admin-users-actions { white-space: nowrap; }
+  .admin-users-table td.admin-users-actions form { display: inline-block; margin-right: 4px; }
+  .admin-users-table td.admin-users-actions button { font-size: 11px; padding: 3px 8px; cursor: pointer; border: 1px solid var(--border); border-radius: 0; background: var(--bg-alt); color: var(--text); }
+  .admin-users-badge { display: inline-block; font-size: 10px; padding: 1px 6px; margin: 0 3px 2px 0; border: 1px solid var(--border); border-radius: 0; color: var(--text-muted); white-space: nowrap; }
+  .admin-users-pagination { display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 12px; }
+  .admin-users-pagination button { font-size: 12px; padding: 4px 10px; cursor: pointer; border: 1px solid var(--border); border-radius: 0; background: var(--bg-alt); color: var(--text); }
+  .admin-users-pagination button:disabled { background: var(--disabled-bg); border-color: var(--disabled-border); color: var(--disabled-text); cursor: default; }
+  .admin-activity-panel { margin-top: 28px; padding: 12px 14px; border: 1px solid var(--border-light); background: var(--bg-alt); }
+  .admin-activity-panel h2 { margin-bottom: 6px; }
+  .admin-activity-panel table { width: 100%; font-size: 12px; }
+  .admin-activity-panel th, .admin-activity-panel td { padding: 5px 8px; border-bottom: 1px solid var(--border-lighter); text-align: left; }
 `;
 
 // Filename extension is always derived from this fixed table, never from
 // the uploaded file's own name — the path-traversal defense for thumbnail
 // uploads (see POST /admin/catalog/:id below).
+// Shared <head> fragment for every ADMIN_STYLE-using page: tokens.css
+// supplies the --dc-* primitives ADMIN_STYLE's :root block now maps onto,
+// Archivo matches the rest of the Deckcelerate-rebranded app.
+const ADMIN_HEAD = `
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/tokens.css?v=${ASSET_VERSION}" />
+  <style>${ADMIN_STYLE}</style>
+`;
+
 const MIME_TO_EXT = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -1592,7 +1690,7 @@ app.get("/admin", async (req, res) => {
   const highlightId = Number(req.query.highlight);
   const highlightItemId = Number.isInteger(highlightId) && highlightId > 0 ? highlightId : null;
 
-  res.send(`<!doctype html><html><head><style>${ADMIN_STYLE}</style></head><body>
+  res.send(`<!doctype html><html><head>${ADMIN_HEAD}</head><body>
     <div id="adminSaveBar" class="admin-save-bar">
       <span id="adminSaveStatus">No changes</span>
       <button id="adminSaveAll" type="button" disabled>Save</button>

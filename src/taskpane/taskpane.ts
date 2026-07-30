@@ -478,15 +478,19 @@ let currentLibraryEdit: { itemId: number; title: string; handle: Library.FileIns
 let lastKnownUser: SessionUser | null = null;
 
 /**
- * The Administration section is admin-only by default, but a non-admin
- * editing their own personal item's graphic (via the gallery's Edit
- * button) still needs to see #libraryEditRow's Save/Cancel controls — so
- * visibility is "isAdmin OR an edit is currently in progress", not a flat
- * isAdmin gate.
+ * The Administration section is shown to any admin — global or company —
+ * by default, but a non-admin editing their own personal item's graphic
+ * (via the gallery's Edit button) still needs to see #libraryEditRow's
+ * Save/Cancel controls, so visibility is "isAdmin OR isCompanyAdmin OR an
+ * edit is currently in progress", not a flat admin-only gate. A company
+ * admin has real powers reachable via /admin/users (their own company's
+ * user list) even though they can't reach the global catalog admin view,
+ * so they need this entry point too, same as a global admin.
  */
 function updateAdminSectionVisibility(): void {
   const section = document.getElementById("sectionMyLibrary");
-  const show = !!lastKnownUser?.isRegistered && (!!lastKnownUser?.isAdmin || !!currentLibraryEdit);
+  const show =
+    !!lastKnownUser?.isRegistered && (!!lastKnownUser?.isAdmin || !!lastKnownUser?.isCompanyAdmin || !!currentLibraryEdit);
   if (section) (section as HTMLElement).style.display = show ? "" : "none";
 }
 
@@ -499,9 +503,10 @@ function updateLibraryEditUI(): void {
 }
 
 /**
- * "Open Admin…" is the only thing left in this section that's unconditionally
- * admin-only — see updateAdminSectionVisibility for the section's own
- * (admin-or-editing) gate.
+ * "Open Admin…" — same admin-or-company-admin gate as the section itself
+ * (see updateAdminSectionVisibility); a company admin's /admin/users view
+ * is auto-scoped to their own company server-side, so there's nothing
+ * unsafe about surfacing this link to them too.
  */
 function refreshMyLibrarySection(user: SessionUser | null): void {
   lastKnownUser = user;
@@ -510,7 +515,7 @@ function refreshMyLibrarySection(user: SessionUser | null): void {
   }
 
   const openAdminRow = document.getElementById("openAdminRow");
-  if (openAdminRow) (openAdminRow as HTMLElement).style.display = user?.isAdmin ? "" : "none";
+  if (openAdminRow) (openAdminRow as HTMLElement).style.display = user?.isAdmin || user?.isCompanyAdmin ? "" : "none";
   updateLibraryEditUI(); // also updates section visibility via updateAdminSectionVisibility
 }
 
@@ -901,29 +906,43 @@ Office.onReady((info) => {
   // takes a new user straight through Microsoft auth into account
   // creation, no second click required.
   bindButton("btnSignIn", async () => {
-    let user = await getSessionUser();
-    if (!user) {
-      const msalUser = await Auth.signIn((step) => notify(step));
-      if (!msalUser.email) {
-        // The one case where dumping raw claims is actually useful — an
-        // admin misconfiguring the Azure app registration's optional
-        // claims needs to see what Microsoft actually sent back. Never
-        // shown on a normal sign-in (it would otherwise expose the live
-        // idToken in the visible UI for no reason).
-        const claimsEl = document.getElementById("authClaims") as HTMLElement;
-        claimsEl.style.display = "block";
-        claimsEl.textContent = JSON.stringify(msalUser, null, 2);
-        notify("Signed in, but no email claim was returned — check the Azure app registration's optional claims.", "error");
-        return;
+    const errorEl = document.getElementById("signInError") as HTMLElement | null;
+    if (errorEl) errorEl.style.display = "none";
+    try {
+      let user = await getSessionUser();
+      if (!user) {
+        const msalUser = await Auth.signIn((step) => notify(step));
+        if (!msalUser.email) {
+          // The one case where dumping raw claims is actually useful — an
+          // admin misconfiguring the Azure app registration's optional
+          // claims needs to see what Microsoft actually sent back. Never
+          // shown on a normal sign-in (it would otherwise expose the live
+          // idToken in the visible UI for no reason).
+          const claimsEl = document.getElementById("authClaims") as HTMLElement;
+          claimsEl.style.display = "block";
+          claimsEl.textContent = JSON.stringify(msalUser, null, 2);
+          notify("Signed in, but no email claim was returned — check the Azure app registration's optional claims.", "error");
+          return;
+        }
+        await establishSession(msalUser.idToken);
+        user = await getSessionUser();
+        applySessionState(user);
       }
-      await establishSession(msalUser.idToken);
-      user = await getSessionUser();
-      applySessionState(user);
-    }
-    if (user && !user.isRegistered) {
-      openRegistrationDialog();
-    } else if (user) {
-      notify(`Signed in as ${user.email}`);
+      if (user && !user.isRegistered) {
+        openRegistrationDialog();
+      } else if (user) {
+        notify(`Signed in as ${user.email}`);
+      }
+    } catch (err) {
+      // Surfaced here (right under the button, where the user's eyes
+      // already are) in addition to the bottom-of-page status footer —
+      // a suspended/deleted-account rejection was easy to miss down there.
+      const message = err instanceof Error ? err.message : String(err);
+      if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.style.display = "block";
+      }
+      throw err;
     }
   });
   document.getElementById("btnOpenAdmin")?.addEventListener("click", () => {

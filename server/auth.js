@@ -92,14 +92,22 @@ async function verifyMicrosoftIdToken(idToken) {
   };
 }
 
-/** Case-insensitive match against the comma-separated ADMIN_EMAILS env var. */
-function isAdminEmail(email) {
-  if (!email) return false;
-  const admins = (process.env.ADMIN_EMAILS ?? "")
+function adminEmailList() {
+  return (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return admins.includes(email.toLowerCase());
+}
+
+/** Case-insensitive match against the comma-separated ADMIN_EMAILS env var. */
+function isAdminEmail(email) {
+  if (!email) return false;
+  return adminEmailList().includes(email.toLowerCase());
+}
+
+/** The contact address for a blocked (suspended/deleted) user with no company admin to escalate to — the first configured global admin. */
+function getPrimaryAdminEmail() {
+  return adminEmailList()[0] ?? null;
 }
 
 // companyDomain/isCompanyAdmin (Task Pane Phase 14) and isRegistered
@@ -152,6 +160,7 @@ async function verifySessionToken(token) {
 module.exports = {
   verifyMicrosoftIdToken,
   isAdminEmail,
+  getPrimaryAdminEmail,
   createSessionToken,
   verifySessionToken,
   SESSION_MAX_AGE_SECONDS,

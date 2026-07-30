@@ -374,6 +374,15 @@ button:disabled {
   border: 1px solid var(--accent);
 }
 
+.sign-in-error {
+  font: 600 12px var(--font-family);
+  padding: 6px 8px;
+  margin: 8px 0 0;
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--accent);
+}
+
 .unsupported-note {
   display: none;
   font-size: 11px;
