@@ -50,6 +50,7 @@ interface JobItem {
   title: string;
   tags: string[];
   included: boolean;
+  insertMode: "reconstruct" | "file";
   thumbnailUrl: string;
 }
 
@@ -311,6 +312,21 @@ function renderReview(): void {
       thumb.src = item.thumbnailUrl;
       thumb.alt = "";
       row.appendChild(thumb);
+
+      // Auto-selected per slide by the render sidecar (same
+      // classify_shape_tree logic scripts/slice-catalog-source.py uses):
+      // "Native" shapes/text rebuild with one click; anything else (a
+      // picture, table, or custom-drawn shape) needs the temp-slide/copy-
+      // paste "Paste" path instead. Purely informational — not editable
+      // here.
+      const mode = document.createElement("span");
+      mode.className = "upload-review-mode" + (item.insertMode === "reconstruct" ? " upload-review-mode-native" : "");
+      mode.textContent = item.insertMode === "reconstruct" ? "Native" : "Paste";
+      mode.title =
+        item.insertMode === "reconstruct"
+          ? "Inserts directly with one click, built from the shape's properties."
+          : "Inserts via a temporary slide plus copy/paste — this slide has content (a picture, table, or custom-drawn shape) that can't be rebuilt natively.";
+      row.appendChild(mode);
 
       const fields = document.createElement("div");
       fields.className = "upload-review-fields";

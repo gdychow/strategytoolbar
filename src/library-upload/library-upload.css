@@ -229,6 +229,23 @@ button.upload-secondary:hover {
   flex: 0 0 auto;
 }
 
+.upload-review-mode {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.upload-review-mode-native {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .upload-review-fields {
   flex: 1 1 auto;
   display: flex;

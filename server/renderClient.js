@@ -31,11 +31,19 @@ async function convertPptxToSlides(buffer, filename) {
   const zipBytes = new Uint8Array(await res.arrayBuffer());
   const files = unzipSync(zipBytes);
   const manifest = JSON.parse(strFromU8(files["manifest.json"]));
+  // Each item is either insertMode "reconstruct" (a JSON spec, pptx null —
+  // the one-click native insert path, built via the same
+  // classify_shape_tree/extract_reconstruct_spec logic
+  // scripts/slice-catalog-source.py uses for the offline bulk-seed
+  // pipeline) or "file" (a single-slide pptx Buffer, reconstructSpec null
+  // — the temp-slide/copy-paste path), never both.
   return manifest.slides.map((slide) => ({
     index: slide.index,
     title: slide.title,
     thumbnail: Buffer.from(files[slide.thumbnail]),
-    pptx: Buffer.from(files[slide.pptx]),
+    insertMode: slide.insertMode,
+    reconstructSpec: slide.reconstructSpec ?? null,
+    pptx: slide.pptx ? Buffer.from(files[slide.pptx]) : null,
   }));
 }
 

@@ -756,6 +756,8 @@ app.post("/api/admin/library-upload", uploadLibraryFiles.array("files", 20), asy
             tags: [],
             included: true,
             thumbnail: slide.thumbnail,
+            insertMode: slide.insertMode,
+            reconstructSpec: slide.reconstructSpec,
             pptx: slide.pptx,
           });
         }
@@ -789,6 +791,7 @@ app.get("/api/admin/library-upload/:jobId", (req, res) => {
       title: item.title,
       tags: item.tags,
       included: item.included,
+      insertMode: item.insertMode,
       thumbnailUrl: `/api/admin/library-upload/${req.params.jobId}/thumbnail/${item.tempId}`,
     })),
   });
@@ -828,17 +831,24 @@ app.post("/api/admin/library-upload/:jobId/commit", express.json({ limit: "2mb" 
       : [];
 
     const fileId = crypto.randomUUID();
-    const sourceFile = `admin-added/${fileId}.pptx`;
     const thumbnailPath = `${fileId}.png`;
-    await fs.promises.writeFile(path.join(ADMIN_ADDED_DIR, `${fileId}.pptx`), item.pptx);
     await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), item.thumbnail);
+
+    // Mirrors scripts/slice-catalog-source.py's own split: a 'reconstruct'
+    // item has no source file at all (the reconstructSpec JSON is the real
+    // content), only a 'file' item gets one written to disk.
+    const sourceFile = item.insertMode === "file" ? `admin-added/${fileId}.pptx` : undefined;
+    if (item.insertMode === "file") {
+      await fs.promises.writeFile(path.join(ADMIN_ADDED_DIR, `${fileId}.pptx`), item.pptx);
+    }
 
     const row = await insertCatalogItem({
       category,
       companyDomain: job.companyDomain,
       title,
-      insertMode: "file",
+      insertMode: item.insertMode,
       sourceFile,
+      reconstructSpec: item.insertMode === "reconstruct" ? item.reconstructSpec : undefined,
       thumbnailPath,
       sortOrder: 0,
     });
