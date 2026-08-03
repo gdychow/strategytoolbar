@@ -25,6 +25,27 @@ let isAdmin = false;
 let isCompanyAdmin = false;
 let myCompanyDomain: string | null = null;
 
+/**
+ * window.confirm() doesn't reliably produce a visible native dialog in
+ * every Office-hosted webview this app runs in (this is the same class of
+ * gap already worked around in the task pane itself, via its own arm/
+ * confirm pattern on #btnLibraryAdd) — confirmed here directly: clicking
+ * Delete with a plain window.confirm() call silently did nothing, no
+ * dialog, no error, no deletion. A two-click "click again to confirm" on
+ * the button itself has no such dependency on the host's dialog support.
+ */
+let deleteArmed = false;
+let deleteArmedTimer: number | undefined;
+const DELETE_LABEL = "Delete";
+const DELETE_CONFIRM_LABEL = "Click again to confirm";
+
+function resetDeleteArm(): void {
+  deleteArmed = false;
+  window.clearTimeout(deleteArmedTimer);
+  const btn = document.getElementById("btnDelete");
+  if (btn) btn.textContent = DELETE_LABEL;
+}
+
 function statusEl(): HTMLElement | null {
   return document.getElementById("status");
 }
@@ -52,6 +73,7 @@ function renderTabs(): void {
 
 function hidePreview(): void {
   selectedItem = null;
+  resetDeleteArm();
   const panel = document.getElementById("previewPanel");
   if (panel) panel.style.display = "none";
 }
@@ -65,6 +87,7 @@ function showPreview(item: TemplateItem): void {
   const errorEl = document.getElementById("previewError");
   if (!panel || !title || !manageRow || !editTitle || !editDescription) return;
 
+  resetDeleteArm(); // switching selection shouldn't leave a stale "click again to confirm" pointed at the wrong item
   title.textContent = item.title;
   if (errorEl) {
     errorEl.style.display = "none";
@@ -182,7 +205,16 @@ async function saveEdit(): Promise<void> {
 
 async function deleteSelected(): Promise<void> {
   if (!selectedItem) return;
-  if (!window.confirm(`Delete "${selectedItem.title}"? This can't be undone.`)) return;
+  const btn = document.getElementById("btnDelete");
+  if (!deleteArmed) {
+    deleteArmed = true;
+    if (btn) btn.textContent = DELETE_CONFIRM_LABEL;
+    window.clearTimeout(deleteArmedTimer);
+    deleteArmedTimer = window.setTimeout(resetDeleteArm, 4000);
+    return;
+  }
+  resetDeleteArm();
+
   const id = selectedItem.id;
   try {
     await Templates.deleteTemplate(id);
