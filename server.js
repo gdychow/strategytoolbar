@@ -2104,10 +2104,32 @@ app.get("/admin", async (req, res) => {
       // trip the beforeunload guard above if other cards are still
       // dirty, which would be a confusing prompt for an unrelated
       // action) ----
+      // window.confirm() doesn't reliably produce a visible dialog in
+      // every browser/webview this page can be opened in — confirmed
+      // directly (Mac: no dialog appears at all, the click silently does
+      // nothing; Windows: works). A two-click "click again to confirm" on
+      // the button itself has no dependency on the host's native dialog
+      // support, matching the same fix already applied to the Template
+      // Library dialog's own Delete button for this exact reason.
       document.querySelectorAll(".admin-card-delete").forEach((form) => {
+        const btn = form.querySelector("button");
+        let armed = false;
+        let armedTimer;
         form.addEventListener("submit", (e) => {
           e.preventDefault();
-          if (!confirm("Delete this catalog item permanently?")) return;
+          if (!armed) {
+            armed = true;
+            btn.textContent = "Click again to confirm";
+            clearTimeout(armedTimer);
+            armedTimer = setTimeout(() => {
+              armed = false;
+              btn.textContent = "Delete";
+            }, 4000);
+            return;
+          }
+          armed = false;
+          clearTimeout(armedTimer);
+          btn.textContent = "Delete";
           fetch(form.action, { method: "POST", headers: { Accept: "application/json" } })
             .then((res) => {
               if (!res.ok) throw new Error("HTTP " + res.status);
@@ -2309,10 +2331,27 @@ app.get("/admin", async (req, res) => {
         });
       });
 
-      // Delete: the × button next to a group heading.
+      // Delete: the × button next to a group heading. Same window.confirm()
+      // reliability issue as .admin-card-delete above — two-click arm/
+      // confirm on the button itself instead.
       document.querySelectorAll(".admin-group-delete").forEach((button) => {
+        let armed = false;
+        let armedTimer;
+        const originalLabel = button.textContent;
         button.addEventListener("click", () => {
-          if (!confirm("Delete this group? Items in it become ungrouped.")) return;
+          if (!armed) {
+            armed = true;
+            button.textContent = "Confirm?";
+            clearTimeout(armedTimer);
+            armedTimer = setTimeout(() => {
+              armed = false;
+              button.textContent = originalLabel;
+            }, 4000);
+            return;
+          }
+          armed = false;
+          clearTimeout(armedTimer);
+          button.textContent = originalLabel;
           const id = button.dataset.groupId;
           fetch("/admin/groups/" + id + "/delete", { method: "POST", headers: { Accept: "application/json" } })
             .then((res) => {
