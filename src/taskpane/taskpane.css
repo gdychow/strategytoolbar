@@ -145,17 +145,21 @@ section.dragging {
   flex: 0 0 auto;
 }
 
-/* Fill/Line/Text share one .color-row (see taskpane.html) — each is its own label+swatch+caret group, compact enough that all three still fit on one line at the task pane's minimum width. */
+/* Fill/Line/Text share one .color-row (see taskpane.html) — each is its own label+swatch+caret group, compact enough that all three still fit on one line at the task pane's minimum width. flex-basis 0 (matching the plain `button` rule's own reasoning below) so the three controls always split the row into even thirds and grow/shrink together as the task pane is resized, rather than sizing off each control's own content width first. */
 .color-control {
   position: relative;
   display: flex;
   align-items: center;
   gap: 3px;
+  flex: 1 1 0%;
+  min-width: 0;
 }
 
-/* Zero gap here (unlike .color-row/.color-control above) so the caret sits flush against the swatch — the two share a hairline border and read as one control. */
+/* Zero gap here (unlike .color-row/.color-control above) so the caret sits flush against the swatch — the two share a hairline border and read as one control. Stretches to fill its .color-control's share of the row (the swatch inside is what actually grows — see .color-swatch). */
 .color-swatch-group {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* "Margin" is wider than the 26px that fits "Fill"/"Line"/"Text" fine on its own — min-width is just a floor, this just gives it a bit more breathing room from the input next to it. */
@@ -175,14 +179,14 @@ section.dragging {
 }
 
 .color-swatch {
-  width: 26px;
+  min-width: 26px;
   height: 26px;
   padding: 0;
   border: 1px solid var(--border);
   border-right: none;
   border-radius: 0;
   cursor: pointer;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
 }
 
 .color-caret {
@@ -222,6 +226,15 @@ section.dragging {
 
 .color-row button {
   flex: 0 0 auto;
+}
+
+/* Overrides ".color-row button" above (needs the extra class for
+   specificity) — the swatch is the one button in this row that should
+   grow, so the color preview itself gets wider/narrower as the task pane
+   is resized instead of empty space collecting between the three
+   controls. */
+.color-row .color-swatch {
+  flex: 1 1 auto;
 }
 
 button {
