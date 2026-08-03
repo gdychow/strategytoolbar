@@ -140,6 +140,15 @@ section.dragging {
   flex-wrap: wrap;
 }
 
+/* Matches the button rule's own font below (500 weight, 12.5px) instead of
+   inheriting body's default 400/13px, so these labels read as part of the
+   same control language as the buttons around them. */
+.color-row label,
+#libraryTargetLabel,
+.margin-label {
+  font: 500 12.5px var(--font-family);
+}
+
 .color-row label {
   min-width: 26px;
   flex: 0 0 auto;
