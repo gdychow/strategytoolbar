@@ -136,10 +136,16 @@ button.upload-secondary:hover {
 }
 
 .upload-file-name {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.upload-file-spacer {
+  flex: 1 1 auto;
 }
 
 .upload-file-row select {

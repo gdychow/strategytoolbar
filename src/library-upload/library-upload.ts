@@ -116,6 +116,14 @@ function renderFileList(): void {
       row.appendChild(select);
     }
 
+    // Absorbs the row's remaining width so filename+category sit together
+    // on the left (immediately next to each other, since it's clear which
+    // category belongs to which file) while the remove button still lands
+    // on the right edge like every other row of controls in this dialog.
+    const spacer = document.createElement("span");
+    spacer.className = "upload-file-spacer";
+    row.appendChild(spacer);
+
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "upload-remove-btn";
