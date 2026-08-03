@@ -96,13 +96,13 @@ function renderFileList(): void {
     const row = document.createElement("div");
     row.className = "upload-file-row";
 
-    const name = document.createElement("span");
-    name.className = "upload-file-name";
-    name.textContent = entry.file.name;
-    row.appendChild(name);
-
     if (scope === "global") {
       const select = document.createElement("select");
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = "Category…";
+      if (entry.category === "") blank.selected = true;
+      select.appendChild(blank);
       for (const cat of CATEGORIES) {
         const opt = document.createElement("option");
         opt.value = cat.value;
@@ -112,9 +112,15 @@ function renderFileList(): void {
       }
       select.addEventListener("change", () => {
         entry.category = select.value;
+        updateStartButton();
       });
       row.appendChild(select);
     }
+
+    const name = document.createElement("span");
+    name.className = "upload-file-name";
+    name.textContent = entry.file.name;
+    row.appendChild(name);
 
     // Absorbs the row's remaining width so filename+category sit together
     // on the left (immediately next to each other, since it's clear which
@@ -140,9 +146,12 @@ function renderFileList(): void {
   });
 }
 
+/** Global uploads need every file categorized before converting; company uploads have no per-file category picker at all, so only the file count matters there. */
 function updateStartButton(): void {
   const btn = document.getElementById("btnStartUpload") as HTMLButtonElement | null;
-  if (btn) btn.disabled = chosenFiles.length === 0;
+  if (!btn) return;
+  const allCategorized = scope !== "global" || chosenFiles.every((e) => e.category !== "");
+  btn.disabled = chosenFiles.length === 0 || !allCategorized;
 }
 
 function addFiles(files: FileList): void {
@@ -152,7 +161,7 @@ function addFiles(files: FileList): void {
       rejected.push(file.name);
       continue;
     }
-    chosenFiles.push({ file, category: CATEGORIES[0].value });
+    chosenFiles.push({ file, category: "" });
   }
   if (rejected.length) {
     setSetupError(`Skipped non-.pptx file(s): ${rejected.join(", ")}`);
@@ -405,6 +414,7 @@ function populateScope(): void {
   select.addEventListener("change", () => {
     scope = select.value as Scope;
     renderFileList();
+    updateStartButton();
   });
 }
 
