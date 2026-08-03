@@ -34,8 +34,10 @@ import subprocess
 import tempfile
 import zipfile
 
+from lxml import etree
 from flask import Flask, jsonify, request, send_file
 from pptx import Presentation
+from pptx.enum.dml import MSO_COLOR_TYPE, MSO_THEME_COLOR
 from pptx.enum.shapes import MSO_SHAPE_TYPE, PP_PLACEHOLDER
 from pptx.oxml.ns import qn
 from pptx.util import Emu
@@ -234,34 +236,124 @@ def classify_shape_tree(shape) -> str:
     return "reconstruct"
 
 
-def extract_fill(shape):
+# ---------------------------------------------------------------------------
+# Theme-color resolution. A color set via this app's own Fill/Line/Text
+# color picker (src/features/fillLineColors.ts) -- or via PowerPoint's own
+# theme-based color swatches, which is the common case for any shape not
+# explicitly given a custom RGB color -- is stored as <a:schemeClr val="..">
+# (e.g. "accent1"), not a literal RGB value. python-pptx's ColorFormat.rgb
+# raises AttributeError on this color type ("no .rgb property on color type
+# '_SchemeColor'") -- confirmed directly, and without handling it here every
+# theme-colored fill/line/font color was silently dropped (caught by a
+# blanket except and turned into None), which is why "recreate" mode was
+# losing exactly the styles reported: colors are almost always theme-based
+# in real content, explicit RGB is the unusual case.
+#
+# Resolving requires walking the real OOXML relationship chain: the shape's
+# slide -> slide layout -> slide master -> theme part (for the actual
+# <a:clrScheme> RGB values, keyed by raw slot names dk1/lt1/dk2/lt2/
+# accent1-6/hlink/folHlink) and the slide master's own <p:clrMap> (which
+# remaps the four semantic bg1/tx1/bg2/tx2 names PowerPoint's UI/API uses to
+# whichever raw slot the current master actually points them at -- a "dark"
+# master can map bg1 to dk1 instead of lt1. accent1-6/hlink/folHlink map to
+# themselves, but only by convention; only the actual clrMap is Definitive.
+# Verified against a real theme-colored test file before writing this: the
+# resolved hex values matched the theme's own <a:clrScheme> exactly.
+# ---------------------------------------------------------------------------
+
+
+def _load_master_theme(master):
+    """Returns (clr_map, clr_scheme) for a slide master, both plain dicts of
+    XML slot name -> value. Cached per (per-request) theme_cache dict, since
+    a whole category's worth of slides typically share one master and
+    re-walking the relationship chain/re-parsing the theme XML per shape
+    would be wasteful."""
+    clr_map_el = master.element.find(qn("p:clrMap"))
+    clr_map = dict(clr_map_el.attrib) if clr_map_el is not None else {}
+
+    theme_part = None
+    for rel in master.part.rels.values():
+        if rel.reltype.endswith("/theme"):
+            theme_part = rel.target_part
+            break
+
+    scheme = {}
+    if theme_part is not None:
+        theme_el = etree.fromstring(theme_part.blob)
+        clr_scheme_el = theme_el.find(".//" + qn("a:clrScheme"))
+        if clr_scheme_el is not None:
+            for child in clr_scheme_el:
+                tag = etree.QName(child).localname
+                srgb = child.find(qn("a:srgbClr"))
+                sys_clr = child.find(qn("a:sysClr"))
+                if srgb is not None:
+                    scheme[tag] = srgb.get("val")
+                elif sys_clr is not None:
+                    scheme[tag] = sys_clr.get("lastClr")
+
+    return clr_map, scheme
+
+
+def resolve_theme_color(shape, mso_theme_color, theme_cache):
+    try:
+        xml_name = MSO_THEME_COLOR.to_xml(mso_theme_color)
+    except Exception:
+        return None
+    try:
+        master = shape.part.slide_layout.slide_master
+    except Exception:
+        return None
+    cache_key = id(master.part)
+    if cache_key not in theme_cache:
+        theme_cache[cache_key] = _load_master_theme(master)
+    clr_map, scheme = theme_cache[cache_key]
+    slot = clr_map.get(xml_name, xml_name)
+    hexval = scheme.get(slot)
+    return f"#{hexval}" if hexval else None
+
+
+def resolve_color_hex(color_format, shape, theme_cache):
+    """Resolves a python-pptx ColorFormat to a real #RRGGBB string, handling
+    both explicit RGB colors and theme-derived ones. Returns None if no
+    color is set, or for the rare color types (HSL/preset/system/scRGB)
+    this doesn't handle -- safer to omit than to guess."""
+    try:
+        color_type = color_format.type
+    except Exception:
+        return None
+    if color_type == MSO_COLOR_TYPE.RGB:
+        return f"#{color_format.rgb}"
+    if color_type == MSO_COLOR_TYPE.SCHEME:
+        return resolve_theme_color(shape, color_format.theme_color, theme_cache)
+    return None
+
+
+def extract_fill(shape, theme_cache):
     try:
         fill = shape.fill
         if fill.type is None:
             return None
         if str(fill.type) == "MSO_FILL_TYPE.SOLID (1)" or fill.type == 1:
-            return {"type": "solid", "color": f"#{fill.fore_color.rgb}"}
+            color = resolve_color_hex(fill.fore_color, shape, theme_cache)
+            return {"type": "solid", "color": color} if color else None
         return None
     except Exception:
         return None
 
 
-def extract_line(shape):
+def extract_line(shape, theme_cache):
     try:
         line = shape.line
         if line.fill.type is None:
             return None
         width_pt = emu_to_pt(line.width) if line.width else None
-        try:
-            color = f"#{line.color.rgb}"
-        except Exception:
-            color = None
-        return {"color": color, "widthPt": width_pt}
+        color = resolve_color_hex(line.color, shape, theme_cache)
+        return {"color": color, "widthPt": width_pt} if color else None
     except Exception:
         return None
 
 
-def extract_text_spec(shape):
+def extract_text_spec(shape, theme_cache):
     if not shape.has_text_frame:
         return None
     paragraphs = []
@@ -275,14 +367,14 @@ def extract_text_spec(shape):
                     "italic": r.font.italic,
                     "size": r.font.size.pt if r.font.size else None,
                     "fontName": r.font.name,
-                    "color": (f"#{r.font.color.rgb}" if r.font.color and r.font.color.type is not None else None),
+                    "color": resolve_color_hex(r.font.color, shape, theme_cache) if r.font.color else None,
                 }
             )
         paragraphs.append({"level": p.level, "bullet": None, "runs": runs})
     return paragraphs
 
 
-def extract_reconstruct_spec(shape):
+def extract_reconstruct_spec(shape, theme_cache):
     is_text_box = shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX
     spec = {
         "kind": "textBox" if is_text_box else "geometricShape",
@@ -291,9 +383,9 @@ def extract_reconstruct_spec(shape):
         "width": emu_to_pt(shape.width),
         "height": emu_to_pt(shape.height),
         "rotation": shape.rotation,
-        "fill": extract_fill(shape),
-        "line": extract_line(shape),
-        "paragraphs": extract_text_spec(shape),
+        "fill": extract_fill(shape, theme_cache),
+        "line": extract_line(shape, theme_cache),
+        "paragraphs": extract_text_spec(shape, theme_cache),
     }
     if not is_text_box:
         prst_el = shape._element.find(".//" + qn("a:prstGeom"))
@@ -351,6 +443,11 @@ def convert():
                 status=422,
             )
 
+        # One per request (not module-level) so a slide master's cached
+        # theme never leaks across unrelated uploads -- see
+        # _load_master_theme's docstring for why caching happens at all.
+        theme_cache = {}
+
         manifest = {"slides": []}
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -373,9 +470,12 @@ def convert():
 
                 if real_shapes and all(classify_shape_tree(s) == "reconstruct" for s in real_shapes):
                     if len(real_shapes) == 1:
-                        spec = extract_reconstruct_spec(real_shapes[0])
+                        spec = extract_reconstruct_spec(real_shapes[0], theme_cache)
                     else:
-                        spec = {"kind": "group", "shapes": [extract_reconstruct_spec(s) for s in real_shapes]}
+                        spec = {
+                            "kind": "group",
+                            "shapes": [extract_reconstruct_spec(s, theme_cache) for s in real_shapes],
+                        }
                     entry["insertMode"] = "reconstruct"
                     entry["reconstructSpec"] = spec
                     entry["pptx"] = None
