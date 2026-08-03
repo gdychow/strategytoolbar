@@ -80,6 +80,7 @@ const {
   resolveTemplateFilePath,
 } = require("./server/catalog");
 const { convertPotxToPresentationBytes } = require("./server/potxConvert");
+const { convertPptxToSlides } = require("./server/renderClient");
 const { deriveCompanyDomain } = require("./server/consumerDomains");
 // Same clientId/authority the task pane's NAA client uses (src/auth/msal.ts)
 // — reused as-is by /admin's separate, standard-MSAL browser sign-in flow
@@ -652,6 +653,209 @@ app.post("/api/personal/catalog/:id/delete", async (req, res) => {
 
   res.json({ ok: true });
 });
+
+// ---------------------------------------------------------------------------
+// Library Upload: bulk-import multiple .pptx files from /admin, each slide
+// becoming its own catalog item. Two steps — upload+convert (via the render
+// sidecar), then a review screen where the admin can rename/tag/exclude
+// individual slides before anything is written to the DB or the catalog
+// volume. Same "no new infrastructure" in-memory-state pattern already used
+// for the suspend/delete blocklist (server/auth.js) — an abandoned or
+// interrupted upload just needs to be re-run, since nothing is written to
+// disk/DB until commit.
+const libraryUploadJobs = new Map();
+const LIBRARY_UPLOAD_JOB_TTL_MS = 30 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, job] of libraryUploadJobs) {
+    if (now - job.createdAt > LIBRARY_UPLOAD_JOB_TTL_MS) libraryUploadJobs.delete(id);
+  }
+}, 5 * 60 * 1000).unref();
+
+function getOwnedLibraryUploadJob(req, jobId) {
+  const job = libraryUploadJobs.get(jobId);
+  if (!job || job.ownerOid !== req.user?.oid || job.ownerTid !== req.user?.tid) return null;
+  return job;
+}
+
+const uploadLibraryFiles = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024, files: 20 },
+  fileFilter: (req, file, cb) => {
+    if (!/\.pptx$/i.test(file.originalname)) return cb(new Error("Files must be .pptx."));
+    cb(null, true);
+  },
+});
+
+// Starts a batch conversion job and returns its id immediately — the
+// client polls GET /:jobId rather than this request blocking on however
+// long N LibreOffice conversions take (each is a real, possibly multi-
+// second, round trip to the render sidecar).
+app.post("/api/admin/library-upload", uploadLibraryFiles.array("files", 20), async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
+  const scope = req.body.scope === "company" ? "company" : "global";
+  if (scope === "company") {
+    if (!req.user.isCompanyAdmin && !req.user.isAdmin) return res.status(403).json({ error: "Not a company admin." });
+    if (!req.user.companyDomain) return res.status(403).json({ error: "You're not part of a company." });
+  } else if (!req.user.isAdmin) {
+    return res.status(403).json({ error: "Not an admin." });
+  }
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: "No files uploaded." });
+
+  // Per-file category, sent as a JSON array in the same order as the
+  // files themselves — form fields can't be reliably paired with
+  // individual files by name when several files share one field name.
+  // Company-scoped items have no category at all (see db/init.sql's
+  // orthogonal-scoping-columns design), so this only applies to global.
+  let categories = [];
+  if (scope === "global") {
+    try {
+      categories = JSON.parse(req.body.categories || "[]");
+    } catch {
+      return res.status(400).json({ error: "Invalid categories." });
+    }
+    if (
+      !Array.isArray(categories) ||
+      categories.length !== req.files.length ||
+      categories.some((c) => !CATALOG_CATEGORIES.includes(c))
+    ) {
+      return res.status(400).json({ error: "Each file needs a valid category." });
+    }
+  }
+
+  const jobId = crypto.randomUUID();
+  const job = {
+    createdAt: Date.now(),
+    ownerOid: req.user.oid,
+    ownerTid: req.user.tid,
+    scope,
+    companyDomain: scope === "company" ? req.user.companyDomain : null,
+    status: "processing",
+    files: req.files.map((f) => ({ filename: f.originalname, status: "pending" })),
+    items: [],
+  };
+  libraryUploadJobs.set(jobId, job);
+
+  (async () => {
+    for (let i = 0; i < req.files.length; i++) {
+      const file = req.files[i];
+      job.files[i].status = "converting";
+      try {
+        const slides = await convertPptxToSlides(file.buffer, file.originalname);
+        job.files[i].status = "done";
+        job.files[i].slideCount = slides.length;
+        const baseName = file.originalname.replace(/\.pptx$/i, "");
+        for (const slide of slides) {
+          job.items.push({
+            tempId: crypto.randomUUID(),
+            sourceFilename: file.originalname,
+            slideIndex: slide.index,
+            category: scope === "global" ? categories[i] : null,
+            title: slide.title || `${baseName} — slide ${slide.index + 1}`,
+            tags: [],
+            included: true,
+            thumbnail: slide.thumbnail,
+            pptx: slide.pptx,
+          });
+        }
+      } catch (err) {
+        job.files[i].status = "error";
+        job.files[i].error = err instanceof Error ? err.message : String(err);
+      }
+    }
+    job.status = "done";
+  })().catch((err) => {
+    job.status = "error";
+    job.error = err instanceof Error ? err.message : String(err);
+  });
+
+  res.json({ jobId });
+});
+
+app.get("/api/admin/library-upload/:jobId", (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  const job = getOwnedLibraryUploadJob(req, req.params.jobId);
+  if (!job) return res.status(404).json({ error: "Upload session not found." });
+  res.json({
+    status: job.status,
+    error: job.error ?? null,
+    files: job.files,
+    items: job.items.map((item) => ({
+      tempId: item.tempId,
+      sourceFilename: item.sourceFilename,
+      slideIndex: item.slideIndex,
+      category: item.category,
+      title: item.title,
+      tags: item.tags,
+      included: item.included,
+      thumbnailUrl: `/api/admin/library-upload/${req.params.jobId}/thumbnail/${item.tempId}`,
+    })),
+  });
+});
+
+// No req.user JSON-error convention here (this is an <img src>, not a
+// fetch call) — a plain 401/404 status is enough, the browser just shows
+// a broken-image icon.
+app.get("/api/admin/library-upload/:jobId/thumbnail/:tempId", (req, res) => {
+  if (!req.user) return res.status(401).end();
+  const job = getOwnedLibraryUploadJob(req, req.params.jobId);
+  if (!job) return res.status(404).end();
+  const item = job.items.find((i) => i.tempId === req.params.tempId);
+  if (!item) return res.status(404).end();
+  res.set("Content-Type", "image/png");
+  res.send(item.thumbnail);
+});
+
+app.post("/api/admin/library-upload/:jobId/commit", express.json({ limit: "2mb" }), async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  const job = getOwnedLibraryUploadJob(req, req.params.jobId);
+  if (!job) return res.status(404).json({ error: "Upload session not found." });
+  if (job.status !== "done") return res.status(409).json({ error: "Upload is still processing." });
+
+  const edits = new Map((Array.isArray(req.body.items) ? req.body.items : []).map((i) => [i.tempId, i]));
+  let created = 0;
+  for (const item of job.items) {
+    const edit = edits.get(item.tempId);
+    if (!edit || edit.included === false) continue;
+
+    const title = typeof edit.title === "string" && edit.title.trim() ? edit.title.trim() : item.title;
+    const category =
+      job.scope === "global" ? (CATALOG_CATEGORIES.includes(edit.category) ? edit.category : item.category) : null;
+    if (job.scope === "global" && !category) continue; // shouldn't happen given upload-time validation — never write a categoryless global row
+    const tags = Array.isArray(edit.tags)
+      ? [...new Set(edit.tags.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim()))]
+      : [];
+
+    const fileId = crypto.randomUUID();
+    const sourceFile = `admin-added/${fileId}.pptx`;
+    const thumbnailPath = `${fileId}.png`;
+    await fs.promises.writeFile(path.join(ADMIN_ADDED_DIR, `${fileId}.pptx`), item.pptx);
+    await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), item.thumbnail);
+
+    const row = await insertCatalogItem({
+      category,
+      companyDomain: job.companyDomain,
+      title,
+      insertMode: "file",
+      sourceFile,
+      thumbnailPath,
+      sortOrder: 0,
+    });
+    if (tags.length) await setItemTags(row.id, tags);
+    created++;
+  }
+
+  libraryUploadJobs.delete(req.params.jobId);
+  res.json({ created });
+});
+
+app.post("/api/admin/library-upload/:jobId/cancel", (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Sign in first." });
+  if (getOwnedLibraryUploadJob(req, req.params.jobId)) libraryUploadJobs.delete(req.params.jobId);
+  res.json({ ok: true });
+});
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Task Pane Phase 20: a genuine file picker, not a live-document capture —

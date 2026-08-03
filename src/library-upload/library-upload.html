@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Library Upload</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/tokens.css?v=__CACHE_BUST__" />
+  <link rel="stylesheet" href="/library-upload.css?v=__CACHE_BUST__" />
+</head>
+<body>
+  <div id="setupScreen" class="upload-screen">
+    <h2>Library Upload</h2>
+    <p class="upload-hint">Each slide in every file you choose becomes its own library item — thumbnail generated automatically, whitespace trimmed.</p>
+    <div id="scopeRow" class="upload-row" style="display: none;">
+      <label>Destination
+        <select id="scopeSelect"></select>
+      </label>
+    </div>
+    <div class="upload-row">
+      <input
+        type="file"
+        id="fileInput"
+        multiple
+        accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        style="display: none;"
+      />
+      <button type="button" id="btnChooseFiles">Choose Files…</button>
+    </div>
+    <div id="fileList" class="upload-file-list"></div>
+    <p id="setupError" class="error" style="display: none;"></p>
+    <div class="upload-actions">
+      <button type="button" id="btnStartUpload" disabled>Convert &amp; Continue</button>
+    </div>
+  </div>
+
+  <div id="progressScreen" class="upload-screen" style="display: none;">
+    <h2>Converting…</h2>
+    <p id="progressStatus" class="upload-status"></p>
+    <div id="fileProgressList" class="upload-file-list"></div>
+    <div class="upload-actions">
+      <button type="button" id="btnProgressBack" style="display: none;">Back</button>
+    </div>
+  </div>
+
+  <div id="reviewScreen" class="upload-screen upload-screen-review" style="display: none;">
+    <h2>Review Slides</h2>
+    <p id="reviewSummary" class="upload-status"></p>
+    <div id="reviewList" class="upload-review-list"></div>
+    <p id="commitError" class="error" style="display: none;"></p>
+    <div class="upload-actions">
+      <button type="button" id="btnCancelReview" class="upload-secondary">Cancel</button>
+      <button type="button" id="btnCommit">Add Selected to Library</button>
+    </div>
+  </div>
+
+  <div id="doneScreen" class="upload-screen" style="display: none;">
+    <h2>Done</h2>
+    <p id="doneStatus" class="upload-status"></p>
+    <div class="upload-actions">
+      <button type="button" id="btnClose">Close</button>
+    </div>
+  </div>
+
+  <script src="/library-upload.js?v=__CACHE_BUST__"></script>
+</body>
+</html>

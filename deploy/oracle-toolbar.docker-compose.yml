@@ -92,6 +92,7 @@ services:
       # see the header comment above for why.
       - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@db:5432/strategytoolbar
       - CATALOG_DIR=/app/data/catalog
+      - RENDER_SERVICE_URL=http://render:8090
     env_file:
       - .env
     volumes:
@@ -101,6 +102,8 @@ services:
       - ./data/catalog:/app/data/catalog
     depends_on:
       db:
+        condition: service_healthy
+      render:
         condition: service_healthy
     restart: unless-stopped
 
@@ -121,6 +124,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+
+  render:
+    # Stateless PPTX-to-slide-image conversion sidecar (LibreOffice/
+    # ImageMagick, isolated here since LibreOffice needs a Debian base,
+    # incompatible with the main app's Alpine image). No DATABASE_URL, no
+    # env_file, no volumes, no `ports:` — unreachable from outside the
+    # host, reachable only from strategy-toolbar at http://render:8090.
+    build:
+      context: ./render-sidecar
+    image: deckcelerate-toolbar-render:latest
+    expose:
+      - "8090"
     restart: unless-stopped
 
 volumes:

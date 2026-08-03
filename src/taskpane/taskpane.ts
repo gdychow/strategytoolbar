@@ -1074,6 +1074,29 @@ Office.onReady((info) => {
     );
   });
 
+  // Library Upload — same displayDialogAsync shape as gallery/templates
+  // above, but simpler: this dialog never needs PowerPoint API access at
+  // all (the actual catalog writes happen server-side on commit), so the
+  // only message it ever sends is "done", once, telling the task pane to
+  // close it. No payload to act on beyond that.
+  document.getElementById("btnBulkUpload")?.addEventListener("click", () => {
+    Office.context.ui.displayDialogAsync(
+      `${window.location.origin}/library-upload.html?v=${Date.now()}`,
+      { height: 80, width: 70 },
+      (result) => {
+        if (result.status === Office.AsyncResultStatus.Failed) {
+          notify(`Failed to open Library Upload: ${result.error.message}`, "error");
+          return;
+        }
+        const dialog = result.value;
+        dialog.addEventHandler(Office.EventType.DialogMessageReceived, (args) => {
+          if (!("message" in args)) return;
+          dialog.close();
+        });
+      }
+    );
+  });
+
   bindButton("btnLibraryFinishDelete", async () => {
     if (!currentFileInsertHandle) return;
     await Library.finishFileInsert(currentFileInsertHandle);

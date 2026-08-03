@@ -27,6 +27,14 @@ const registerOptions = { ...sharedOptions, entryPoints: ["src/register/register
 // Task Pane Phase 20: the template library dialog, same reasoning as
 // galleryOptions/registerOptions above.
 const templatesOptions = { ...sharedOptions, entryPoints: ["src/templates/templates.ts"], outfile: "dist/templates.js" };
+// Library Upload: the bulk-import review dialog, same reasoning as the
+// entry points above — its own small bundle, not a second entry point
+// sharing taskpane.js's outfile.
+const libraryUploadOptions = {
+  ...sharedOptions,
+  entryPoints: ["src/library-upload/library-upload.ts"],
+  outfile: "dist/library-upload.js",
+};
 
 /**
  * Prefers GIT_COMMIT from the environment (set as a Docker build ARG, since
@@ -65,6 +73,9 @@ async function copyStaticAssets() {
   const templatesHtml = await readFile("src/templates/templates.html", "utf8");
   await writeFile("dist/templates.html", templatesHtml.replaceAll("__CACHE_BUST__", commit));
   await cp("src/templates/templates.css", "dist/templates.css");
+  const libraryUploadHtml = await readFile("src/library-upload/library-upload.html", "utf8");
+  await writeFile("dist/library-upload.html", libraryUploadHtml.replaceAll("__CACHE_BUST__", commit));
+  await cp("src/library-upload/library-upload.css", "dist/library-upload.css");
   await cp("assets", "dist/assets", { recursive: true });
   await cp(prod ? "manifest.prod.xml" : "manifest.xml", "dist/manifest.xml");
   // Vendored fresh from node_modules on every build (not committed to the
@@ -92,10 +103,12 @@ if (watch) {
   const galleryCtx = await esbuild.context(galleryOptions);
   const registerCtx = await esbuild.context(registerOptions);
   const templatesCtx = await esbuild.context(templatesOptions);
+  const libraryUploadCtx = await esbuild.context(libraryUploadOptions);
   await ctx.watch();
   await galleryCtx.watch();
   await registerCtx.watch();
   await templatesCtx.watch();
+  await libraryUploadCtx.watch();
   await copyStaticAssets();
   console.log("Watching for changes...");
 } else {
@@ -103,5 +116,6 @@ if (watch) {
   await esbuild.build(galleryOptions);
   await esbuild.build(registerOptions);
   await esbuild.build(templatesOptions);
+  await esbuild.build(libraryUploadOptions);
   await copyStaticAssets();
 }

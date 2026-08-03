@@ -1,8 +1,11 @@
-# Two services, started together as one unit: the app, and its own
-# Postgres — not a sprawl of unrelated containers. Cloudflare Tunnel
-# (cloudflared) points at whatever host:port the app service is published
-# on; it isn't part of this compose file since it isn't a dependency of
-# the app itself.
+# Three services, started together as one unit: the app, its own Postgres,
+# and a render sidecar (LibreOffice/ImageMagick, for PPTX-to-slide-image
+# conversion) — not a sprawl of unrelated containers. The render service is
+# deliberately isolated: no database credentials, no volume mount, no
+# published port (see its own service block below for why). Cloudflare
+# Tunnel (cloudflared) points at whatever host:port the app service is
+# published on; it isn't part of this compose file since it isn't a
+# dependency of the app itself.
 #
 # Requires a .env file in this same directory (gitignored — never commit
 # it) with exactly these three variables. Copy .env.example to .env and
@@ -35,6 +38,7 @@ services:
       - AZURE_CLIENT_ID=2d499447-2b3d-4da8-ba78-ff5d1b1699b1
       - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@db:5432/strategytoolbar
       - CATALOG_DIR=/app/data/catalog
+      - RENDER_SERVICE_URL=http://render:8090
     env_file:
       - .env
     volumes:
@@ -49,6 +53,8 @@ services:
       - ./data/catalog:/app/data/catalog
     depends_on:
       db:
+        condition: service_healthy
+      render:
         condition: service_healthy
     restart: unless-stopped
 
@@ -65,6 +71,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+
+  render:
+    # Stateless PPTX-to-slide-image conversion (LibreOffice/ImageMagick).
+    # No DATABASE_URL, no env_file, no volumes, and no `ports:` entry —
+    # unreachable from outside the host, reachable only from strategy-
+    # toolbar over Compose's internal network at http://render:8090. Even
+    # if this container were compromised, it has no credentials and no
+    # persistent data to reach.
+    build:
+      context: ./render-sidecar
+    image: strategy-toolbar-addin-render:latest
+    expose:
+      - "8090"
     restart: unless-stopped
 
 volumes:
