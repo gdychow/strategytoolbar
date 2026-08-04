@@ -132,15 +132,81 @@ function canEdit(item: CatalogItem): boolean {
   return false;
 }
 
+/**
+ * Task Pane Phase 16 (redesigned): title/tags/group are always visible
+ * once an item is selected — read-only display for anyone who can't edit
+ * this item, editable inputs (with an explicit Save) for whoever can. No
+ * more toggled "Edit Details" button/form — matches the Template Library
+ * dialog's own always-visible manage row, generalized to also show
+ * (rather than hide) the read-only case for non-owners, since tags/group
+ * are useful context while browsing regardless of edit rights.
+ */
+function renderMetaSection(item: CatalogItem, editable: boolean): void {
+  const metaSection = document.getElementById("metaSection");
+  const scopedFields = document.getElementById("metaScopedFields");
+  const tagsDisplay = document.getElementById("metaTagsDisplay");
+  const groupDisplay = document.getElementById("metaGroupDisplay");
+  const tagsInput = document.getElementById("editTags") as HTMLInputElement | null;
+  const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
+  const saveBtn = document.getElementById("btnSaveDetails");
+  const errorEl = document.getElementById("editError");
+  if (!metaSection || !scopedFields || !tagsDisplay || !groupDisplay || !tagsInput || !groupSelect || !saveBtn) return;
+
+  if (errorEl) {
+    errorEl.style.display = "none";
+    errorEl.textContent = "";
+  }
+
+  const isPersonal = !!item.ownerOid;
+  // Personal items have no tags/group at all — the section still shows
+  // (with just a Save button) for the owner, since the title itself is
+  // still editable; for anyone else it never applies (personal items
+  // aren't visible to non-owners in the first place).
+  metaSection.style.display = !isPersonal || editable ? "flex" : "none";
+  scopedFields.style.display = isPersonal ? "none" : "flex";
+  saveBtn.style.display = editable ? "" : "none";
+
+  if (isPersonal) return;
+
+  tagsDisplay.style.display = editable ? "none" : "";
+  tagsInput.style.display = editable ? "" : "none";
+  groupDisplay.style.display = editable ? "none" : "";
+  groupSelect.style.display = editable ? "" : "none";
+  tagsDisplay.textContent = item.tags.length ? item.tags.join(", ") : "—";
+  groupDisplay.textContent = item.groupName ?? "—";
+
+  if (!editable) return;
+  tagsInput.value = item.tags.join(", ");
+  groupSelect.innerHTML = "";
+  const noneOption = document.createElement("option");
+  noneOption.value = "";
+  noneOption.textContent = "(none)";
+  groupSelect.appendChild(noneOption);
+  const groups = cache.get(activeCategory)?.groups ?? [];
+  for (const group of [...groups].sort((a, b) => a.sortOrder - b.sortOrder)) {
+    const opt = document.createElement("option");
+    opt.value = String(group.id);
+    opt.textContent = group.name;
+    groupSelect.appendChild(opt);
+  }
+  const newGroupOption = document.createElement("option");
+  newGroupOption.value = "__new__";
+  newGroupOption.textContent = "+ Add new group…";
+  groupSelect.appendChild(newGroupOption);
+  groupSelect.value = item.groupId !== null ? String(item.groupId) : "";
+  editGroupPreviousValue = groupSelect.value;
+}
+
 function showPreview(item: CatalogItem): void {
   const panel = document.getElementById("previewPanel");
   const img = document.getElementById("previewImg") as HTMLImageElement | null;
   const title = document.getElementById("previewTitle");
+  const titleInput = document.getElementById("editTitle") as HTMLInputElement | null;
   const insertAsSlideBtn = document.getElementById("btnInsertAsSlide");
+  const manageActionsRow = document.getElementById("manageActionsRow");
   const editBtn = document.getElementById("btnEdit");
-  const editDetailsBtn = document.getElementById("btnEditDetails");
   const deleteBtn = document.getElementById("btnDelete");
-  if (!panel || !img || !title) return;
+  if (!panel || !img || !title || !titleInput) return;
   resetDeleteArm(); // switching selection shouldn't leave a stale "click again to confirm" pointed at the wrong item
   const previewErrorEl = document.getElementById("previewError");
   if (previewErrorEl) {
@@ -152,7 +218,6 @@ function showPreview(item: CatalogItem): void {
   // directly in one step, so a second "as new slide" route is meaningless
   // for them.
   if (insertAsSlideBtn) (insertAsSlideBtn as HTMLElement).style.display = item.insertMode === "file" ? "" : "none";
-  closeEditDetails();
   const existingGlyph = panel.querySelector(".preview-glyph");
   if (existingGlyph) existingGlyph.remove();
   if (item.unicodeChar) {
@@ -167,72 +232,18 @@ function showPreview(item: CatalogItem): void {
   } else {
     img.style.display = "none";
   }
-  title.textContent = item.title;
   panel.style.display = "flex";
   const editable = canEdit(item);
-  if (editBtn) (editBtn as HTMLElement).style.display = editable ? "" : "none";
-  if (editDetailsBtn) (editDetailsBtn as HTMLElement).style.display = editable ? "" : "none";
-  if (deleteBtn) (deleteBtn as HTMLElement).style.display = editable ? "" : "none";
-}
-
-/**
- * Task Pane Phase 16: lightweight title/tags/group quick-edit, so a
- * company/global admin doesn't have to leave the gallery and open /admin
- * just to fix a typo or move an item between groups. Category reassignment,
- * thumbnail replacement, and new-group creation stay /admin-only — this is
- * deliberately the small subset worth editing without leaving the gallery.
- */
-function openEditDetails(item: CatalogItem): void {
-  const form = document.getElementById("editDetailsForm") as HTMLFormElement | null;
-  const titleInput = document.getElementById("editTitle") as HTMLInputElement | null;
-  const scopedFields = document.getElementById("editScopedFields");
-  const tagsInput = document.getElementById("editTags") as HTMLInputElement | null;
-  const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
-  const errorEl = document.getElementById("editError");
-  if (!form || !titleInput || !scopedFields || !tagsInput || !groupSelect) return;
-
-  if (errorEl) {
-    errorEl.style.display = "none";
-    errorEl.textContent = "";
-  }
+  // Title: static heading for read-only viewers, an editable input (fed
+  // straight into renderMetaSection's Save) for whoever can edit this item.
+  title.style.display = editable ? "none" : "";
+  titleInput.style.display = editable ? "" : "none";
+  title.textContent = item.title;
   titleInput.value = item.title;
-
-  const isPersonal = !!item.ownerOid;
-  scopedFields.style.display = isPersonal ? "none" : "";
-  if (!isPersonal) {
-    tagsInput.value = item.tags.join(", ");
-    groupSelect.innerHTML = "";
-    const noneOption = document.createElement("option");
-    noneOption.value = "";
-    noneOption.textContent = "(none)";
-    groupSelect.appendChild(noneOption);
-    const groups = cache.get(activeCategory)?.groups ?? [];
-    for (const group of [...groups].sort((a, b) => a.sortOrder - b.sortOrder)) {
-      const opt = document.createElement("option");
-      opt.value = String(group.id);
-      opt.textContent = group.name;
-      groupSelect.appendChild(opt);
-    }
-    const newGroupOption = document.createElement("option");
-    newGroupOption.value = "__new__";
-    newGroupOption.textContent = "+ Add new group…";
-    groupSelect.appendChild(newGroupOption);
-    groupSelect.value = item.groupId !== null ? String(item.groupId) : "";
-    editGroupPreviousValue = groupSelect.value;
-  }
-
-  form.style.display = "";
-  titleInput.focus();
-}
-
-function closeEditDetails(): void {
-  const form = document.getElementById("editDetailsForm") as HTMLFormElement | null;
-  const errorEl = document.getElementById("editError");
-  if (form) form.style.display = "none";
-  if (errorEl) {
-    errorEl.style.display = "none";
-    errorEl.textContent = "";
-  }
+  if (manageActionsRow) manageActionsRow.style.display = editable ? "flex" : "none";
+  if (editBtn) (editBtn as HTMLElement).style.display = editable ? "" : "none";
+  if (deleteBtn) (deleteBtn as HTMLElement).style.display = editable ? "" : "none";
+  renderMetaSection(item, editable);
 }
 
 async function saveEditDetails(item: CatalogItem): Promise<void> {
@@ -275,7 +286,6 @@ async function saveEditDetails(item: CatalogItem): Promise<void> {
       const group = (cache.get(activeCategory)?.groups ?? []).find((g) => g.id === groupId);
       item.groupName = group?.name ?? null;
     }
-    closeEditDetails();
     showPreview(item);
     rerenderGrid();
   } catch (err) {
@@ -661,12 +671,7 @@ Office.onReady(async () => {
   document.getElementById("btnDelete")?.addEventListener("click", () => {
     if (selectedItem) deleteItem(selectedItem);
   });
-  document.getElementById("btnEditDetails")?.addEventListener("click", () => {
-    if (selectedItem) openEditDetails(selectedItem);
-  });
-  document.getElementById("btnEditCancel")?.addEventListener("click", () => closeEditDetails());
-  document.getElementById("editDetailsForm")?.addEventListener("submit", (e) => {
-    e.preventDefault();
+  document.getElementById("btnSaveDetails")?.addEventListener("click", () => {
     if (selectedItem) saveEditDetails(selectedItem).catch(() => {});
   });
   document.getElementById("editGroup")?.addEventListener("change", () => {

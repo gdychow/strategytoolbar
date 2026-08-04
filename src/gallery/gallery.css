@@ -214,47 +214,17 @@ body {
   color: var(--text);
 }
 
-.preview-panel button {
-  padding: 8px 20px;
-  font-size: 13px;
-  cursor: pointer;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: #fff;
-  border-radius: 0;
-}
-
-.preview-panel button:hover {
-  background: var(--accent-hover);
-}
-
-/* Task Pane Phase 16: lightweight in-gallery quick-edit (title/tags/group) */
-.gallery-item.dragging {
-  opacity: 0.4;
-}
-
-#editDetailsForm {
+/*
+ * Editable title swaps in for the static <h3> above (see gallery.ts) —
+ * same size/weight/alignment so nothing visibly shifts when a viewer who
+ * can edit this item selects it.
+ */
+.preview-title-input {
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-light);
-}
-
-#editDetailsForm label {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 11px;
-  color: var(--text-muted);
-  text-align: left;
-}
-
-#editDetailsForm input,
-#editDetailsForm select {
-  font-size: 12px;
-  padding: 5px 7px;
+  margin: 0;
+  font: 600 14px var(--font-family);
+  text-align: center;
+  padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 0;
   background: var(--bg);
@@ -262,37 +232,115 @@ body {
   box-sizing: border-box;
 }
 
-.edit-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.edit-actions button {
-  flex: 1 1 auto;
-  padding: 6px 0;
-  font-size: 12px;
+/*
+ * Base button style matches the task pane's own neutral button exactly
+ * (same padding/height/font/border/background) — every preview-panel
+ * button reads as one control language with the rest of this app, not a
+ * dialog-specific look. .btn-primary (Insert / Insert as New Slide) is the
+ * one deliberate exception, styled in the accent color to mark the
+ * primary action; everything else (Edit Graphic, Delete, Save) stays
+ * neutral.
+ */
+.preview-panel button {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 10px;
+  min-height: 30px;
+  font: 500 12.5px var(--font-family);
   cursor: pointer;
+  border: 1px solid var(--border);
   border-radius: 0;
+  background: var(--bg-alt);
+  color: var(--text);
 }
 
-.edit-actions button[type="submit"] {
+.preview-panel button:hover {
+  background: var(--bg-hover);
+}
+
+.preview-panel .btn-primary {
   border: 1px solid var(--accent);
   background: var(--accent);
   color: #fff;
 }
 
-.edit-actions button[type="submit"]:hover {
+.preview-panel .btn-primary:hover {
   background: var(--accent-hover);
 }
 
-.edit-actions button[type="button"] {
-  border: 1px solid var(--border);
-  background: var(--bg-alt);
-  color: var(--text);
+.preview-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.edit-actions button[type="button"]:hover {
-  background: var(--bg-hover);
+/*
+ * Edit Graphic / Delete visually separated from the Insert actions above
+ * (a different kind of action — managing the item, not using it) via the
+ * same hairline-divider-plus-padding treatment the metadata section and
+ * every other dialog's own "manage" block already use.
+ */
+.preview-actions-manage {
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+}
+
+/* Task Pane Phase 16: lightweight in-gallery quick-edit (title/tags/group) — Admin UI Phase 22-style always-visible display, not a toggled form (see gallery.ts) */
+.gallery-item.dragging {
+  opacity: 0.4;
+}
+
+.preview-meta {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+  box-sizing: border-box;
+}
+
+#metaScopedFields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.meta-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 34px;
+}
+
+.meta-value {
+  flex: 1 1 auto;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-row input,
+.meta-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
 }
 
 #editError.error,

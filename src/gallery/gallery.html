@@ -21,24 +21,44 @@
     <div id="previewPanel" class="preview-panel" style="display: none;">
       <img id="previewImg" alt="" />
       <h3 id="previewTitle"></h3>
-      <button id="btnInsert" type="button">Insert</button>
-      <button id="btnInsertAsSlide" type="button" style="display: none;" title="Inserts directly as a permanent new slide — no temporary slide, no copy/paste, no Finish step.">Insert as New Slide</button>
-      <button id="btnEdit" type="button" style="display: none;">Edit Graphic</button>
-      <button id="btnEditDetails" type="button" style="display: none;">Edit Details</button>
-      <button id="btnDelete" type="button" style="display: none;">Delete</button>
-      <p id="previewError" class="error" style="display: none;"></p>
-      <form id="editDetailsForm" style="display: none;">
-        <label>Title <input id="editTitle" type="text" /></label>
-        <div id="editScopedFields">
-          <label>Tags <input id="editTags" type="text" placeholder="comma, separated" /></label>
-          <label>Group <select id="editGroup"></select></label>
+      <input id="editTitle" type="text" class="preview-title-input" style="display: none;" />
+
+      <div class="preview-actions preview-actions-primary">
+        <button id="btnInsert" type="button" class="btn-primary">Insert</button>
+        <button
+          id="btnInsertAsSlide"
+          type="button"
+          class="btn-primary"
+          style="display: none;"
+          title="Inserts directly as a permanent new slide — no temporary slide, no copy/paste, no Finish step."
+        >
+          Insert as New Slide
+        </button>
+      </div>
+
+      <div id="manageActionsRow" class="preview-actions preview-actions-manage" style="display: none;">
+        <button id="btnEdit" type="button" style="display: none;">Edit Graphic</button>
+        <button id="btnDelete" type="button" style="display: none;">Delete</button>
+      </div>
+
+      <div id="metaSection" class="preview-meta" style="display: none;">
+        <div id="metaScopedFields">
+          <div class="meta-row">
+            <span class="meta-label">Tags</span>
+            <span id="metaTagsDisplay" class="meta-value"></span>
+            <input id="editTags" type="text" placeholder="comma, separated" style="display: none;" />
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Group</span>
+            <span id="metaGroupDisplay" class="meta-value"></span>
+            <select id="editGroup" style="display: none;"></select>
+          </div>
         </div>
-        <div class="edit-actions">
-          <button type="submit">Save</button>
-          <button type="button" id="btnEditCancel">Cancel</button>
-        </div>
+        <button id="btnSaveDetails" type="button" style="display: none;">Save</button>
         <p id="editError" class="error" style="display: none;"></p>
-      </form>
+      </div>
+
+      <p id="previewError" class="error" style="display: none;"></p>
     </div>
   </div>
   <script src="/gallery.js?v=__CACHE_BUST__"></script>
