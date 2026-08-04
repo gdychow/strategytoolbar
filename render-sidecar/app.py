@@ -10,13 +10,15 @@ past one request.
 POST /convert with a multipart 'file' field (a .pptx/.potx) returns a zip:
   manifest.json  -- {"slides": [{index, title, thumbnail, insertMode,
                      reconstructSpec, pptx}, ...]}
-  slide-N.png    -- whitespace-trimmed PNG thumbnail for slide N (1-based)
+  slide-N.png    -- whitespace-trimmed (with a small margin re-added, see
+                     THUMBNAIL_MARGIN_PX) PNG thumbnail for slide N (1-based)
   slide-N.pptx   -- present only for insertMode "file": that slide alone,
                      as its own single-slide presentation
 
 Pipeline verified directly against a real multi-shape .pptx before this was
 written: LibreOffice (--convert-to pdf) -> pdftoppm (per-slide PNG) ->
-ImageMagick (-trim +repage) -> python-pptx (title hint, single-slide
+ImageMagick (-trim +repage, then a small white border added back) ->
+python-pptx (title hint, single-slide
 extraction, and reconstruct/file classification -- the same technique and
 the same classify_shape_tree/extract_reconstruct_spec logic
 scripts/slice-catalog-source.py already uses for the offline bulk-seed
@@ -49,6 +51,12 @@ app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # real templates carry emb
 
 SUBPROCESS_TIMEOUT_SECONDS = 120
 THUMBNAIL_DPI = 150
+# `-trim` crops to the exact non-background bounding box with zero
+# breathing room, which made every thumbnail look uncomfortably tight
+# against its own content -- this re-adds a small white margin on all
+# sides afterward so there's a visible sense of the graphic sitting on a
+# background rather than filling the frame edge-to-edge.
+THUMBNAIL_MARGIN_PX = 12
 THINK_CELL_MARKER = "think-cell"
 
 
@@ -1169,7 +1177,11 @@ def convert():
                 page_num = index + 1
                 raw_png = os.path.join(work_dir, raw_png_name)
                 trimmed_png = os.path.join(work_dir, f"trimmed-{page_num}.png")
-                run(["convert", raw_png, "-trim", "+repage", trimmed_png])
+                run([
+                    "convert", raw_png, "-trim", "+repage",
+                    "-bordercolor", "white", "-border", str(THUMBNAIL_MARGIN_PX),
+                    trimmed_png,
+                ])
                 thumb_name = f"slide-{page_num}.png"
                 zf.write(trimmed_png, thumb_name)
 

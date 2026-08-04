@@ -9,11 +9,39 @@
 # isolation.
 FROM python:3.12-slim
 
+# fonts-liberation covers Arial/Times New Roman/Courier New (metric-
+# compatible substitutes for those three specifically). It does NOT cover
+# Calibri/Cambria -- the default fonts in every "Office"-themed deck since
+# PowerPoint 2007 -- so any title/body text using them had no matching
+# substitute at all. Without a metric-compatible substitute, LibreOffice
+# falls back to a generic font whose glyphs are narrower than Calibri's,
+# and inflates inter-character spacing trying to preserve the original
+# layout's line width -- this is what produced the widely-spaced,
+# "stretched" text (confirmed by reproducing it locally: a plain Calibri
+# title/subtitle textbox render with exactly that spacing artifact, gone
+# once these packages are installed). fonts-crosextra-carlito/-caladea are
+# Google's metric-compatible substitutes for Calibri/Cambria respectively
+# -- same recipe used by Collabora Online and other headless-LO PDF/image
+# conversion services, no EULA acceptance needed (unlike ttf-mscorefonts-
+# installer, which would need extra non-interactive-debconf plumbing for
+# real Arial/Times New Roman -- not worth it here since Liberation already
+# covers those two adequately).
+# fonts-open-sans: the real thing, not a substitute -- Open Sans/Open Sans
+# ExtraBold are the actual theme fonts used across this app's own content
+# library source decks (confirmed by grepping every theme1.xml under
+# Package Files/StrategyToolbar/BoilerPlates/16x9/ for <a:latin typeface>:
+# Calibri/Calibri Light/Open Sans/Open Sans ExtraBold/Arial are the only
+# five fonts in use anywhere in that library), so there's no metric-
+# compatible-substitute step needed here the way there is for Calibri --
+# just install the font itself, freely licensed (Apache 2.0), no EULA.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-impress \
     imagemagick \
     poppler-utils \
     fonts-liberation \
+    fonts-crosextra-carlito \
+    fonts-crosextra-caladea \
+    fonts-open-sans \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
