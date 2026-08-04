@@ -98,7 +98,7 @@ function renderTabs(): void {
  */
 let deleteArmed = false;
 let deleteArmedTimer: number | undefined;
-const DELETE_LABEL = "Delete";
+const DELETE_LABEL = "Delete Graphic";
 const DELETE_CONFIRM_LABEL = "Click again to confirm";
 
 function resetDeleteArm(): void {
@@ -140,17 +140,35 @@ function canEdit(item: CatalogItem): boolean {
  * dialog's own always-visible manage row, generalized to also show
  * (rather than hide) the read-only case for non-owners, since tags/group
  * are useful context while browsing regardless of edit rights.
+ *
+ * Title lives here too, alongside Tags/Group, rather than as a separate
+ * always-editable field above the Insert buttons — the static <h3> above
+ * stays as a plain, non-editable heading; this is the one place the title
+ * is actually editable.
  */
 function renderMetaSection(item: CatalogItem, editable: boolean): void {
   const metaSection = document.getElementById("metaSection");
   const scopedFields = document.getElementById("metaScopedFields");
+  const titleDisplay = document.getElementById("metaTitleDisplay");
+  const titleInput = document.getElementById("editTitle") as HTMLInputElement | null;
   const tagsDisplay = document.getElementById("metaTagsDisplay");
   const groupDisplay = document.getElementById("metaGroupDisplay");
   const tagsInput = document.getElementById("editTags") as HTMLInputElement | null;
   const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
   const saveBtn = document.getElementById("btnSaveDetails");
   const errorEl = document.getElementById("editError");
-  if (!metaSection || !scopedFields || !tagsDisplay || !groupDisplay || !tagsInput || !groupSelect || !saveBtn) return;
+  if (
+    !metaSection ||
+    !scopedFields ||
+    !titleDisplay ||
+    !titleInput ||
+    !tagsDisplay ||
+    !groupDisplay ||
+    !tagsInput ||
+    !groupSelect ||
+    !saveBtn
+  )
+    return;
 
   if (errorEl) {
     errorEl.style.display = "none";
@@ -159,12 +177,17 @@ function renderMetaSection(item: CatalogItem, editable: boolean): void {
 
   const isPersonal = !!item.ownerOid;
   // Personal items have no tags/group at all — the section still shows
-  // (with just a Save button) for the owner, since the title itself is
+  // (with just Title + Save) for the owner, since the title itself is
   // still editable; for anyone else it never applies (personal items
   // aren't visible to non-owners in the first place).
   metaSection.style.display = !isPersonal || editable ? "flex" : "none";
   scopedFields.style.display = isPersonal ? "none" : "flex";
   saveBtn.style.display = editable ? "" : "none";
+
+  titleDisplay.style.display = editable ? "none" : "";
+  titleInput.style.display = editable ? "" : "none";
+  titleDisplay.textContent = item.title;
+  if (editable) titleInput.value = item.title;
 
   if (isPersonal) return;
 
@@ -201,12 +224,11 @@ function showPreview(item: CatalogItem): void {
   const panel = document.getElementById("previewPanel");
   const img = document.getElementById("previewImg") as HTMLImageElement | null;
   const title = document.getElementById("previewTitle");
-  const titleInput = document.getElementById("editTitle") as HTMLInputElement | null;
   const insertAsSlideBtn = document.getElementById("btnInsertAsSlide");
   const manageActionsRow = document.getElementById("manageActionsRow");
   const editBtn = document.getElementById("btnEdit");
   const deleteBtn = document.getElementById("btnDelete");
-  if (!panel || !img || !title || !titleInput) return;
+  if (!panel || !img || !title) return;
   resetDeleteArm(); // switching selection shouldn't leave a stale "click again to confirm" pointed at the wrong item
   const previewErrorEl = document.getElementById("previewError");
   if (previewErrorEl) {
@@ -234,12 +256,9 @@ function showPreview(item: CatalogItem): void {
   }
   panel.style.display = "flex";
   const editable = canEdit(item);
-  // Title: static heading for read-only viewers, an editable input (fed
-  // straight into renderMetaSection's Save) for whoever can edit this item.
-  title.style.display = editable ? "none" : "";
-  titleInput.style.display = editable ? "" : "none";
+  // Static heading, always shown as plain read-only text — the actual
+  // editable title field lives inside renderMetaSection, alongside Tags/Group.
   title.textContent = item.title;
-  titleInput.value = item.title;
   if (manageActionsRow) manageActionsRow.style.display = editable ? "flex" : "none";
   if (editBtn) (editBtn as HTMLElement).style.display = editable ? "" : "none";
   if (deleteBtn) (deleteBtn as HTMLElement).style.display = editable ? "" : "none";

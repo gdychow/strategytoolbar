@@ -215,24 +215,6 @@ body {
 }
 
 /*
- * Editable title swaps in for the static <h3> above (see gallery.ts) —
- * same size/weight/alignment so nothing visibly shifts when a viewer who
- * can edit this item selects it.
- */
-.preview-title-input {
-  width: 100%;
-  margin: 0;
-  font: 600 14px var(--font-family);
-  text-align: center;
-  padding: 4px 6px;
-  border: 1px solid var(--border);
-  border-radius: 0;
-  background: var(--bg);
-  color: var(--text);
-  box-sizing: border-box;
-}
-
-/*
  * Base button style matches the task pane's own neutral button exactly
  * (same padding/height/font/border/background) — every preview-panel
  * button reads as one control language with the rest of this app, not a

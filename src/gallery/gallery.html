@@ -21,10 +21,9 @@
     <div id="previewPanel" class="preview-panel" style="display: none;">
       <img id="previewImg" alt="" />
       <h3 id="previewTitle"></h3>
-      <input id="editTitle" type="text" class="preview-title-input" style="display: none;" />
 
       <div class="preview-actions preview-actions-primary">
-        <button id="btnInsert" type="button" class="btn-primary">Insert</button>
+        <button id="btnInsert" type="button" class="btn-primary">Insert Graphic</button>
         <button
           id="btnInsertAsSlide"
           type="button"
@@ -36,12 +35,12 @@
         </button>
       </div>
 
-      <div id="manageActionsRow" class="preview-actions preview-actions-manage" style="display: none;">
-        <button id="btnEdit" type="button" style="display: none;">Edit Graphic</button>
-        <button id="btnDelete" type="button" style="display: none;">Delete</button>
-      </div>
-
       <div id="metaSection" class="preview-meta" style="display: none;">
+        <div class="meta-row">
+          <span class="meta-label">Title</span>
+          <span id="metaTitleDisplay" class="meta-value"></span>
+          <input id="editTitle" type="text" style="display: none;" />
+        </div>
         <div id="metaScopedFields">
           <div class="meta-row">
             <span class="meta-label">Tags</span>
@@ -54,8 +53,13 @@
             <select id="editGroup" style="display: none;"></select>
           </div>
         </div>
-        <button id="btnSaveDetails" type="button" style="display: none;">Save</button>
+        <button id="btnSaveDetails" type="button" style="display: none;">Update Metadata</button>
         <p id="editError" class="error" style="display: none;"></p>
+      </div>
+
+      <div id="manageActionsRow" class="preview-actions preview-actions-manage" style="display: none;">
+        <button id="btnEdit" type="button" style="display: none;">Edit Graphic</button>
+        <button id="btnDelete" type="button" style="display: none;">Delete Graphic</button>
       </div>
 
       <p id="previewError" class="error" style="display: none;"></p>
