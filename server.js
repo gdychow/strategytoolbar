@@ -795,13 +795,6 @@ app.post("/api/admin/library-upload", uploadLibraryFiles.array("files", 20), asy
       const file = req.files[i];
       job.files[i].status = "converting";
       try {
-        // TEMPORARY DEBUG CAPTURE — remove once the theme-color
-        // investigation is done. Saves the raw uploaded .pptx exactly as
-        // received, before it reaches the render sidecar, so the real
-        // source theme XML can be inspected directly.
-        await fs.promises
-          .writeFile(path.join(ADMIN_ADDED_DIR, "debug-last-bulk-upload.pptx"), file.buffer)
-          .catch((err) => console.error("debug capture failed:", err.message));
         const slides = await convertPptxToSlides(file.buffer, file.originalname);
         job.files[i].status = "done";
         job.files[i].slideCount = slides.length;

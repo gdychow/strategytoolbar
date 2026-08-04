@@ -429,9 +429,16 @@ NON_RECONSTRUCTABLE_FILL_TYPES = {
 
 def has_unreconstructable_fill(shape) -> bool:
     try:
-        return shape.fill.type in NON_RECONSTRUCTABLE_FILL_TYPES
+        if shape.fill.type in NON_RECONSTRUCTABLE_FILL_TYPES:
+            return True
     except Exception:
-        return False
+        pass
+    # No explicit fill on the shape itself -- if it's coming from a
+    # <p:style><a:fillRef> quick-style pointing at a gradient format-scheme
+    # entry, that can't be flattened to one color either (see
+    # has_unreconstructable_style_ref_fill, defined further down alongside
+    # the rest of the style-ref resolution logic).
+    return has_unreconstructable_style_ref_fill(shape)
 
 
 def has_unmapped_auto_number(element) -> bool:
@@ -678,6 +685,186 @@ def resolve_color_spec(color_format, shape, theme_cache):
     return None
 
 
+# ---------------------------------------------------------------------------
+# "Shape Style" quick-formatting (<p:style><a:lnRef>/<a:fillRef>/<a:fontRef>).
+# Confirmed as the actual root cause of a real "theme colour pastes as no
+# colour" report: when a shape has no EXPLICIT <a:solidFill>/<a:ln>/run-
+# level <a:solidFill> of its own, PowerPoint still renders it using
+# whichever color the shape's <p:style> block references -- this is how a
+# freshly-drawn shape gets its default fill/line/font color, and it's a
+# completely separate mechanism from the direct <a:schemeClr> references
+# resolve_theme_color already handles. shape.fill.type/shape.line.fill.type/
+# run.font.color.type are all None in this case (python-pptx only reads
+# spPr/rPr directly, never <p:style>), which is why extraction was silently
+# reporting "no fill" / "no line" / "no run color" for shapes that actually
+# render with a real color in PowerPoint -- confirmed directly against a
+# real user-reported file (a freshly-drawn oval with fillRef idx="1"
+# accent1 and no spPr fill at all).
+# ---------------------------------------------------------------------------
+
+
+def _find_style_ref(shape, ref_tag):
+    """Returns the <p:style><a:{ref_tag}> element for this shape, or None
+    if the shape has no <p:style> block at all (e.g. a plain text box,
+    which never gets one) or no ref of that kind."""
+    style_el = shape._element.find(qn("p:style"))
+    if style_el is None:
+        return None
+    return style_el.find(qn("a:" + ref_tag))
+
+
+def _apply_color_modifiers(hexval, scheme_clr_el):
+    """Applies the common OOXML color transforms (shade/tint/lumMod/
+    lumOff) that can appear as direct children of a <p:style> ref's
+    <a:schemeClr>, adjusting an already-resolved base hex via simple HSL
+    luminance math. Anything more exotic (satMod, hueMod, etc.) is left
+    unapplied -- the base color is still far better than nothing, and
+    those are rare on a shape-level style ref in practice (they're far
+    more common inside the theme's own gradient stop definitions, which
+    this app already refuses to flatten -- see
+    _format_scheme_entry_is_gradient below)."""
+    if scheme_clr_el is None or hexval is None:
+        return hexval
+    try:
+        r = int(hexval[1:3], 16) / 255.0
+        g = int(hexval[3:5], 16) / 255.0
+        b = int(hexval[5:7], 16) / 255.0
+    except (ValueError, IndexError):
+        return hexval
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    for tag, apply in (
+        ("a:shade", lambda v, l: l * (v / 100000.0)),
+        ("a:tint", lambda v, l: l * (v / 100000.0) + (1.0 - v / 100000.0)),
+        ("a:lumMod", lambda v, l: l * (v / 100000.0)),
+        ("a:lumOff", lambda v, l: l + v / 100000.0),
+    ):
+        el = scheme_clr_el.find(qn(tag))
+        if el is not None:
+            try:
+                l = apply(int(el.get("val")), l)
+            except (TypeError, ValueError):
+                pass
+    l = max(0.0, min(1.0, l))
+    r2, g2, b2 = colorsys.hls_to_rgb(h, l, s)
+    return f"#{round(r2 * 255):02X}{round(g2 * 255):02X}{round(b2 * 255):02X}"
+
+
+def _format_scheme_entry(master, list_tag, idx):
+    """Returns the theme's <a:fmtScheme><a:{list_tag}> entry at 1-based
+    idx (an lxml element), or None if idx is 0/missing/out of range. A
+    style ref's idx indexes into this 3-entry list (fillStyleLst/
+    lnStyleLst), which is where the format scheme -- not the shape itself
+    -- defines whether that "look" is a flat solid or a gradient, and
+    (for lines) the actual weight."""
+    if not idx or idx == "0":
+        return None
+    try:
+        theme_part = None
+        for rel in master.part.rels.values():
+            if rel.reltype.endswith("/theme"):
+                theme_part = rel.target_part
+                break
+        if theme_part is None:
+            return None
+        theme_el = etree.fromstring(theme_part.blob)
+        list_el = theme_el.find(".//" + qn("a:fmtScheme") + "/" + qn("a:" + list_tag))
+        if list_el is None:
+            return None
+        entries = list(list_el)
+        return entries[int(idx) - 1]
+    except Exception:
+        return None
+
+
+def _format_scheme_entry_is_gradient(master, list_tag, idx):
+    entry = _format_scheme_entry(master, list_tag, idx)
+    return entry is not None and entry.tag == qn("a:gradFill")
+
+
+def resolve_style_ref_spec(shape, ref_tag, theme_cache):
+    """Resolves a <p:style> quick-style reference to a {"hex", "themeRole"}
+    spec, the same shape resolve_color_spec returns -- used as the
+    fallback for fill/line/font color whenever the shape/run has no
+    EXPLICIT color of its own (see extract_fill/extract_line/
+    extract_text_spec). Returns "gradient" as a sentinel when the
+    referenced fillStyleLst entry is a gradient (fontRef has no such
+    concept and never returns this), so the caller can route the whole
+    shape to 'file' mode instead of flattening a gradient to one wrong
+    flat color -- the same reason a shape's own direct gradient fill
+    already routes to 'file'."""
+    ref_el = _find_style_ref(shape, ref_tag)
+    if ref_el is None:
+        return None
+    idx = ref_el.get("idx")
+    if not idx or idx == "0":
+        return None
+    scheme_clr_el = ref_el.find(qn("a:schemeClr"))
+    if scheme_clr_el is None:
+        return None
+    xml_name = scheme_clr_el.get("val")
+    if not xml_name:
+        return None
+    try:
+        master = shape.part.slide_layout.slide_master
+    except Exception:
+        return None
+    list_tag = {"fillRef": "fillStyleLst", "lnRef": "lnStyleLst"}.get(ref_tag)
+    if list_tag and _format_scheme_entry_is_gradient(master, list_tag, idx):
+        return "gradient"
+    officejs_role = XML_NAME_TO_OFFICEJS_ROLE.get(xml_name)
+    cache_key = id(master.part)
+    if cache_key not in theme_cache:
+        theme_cache[cache_key] = _load_master_theme(master)
+    clr_map, scheme = theme_cache[cache_key]
+    slot = clr_map.get(xml_name, xml_name)
+    hexval = scheme.get(slot)
+    hexval = f"#{hexval}" if hexval else None
+    hexval = _apply_color_modifiers(hexval, scheme_clr_el)
+    if not hexval and not officejs_role:
+        return None
+    return {"hex": hexval or "#808080", "themeRole": officejs_role}
+
+
+def style_ref_line_width_pt(shape):
+    """The line weight the format scheme's lnStyleLst[idx-1] entry
+    specifies for this shape's <p:style><a:lnRef> -- used only when the
+    shape has no explicit <a:ln> of its own (see extract_line), since
+    there's no other source for a sensible width in that case."""
+    ref_el = _find_style_ref(shape, "lnRef")
+    if ref_el is None:
+        return None
+    idx = ref_el.get("idx")
+    if not idx or idx == "0":
+        return None
+    try:
+        master = shape.part.slide_layout.slide_master
+    except Exception:
+        return None
+    entry = _format_scheme_entry(master, "lnStyleLst", idx)
+    if entry is None:
+        return None
+    w = entry.get("w")
+    return emu_to_pt(int(w)) if w else None
+
+
+def has_unreconstructable_style_ref_fill(shape) -> bool:
+    """True when a shape with no explicit fill relies on a <p:style>
+    fillRef pointing at a gradient format-scheme entry -- classify_shape_
+    tree's counterpart to has_unreconstructable_fill, for the style-ref
+    case that function can't see (shape.fill.type is None there, not one
+    of the gradient/pattern/etc. enum members)."""
+    try:
+        if shape.fill.type is not None:
+            return False
+        ref_el = _find_style_ref(shape, "fillRef")
+        if ref_el is None:
+            return False
+        master = shape.part.slide_layout.slide_master
+        return _format_scheme_entry_is_gradient(master, "fillStyleLst", ref_el.get("idx"))
+    except Exception:
+        return False
+
+
 def extract_alpha(color_format):
     """Returns transparency as a 0.0 (opaque) - 1.0 (fully clear) fraction,
     matching Office.js's ShapeFill.transparency/ShapeLineFormat.transparency
@@ -705,6 +892,13 @@ def extract_fill(shape, theme_cache):
     try:
         fill = shape.fill
         if fill.type is None:
+            # No explicit fill on the shape itself -- fall back to the
+            # <p:style><a:fillRef> quick-style color, if any (see the
+            # style-ref resolution block above for why this is common,
+            # not an edge case).
+            style_color = resolve_style_ref_spec(shape, "fillRef", theme_cache)
+            if style_color and style_color != "gradient":
+                return {"type": "solid", "color": style_color, "transparency": 0.0}
             return None
         if str(fill.type) == "MSO_FILL_TYPE.SOLID (1)" or fill.type == 1:
             color = resolve_color_spec(fill.fore_color, shape, theme_cache)
@@ -720,6 +914,17 @@ def extract_line(shape, theme_cache):
     try:
         line = shape.line
         if line.fill.type is None:
+            # No explicit line on the shape itself -- fall back to the
+            # <p:style><a:lnRef> quick-style color/width, if any.
+            style_color = resolve_style_ref_spec(shape, "lnRef", theme_cache)
+            if style_color and style_color != "gradient":
+                return {
+                    "color": style_color,
+                    "widthPt": style_ref_line_width_pt(shape),
+                    "transparency": 0.0,
+                    "dashStyle": None,
+                    "compoundStyle": None,
+                }
             return None
         width_pt = emu_to_pt(line.width) if line.width else None
         color = resolve_color_spec(line.color, shape, theme_cache)
@@ -783,6 +988,16 @@ def extract_text_spec(shape, theme_cache):
                     underline = "None"
             except Exception:
                 underline = None
+            run_color = resolve_color_spec(r.font.color, shape, theme_cache) if r.font.color else None
+            if run_color is None:
+                # No explicit color on this run -- fall back to the
+                # shape-level <p:style><a:fontRef> quick-style color (e.g.
+                # a shape whose text was never given its own color
+                # override, relying on the default that comes with the
+                # shape's style).
+                style_color = resolve_style_ref_spec(shape, "fontRef", theme_cache)
+                if style_color and style_color != "gradient":
+                    run_color = style_color
             runs.append(
                 {
                     "text": r.text,
@@ -791,7 +1006,7 @@ def extract_text_spec(shape, theme_cache):
                     "underline": underline,
                     "size": r.font.size.pt if r.font.size else None,
                     "fontName": r.font.name,
-                    "color": resolve_color_spec(r.font.color, shape, theme_cache) if r.font.color else None,
+                    "color": run_color,
                 }
             )
         align = None
