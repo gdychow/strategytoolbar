@@ -622,17 +622,17 @@ async function cancelLibraryEdit(): Promise<void> {
 }
 
 /**
- * Deletion has no in-task-pane UI (see deleteLibraryItem below, triggered
- * from the gallery dialog instead) since the gallery is an ordinary
- * browser context where window.confirm works fine — the arm/confirm
- * pattern here exists only because *this* task pane's embedded webview
- * doesn't support window.confirm/alert/prompt (confirmed directly: the
- * same call works in the gallery dialog and in /admin, both more ordinary
- * browser contexts, but throws "Function window.confirm is not supported"
- * here). Same fix already applied once this session for the color picker:
- * stop relying on the unsupported native thing, build a small in-page
- * equivalent instead — here, a two-step "click again to confirm" on the
- * button itself, no new markup needed.
+ * This task pane's own embedded webview doesn't support window.confirm/
+ * alert/prompt at all (confirmed directly: it throws "Function
+ * window.confirm is not supported" here) — unlike /admin's standalone
+ * browser tab, where it genuinely does work. The gallery dialog turned out
+ * to have the same gap despite looking like an "ordinary browser context"
+ * (it's opened via displayDialogAsync, the same class of host as this task
+ * pane, not the same as /admin) — its own Delete button now uses the
+ * identical two-step "click again to confirm" pattern, see gallery.ts.
+ * Same fix already applied once this session for the color picker: stop
+ * relying on the unsupported native thing, build a small in-page
+ * equivalent instead — here, on the button itself, no new markup needed.
  */
 let addToLibraryArmed = false;
 let addToLibraryArmedTimer: number | undefined;
@@ -699,17 +699,6 @@ async function addSelectedSlideToLibrary(): Promise<void> {
   } else {
     notify('Added to your personal library — open "Browse Library…" to rename or insert it.');
   }
-}
-
-/** Triggered from the gallery dialog's Delete button (which does its own window.confirm — see the comment above addSelectedSlideToLibrary for why that's fine there but not here). */
-async function deleteLibraryItem(item: Library.CatalogItem): Promise<void> {
-  const url = item.ownerOid ? `/api/personal/catalog/${item.id}/delete` : `/admin/catalog/${item.id}/delete`;
-  const res = await fetchWithTimeout(url, { method: "POST", headers: { Accept: "application/json" } });
-  if (!res.ok) {
-    notify(`Couldn't delete "${item.title}" (${res.status}).`, "error");
-    return;
-  }
-  notify(`Deleted "${item.title}".`);
 }
 
 /**
@@ -1027,11 +1016,9 @@ Office.onReady((info) => {
           const action =
             payload.action === "edit"
               ? beginLibraryEdit
-              : payload.action === "delete"
-                ? deleteLibraryItem
-                : payload.action === "insert-as-slide"
-                  ? insertPickedItemAsSlide
-                  : insertPickedItem;
+              : payload.action === "insert-as-slide"
+                ? insertPickedItemAsSlide
+                : insertPickedItem;
           action(payload.item).catch((err) =>
             notify(`Error: ${err instanceof Error ? err.message : String(err)}`, "error")
           );

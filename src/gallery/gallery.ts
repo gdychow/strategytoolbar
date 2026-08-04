@@ -142,6 +142,11 @@ function showPreview(item: CatalogItem): void {
   const deleteBtn = document.getElementById("btnDelete");
   if (!panel || !img || !title) return;
   resetDeleteArm(); // switching selection shouldn't leave a stale "click again to confirm" pointed at the wrong item
+  const previewErrorEl = document.getElementById("previewError");
+  if (previewErrorEl) {
+    previewErrorEl.style.display = "none";
+    previewErrorEl.textContent = "";
+  }
   // Only 'file'-mode items go through the temp-slide/copy-paste/Finish
   // dance at all — 'reconstruct'/'unicode-char' items already insert
   // directly in one step, so a second "as new slide" route is meaningless
@@ -352,8 +357,19 @@ function insertItemAsSlide(item: CatalogItem): void {
   Office.context.ui.messageParent(JSON.stringify({ action: "insert-as-slide", item }));
 }
 
-/** Two-click arm/confirm (see resetDeleteArm's comment for why, not window.confirm) — the actual deletion still happens back in the task pane via messageParent, same as every other action here. */
-function deleteItem(item: CatalogItem): void {
+/**
+ * Two-click arm/confirm (see resetDeleteArm's comment for why, not
+ * window.confirm). Deletion happens via a direct fetch from right here —
+ * not a messageParent round-trip to the task pane like insert/edit are —
+ * the same "no Office.js involved, so no need to leave the dialog" pattern
+ * saveEditDetails above already uses. Routing this through the task pane
+ * instead (as an earlier version of this function did) meant the task
+ * pane's shared DialogMessageReceived handler closed the dialog
+ * unconditionally for every action, which made the whole gallery vanish
+ * after a delete — not the expected "stay open, item's gone from the
+ * grid" behavior a delete should have.
+ */
+async function deleteItem(item: CatalogItem): Promise<void> {
   const btn = document.getElementById("btnDelete");
   if (!deleteArmed) {
     deleteArmed = true;
@@ -363,7 +379,24 @@ function deleteItem(item: CatalogItem): void {
     return;
   }
   resetDeleteArm();
-  Office.context.ui.messageParent(JSON.stringify({ action: "delete", item }));
+
+  const errorEl = document.getElementById("previewError");
+  const isPersonal = !!item.ownerOid;
+  const url = isPersonal ? `/api/personal/catalog/${item.id}/delete` : `/admin/catalog/${item.id}/delete`;
+  try {
+    const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    const data = cache.get(activeCategory);
+    if (data) data.items = data.items.filter((i) => i.id !== item.id);
+    hidePreview();
+    rerenderGrid();
+  } catch (err) {
+    if (errorEl) {
+      errorEl.textContent = err instanceof Error ? err.message : String(err);
+      errorEl.style.display = "block";
+    }
+  }
 }
 
 function editItem(item: CatalogItem): void {

@@ -295,7 +295,8 @@ body {
   background: var(--bg-hover);
 }
 
-#editError.error {
+#editError.error,
+#previewError.error {
   margin: 0;
   font-size: 11px;
   color: var(--error-text);
