@@ -39,6 +39,7 @@ from flask import Flask, jsonify, request, send_file
 from pptx import Presentation
 from pptx.enum.dml import MSO_COLOR_TYPE, MSO_THEME_COLOR
 from pptx.enum.shapes import MSO_SHAPE_TYPE, PP_PLACEHOLDER
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Emu
 
@@ -222,6 +223,31 @@ PRST_TO_GEOMETRIC_SHAPE_TYPE = {
 }
 
 
+# a:pPr algn -> PowerPoint.ParagraphHorizontalAlignment's exact string
+# values (confirmed against @types/office-js: Left/Center/Right/Justify/
+# JustifyLow/Distributed/ThaiDistributed). PP_ALIGN.to_xml() round-trips a
+# python-pptx alignment member straight back to its raw OOXML value -- same
+# technique already used for MSO_THEME_COLOR below -- so this table only
+# maps that raw value to Office.js's naming, it doesn't re-derive it.
+ALGN_TO_OFFICEJS_ALIGNMENT = {
+    "l": "Left",
+    "ctr": "Center",
+    "r": "Right",
+    "just": "Justify",
+    "justLow": "JustifyLow",
+    "dist": "Distributed",
+    "thaiDist": "ThaiDistributed",
+}
+
+# a:bodyPr anchor (+ anchorCtr) -> PowerPoint.TextVerticalAlignment's exact
+# string values (Top/Middle/Bottom/TopCentered/MiddleCentered/
+# BottomCentered). The "Centered" variants correspond to anchorCtr="1" (the
+# whole text block is also centered horizontally as a group) -- a separate
+# OOXML attribute from paragraph-level algn, combined here since Office.js
+# models both as one enum.
+ANCHOR_TO_OFFICEJS_VERTICAL_ALIGNMENT = {"t": "Top", "ctr": "Middle", "b": "Bottom"}
+
+
 def classify_shape_tree(shape) -> str:
     """Returns 'file' if anything under this shape can't be reconstructed, else 'reconstruct'."""
     el = shape._element
@@ -294,37 +320,87 @@ def _load_master_theme(master):
     return clr_map, scheme
 
 
+# Raw OOXML schemeClr value (pre-clrMap -- MSO_THEME_COLOR.to_xml() returns
+# exactly this, the semantic role name PowerPoint's own UI/API uses, not the
+# raw theme-XML slot it happens to map to on this particular master) ->
+# Office.js's ThemeColorScheme.getThemeColor() role names, confirmed
+# against src/features/fillLineColors.ts's own THEME_COLOR_ROLES list.
+# hlink/folHlink are deliberately absent: that file's getThemeColors() never
+# exposes them either, so there's no live-lookup path for a hyperlink color
+# at this app's PowerPointApi floor -- those colors fall back to the static
+# hex snapshot below and nothing else.
+#
+# MSO_THEME_COLOR.to_xml() can also return the four RAW scheme slot names
+# (dk1/lt1/dk2/lt2) instead of the semantic ones, when a shape's
+# <a:schemeClr val="..."> happens to reference a slot directly rather than
+# through clrMap (confirmed directly: python-pptx round-trips whichever
+# form was actually written -- DARK_1/LIGHT_1/etc. produce "dk1"/"lt1"/...,
+# while TEXT_1/BACKGROUND_1/etc. produce "tx1"/"bg1"/...). Mapped here to
+# the same Office.js role their semantic counterpart would typically
+# resolve to, since tx1->dk1 and bg1->lt1 is clrMap's standard/default
+# configuration -- an approximation for the (uncommon) direct-slot case,
+# not a guess for the common semantic case, which is exact.
+XML_NAME_TO_OFFICEJS_ROLE = {
+    "bg1": "Light1",
+    "tx1": "Dark1",
+    "bg2": "Light2",
+    "tx2": "Dark2",
+    "lt1": "Light1",
+    "dk1": "Dark1",
+    "lt2": "Light2",
+    "dk2": "Dark2",
+    "accent1": "Accent1",
+    "accent2": "Accent2",
+    "accent3": "Accent3",
+    "accent4": "Accent4",
+    "accent5": "Accent5",
+    "accent6": "Accent6",
+}
+
+
 def resolve_theme_color(shape, mso_theme_color, theme_cache):
+    """Returns (hex, officejs_role). hex is a static snapshot of the SOURCE
+    presentation's theme at extraction time -- kept as a fallback. When
+    officejs_role is non-None, the insert-time client can instead resolve
+    the color live against the TARGET presentation's own theme (see
+    src/features/libraryInsert.ts's two-phase theme-role resolve), so a
+    shape colored e.g. "Accent1" in the source lands as whatever Accent1
+    actually is in the presentation it's inserted into, rather than a
+    baked-in hex that's wrong (commonly white-on-white) the moment the two
+    presentations' themes differ."""
     try:
         xml_name = MSO_THEME_COLOR.to_xml(mso_theme_color)
     except Exception:
-        return None
+        return None, None
+    officejs_role = XML_NAME_TO_OFFICEJS_ROLE.get(xml_name)
     try:
         master = shape.part.slide_layout.slide_master
     except Exception:
-        return None
+        return None, officejs_role
     cache_key = id(master.part)
     if cache_key not in theme_cache:
         theme_cache[cache_key] = _load_master_theme(master)
     clr_map, scheme = theme_cache[cache_key]
     slot = clr_map.get(xml_name, xml_name)
     hexval = scheme.get(slot)
-    return f"#{hexval}" if hexval else None
+    return (f"#{hexval}" if hexval else None), officejs_role
 
 
-def resolve_color_hex(color_format, shape, theme_cache):
-    """Resolves a python-pptx ColorFormat to a real #RRGGBB string, handling
-    both explicit RGB colors and theme-derived ones. Returns None if no
-    color is set, or for the rare color types (HSL/preset/system/scRGB)
-    this doesn't handle -- safer to omit than to guess."""
+def resolve_color_spec(color_format, shape, theme_cache):
+    """Resolves a python-pptx ColorFormat to {"hex", "themeRole"}: hex a
+    real #RRGGBB string, themeRole a live Office.js theme-color role name
+    when this color is theme-derived and mappable, else None. Returns None
+    entirely if no color is set, or for the rare color types (HSL/preset/
+    system/scRGB) this doesn't handle -- safer to omit than to guess."""
     try:
         color_type = color_format.type
     except Exception:
         return None
     if color_type == MSO_COLOR_TYPE.RGB:
-        return f"#{color_format.rgb}"
+        return {"hex": f"#{color_format.rgb}", "themeRole": None}
     if color_type == MSO_COLOR_TYPE.SCHEME:
-        return resolve_theme_color(shape, color_format.theme_color, theme_cache)
+        hexval, role = resolve_theme_color(shape, color_format.theme_color, theme_cache)
+        return {"hex": hexval, "themeRole": role} if hexval else None
     return None
 
 
@@ -334,7 +410,7 @@ def extract_fill(shape, theme_cache):
         if fill.type is None:
             return None
         if str(fill.type) == "MSO_FILL_TYPE.SOLID (1)" or fill.type == 1:
-            color = resolve_color_hex(fill.fore_color, shape, theme_cache)
+            color = resolve_color_spec(fill.fore_color, shape, theme_cache)
             return {"type": "solid", "color": color} if color else None
         return None
     except Exception:
@@ -347,7 +423,7 @@ def extract_line(shape, theme_cache):
         if line.fill.type is None:
             return None
         width_pt = emu_to_pt(line.width) if line.width else None
-        color = resolve_color_hex(line.color, shape, theme_cache)
+        color = resolve_color_spec(line.color, shape, theme_cache)
         return {"color": color, "widthPt": width_pt} if color else None
     except Exception:
         return None
@@ -367,11 +443,34 @@ def extract_text_spec(shape, theme_cache):
                     "italic": r.font.italic,
                     "size": r.font.size.pt if r.font.size else None,
                     "fontName": r.font.name,
-                    "color": resolve_color_hex(r.font.color, shape, theme_cache) if r.font.color else None,
+                    "color": resolve_color_spec(r.font.color, shape, theme_cache) if r.font.color else None,
                 }
             )
-        paragraphs.append({"level": p.level, "bullet": None, "runs": runs})
+        align = None
+        try:
+            if p.alignment is not None:
+                align = ALGN_TO_OFFICEJS_ALIGNMENT.get(PP_ALIGN.to_xml(p.alignment))
+        except Exception:
+            align = None
+        paragraphs.append({"level": p.level, "bullet": None, "align": align, "runs": runs})
     return paragraphs
+
+
+def extract_vertical_alignment(shape):
+    """Maps a:bodyPr anchor/anchorCtr to Office.js's TextVerticalAlignment
+    string. Returns None (not a guessed default) when the shape has no text
+    frame or no anchor attribute at all -- the caller only sets
+    TextFrame.verticalAlignment when this is non-null, leaving PowerPoint's
+    own default (Top) untouched otherwise."""
+    if not shape.has_text_frame:
+        return None
+    body_pr = shape._element.find(".//" + qn("a:bodyPr"))
+    if body_pr is None:
+        return None
+    base = ANCHOR_TO_OFFICEJS_VERTICAL_ALIGNMENT.get(body_pr.get("anchor"))
+    if base is None:
+        return None
+    return f"{base}Centered" if body_pr.get("anchorCtr") == "1" else base
 
 
 def extract_reconstruct_spec(shape, theme_cache):
@@ -385,6 +484,7 @@ def extract_reconstruct_spec(shape, theme_cache):
         "rotation": shape.rotation,
         "fill": extract_fill(shape, theme_cache),
         "line": extract_line(shape, theme_cache),
+        "verticalAlignment": extract_vertical_alignment(shape),
         "paragraphs": extract_text_spec(shape, theme_cache),
     }
     if not is_text_box:

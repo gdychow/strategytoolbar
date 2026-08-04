@@ -657,21 +657,24 @@ async function updateCatalogItemThumbnail({ id, thumbnailPath }) {
 }
 
 /**
- * Points source_file/thumbnail_path at freshly admin-exported content
- * (Task Pane Phase 12 — see POST /api/admin/catalog/:id/content) and
- * forces insert_mode = 'file' with reconstruct_spec cleared, which is
- * what actually migrates a 'reconstruct'-mode item to 'file'-mode the
- * first time it's edited this way. Kept separate from updateCatalogItem
- * (title/category/group) and updateCatalogItemThumbnail (thumbnail only)
- * — neither of those covers replacing the underlying content itself.
+ * Points source_file/thumbnail_path/insert_mode/reconstruct_spec at
+ * freshly admin-exported content (Task Pane Phase 12 — see
+ * POST /api/admin/catalog/:id/content), classified by the render sidecar
+ * into 'reconstruct' or 'file' the same way any other single-slide export
+ * is (see classifySingleSlidePptx in server.js) rather than always forcing
+ * 'file' — so an edit that simplifies a shape back into reconstructable
+ * territory gets the one-click native path too, not just the temp-slide
+ * fallback. Kept separate from updateCatalogItem (title/category/group)
+ * and updateCatalogItemThumbnail (thumbnail only) — neither of those
+ * covers replacing the underlying content itself.
  */
-async function updateCatalogItemContent({ id, sourceFile, thumbnailPath }) {
+async function updateCatalogItemContent({ id, insertMode, sourceFile, reconstructSpec, thumbnailPath }) {
   const result = await pool.query(
     `UPDATE catalog_items
-     SET source_file = $2, thumbnail_path = $3, insert_mode = 'file', reconstruct_spec = NULL
+     SET source_file = $2, thumbnail_path = $3, insert_mode = $4, reconstruct_spec = $5
      WHERE id = $1 AND owner_oid IS NULL
      RETURNING id, category`,
-    [id, sourceFile, thumbnailPath]
+    [id, sourceFile ?? null, thumbnailPath, insertMode, reconstructSpec ? JSON.stringify(reconstructSpec) : null]
   );
   return result.rows[0] ?? null;
 }
@@ -724,14 +727,14 @@ async function getOwnedCatalogItem(id, oid, tid) {
   return result.rows[0] ?? null;
 }
 
-/** Owner-scoped equivalent of updateCatalogItemContent (Task Pane Phase 12) — replaces a personal item's underlying graphic, always landing as insert_mode 'file' with reconstruct_spec cleared, same migration behavior as the admin version. */
-async function updateOwnedCatalogItemContent({ id, oid, tid, sourceFile, thumbnailPath }) {
+/** Owner-scoped equivalent of updateCatalogItemContent (Task Pane Phase 12) — replaces a personal item's underlying graphic, classified into 'reconstruct' or 'file' by the render sidecar same as the admin version. */
+async function updateOwnedCatalogItemContent({ id, oid, tid, insertMode, sourceFile, reconstructSpec, thumbnailPath }) {
   const result = await pool.query(
     `UPDATE catalog_items
-     SET source_file = $4, thumbnail_path = $5, insert_mode = 'file', reconstruct_spec = NULL
+     SET source_file = $4, thumbnail_path = $5, insert_mode = $6, reconstruct_spec = $7
      WHERE id = $1 AND owner_oid = $2 AND owner_tid = $3
      RETURNING id`,
-    [id, oid, tid, sourceFile, thumbnailPath]
+    [id, oid, tid, sourceFile ?? null, thumbnailPath, insertMode, reconstructSpec ? JSON.stringify(reconstructSpec) : null]
   );
   return result.rows[0] ?? null;
 }

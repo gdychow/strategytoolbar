@@ -455,17 +455,34 @@ app.get("/api/catalog/file/:itemId", async (req, res) => {
   });
 });
 
+// Routes the current-slide/edit exports captured via
+// Slide.exportAsBase64() through the render sidecar's own classification
+// (the same classify_shape_tree/extract_reconstruct_spec logic
+// scripts/slice-catalog-source.py and the Library Upload commit route
+// already use) instead of always hardcoding insert_mode 'file' — a
+// single-slide export classifies exactly like any other single slide, so
+// this just reuses convertPptxToSlides and takes its one result. Bug fix:
+// previously every "Add to Library"/"Edit Graphic" item landed as 'file'
+// (temp-slide + copy/paste) even when its content was simple enough to
+// insert natively in one click.
+async function classifySingleSlidePptx(buffer) {
+  const slides = await convertPptxToSlides(buffer, "slide.pptx");
+  const slide = slides[0];
+  if (!slide) throw new Error("Conversion produced no slides.");
+  return { insertMode: slide.insertMode, reconstructSpec: slide.reconstructSpec, pptxBuffer: slide.pptx };
+}
+
 // Task Pane Phase 12: JSON, called directly from the task pane (not a
 // browser page) — see beginLibraryEdit/saveLibraryEdit in taskpane.ts.
 // Replaces an existing item's underlying content with whatever the admin
 // just exported from a live PowerPoint session (Slide.exportAsBase64 for
 // the content, Slide.getImageAsBase64 for the thumbnail — both base64,
-// no data: URL prefix). Always lands as insert_mode 'file', even if the
-// item was 'reconstruct' before — updateCatalogItemContent forces that
-// and clears reconstruct_spec. Task Pane Phase 14: fetches the existing
-// row first and checks canManageRow against it, instead of the blanket
-// requireAdmin middleware — a company admin can now reach this route too,
-// for their own company's items.
+// no data: URL prefix). Classified into 'reconstruct' or 'file' by
+// classifySingleSlidePptx the same as any other single-slide export
+// (bug fix — this used to always force insert_mode 'file'). Task Pane
+// Phase 14: fetches the existing row first and checks canManageRow
+// against it, instead of the blanket requireAdmin middleware — a company
+// admin can now reach this route too, for their own company's items.
 app.post("/api/admin/catalog/:id/content", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Sign in first." });
   if (!req.user.isRegistered) return res.status(403).json({ error: "Finish creating your account first." });
@@ -481,12 +498,23 @@ app.post("/api/admin/catalog/:id/content", async (req, res) => {
   if (!existing) return res.status(404).json({ error: "Item not found." });
   if (!canManageRow(req.user, existing)) return res.status(403).json({ error: "Not an admin for this item." });
 
-  const sourceFile = `admin-added/item-${id}.pptx`;
+  const classification = await classifySingleSlidePptx(Buffer.from(pptxBase64, "base64"));
   const thumbnailPath = `item-${id}.png`;
-  await fs.promises.writeFile(path.join(ADMIN_ADDED_DIR, `item-${id}.pptx`), Buffer.from(pptxBase64, "base64"));
   await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), Buffer.from(thumbnailBase64, "base64"));
 
-  const updated = await updateCatalogItemContent({ id, sourceFile, thumbnailPath });
+  let sourceFile;
+  if (classification.insertMode === "file") {
+    sourceFile = `admin-added/item-${id}.pptx`;
+    await fs.promises.writeFile(path.join(ADMIN_ADDED_DIR, `item-${id}.pptx`), classification.pptxBuffer);
+  }
+
+  const updated = await updateCatalogItemContent({
+    id,
+    insertMode: classification.insertMode,
+    sourceFile,
+    reconstructSpec: classification.insertMode === "reconstruct" ? classification.reconstructSpec : undefined,
+    thumbnailPath,
+  });
   if (!updated) return res.status(404).json({ error: "Item not found." });
 
   // Cleans up whatever this item pointed at before — a Python-pipeline
@@ -532,18 +560,24 @@ app.post("/api/admin/catalog", async (req, res) => {
 
   const category = isCompanyScope ? null : CATALOG_CATEGORIES[0];
   const companyDomain = isCompanyScope ? req.user.companyDomain : null;
+  const classification = await classifySingleSlidePptx(Buffer.from(pptxBase64, "base64"));
   const fileId = crypto.randomUUID();
-  const sourceFile = `admin-added/${fileId}.pptx`;
   const thumbnailPath = `${fileId}.png`;
-  await fs.promises.writeFile(path.join(ADMIN_ADDED_DIR, `${fileId}.pptx`), Buffer.from(pptxBase64, "base64"));
   await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), Buffer.from(thumbnailBase64, "base64"));
+
+  let sourceFile;
+  if (classification.insertMode === "file") {
+    sourceFile = `admin-added/${fileId}.pptx`;
+    await fs.promises.writeFile(path.join(ADMIN_ADDED_DIR, `${fileId}.pptx`), classification.pptxBuffer);
+  }
 
   const created = await insertCatalogItem({
     category,
     companyDomain,
     title: "Untitled item",
-    insertMode: "file",
+    insertMode: classification.insertMode,
     sourceFile,
+    reconstructSpec: classification.insertMode === "reconstruct" ? classification.reconstructSpec : undefined,
     thumbnailPath,
     sortOrder: 0,
   });
@@ -565,17 +599,23 @@ app.post("/api/personal/catalog", async (req, res) => {
   }
 
   const category = CATALOG_CATEGORIES[0];
+  const classification = await classifySingleSlidePptx(Buffer.from(pptxBase64, "base64"));
   const fileId = crypto.randomUUID();
-  const sourceFile = `personal-added/${fileId}.pptx`;
   const thumbnailPath = `${fileId}.png`;
-  await fs.promises.writeFile(path.join(PERSONAL_ADDED_DIR, `${fileId}.pptx`), Buffer.from(pptxBase64, "base64"));
   await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), Buffer.from(thumbnailBase64, "base64"));
+
+  let sourceFile;
+  if (classification.insertMode === "file") {
+    sourceFile = `personal-added/${fileId}.pptx`;
+    await fs.promises.writeFile(path.join(PERSONAL_ADDED_DIR, `${fileId}.pptx`), classification.pptxBuffer);
+  }
 
   const created = await insertCatalogItem({
     category,
     title: "Untitled item",
-    insertMode: "file",
+    insertMode: classification.insertMode,
     sourceFile,
+    reconstructSpec: classification.insertMode === "reconstruct" ? classification.reconstructSpec : undefined,
     thumbnailPath,
     sortOrder: 0,
     ownerOid: req.user.oid,
@@ -602,12 +642,25 @@ app.post("/api/personal/catalog/:id/content", async (req, res) => {
   const existing = await getOwnedCatalogItem(id, req.user.oid, req.user.tid);
   if (!existing) return res.status(404).json({ error: "Item not found." });
 
-  const sourceFile = `personal-added/item-${id}.pptx`;
+  const classification = await classifySingleSlidePptx(Buffer.from(pptxBase64, "base64"));
   const thumbnailPath = `item-${id}.png`;
-  await fs.promises.writeFile(path.join(PERSONAL_ADDED_DIR, `item-${id}.pptx`), Buffer.from(pptxBase64, "base64"));
   await fs.promises.writeFile(path.join(THUMBNAILS_DIR, thumbnailPath), Buffer.from(thumbnailBase64, "base64"));
 
-  const updated = await updateOwnedCatalogItemContent({ id, oid: req.user.oid, tid: req.user.tid, sourceFile, thumbnailPath });
+  let sourceFile;
+  if (classification.insertMode === "file") {
+    sourceFile = `personal-added/item-${id}.pptx`;
+    await fs.promises.writeFile(path.join(PERSONAL_ADDED_DIR, `item-${id}.pptx`), classification.pptxBuffer);
+  }
+
+  const updated = await updateOwnedCatalogItemContent({
+    id,
+    oid: req.user.oid,
+    tid: req.user.tid,
+    insertMode: classification.insertMode,
+    sourceFile,
+    reconstructSpec: classification.insertMode === "reconstruct" ? classification.reconstructSpec : undefined,
+    thumbnailPath,
+  });
   if (!updated) return res.status(404).json({ error: "Item not found." });
 
   if (existing.source_file && existing.source_file !== sourceFile) {

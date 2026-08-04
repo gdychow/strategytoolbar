@@ -20,18 +20,34 @@
 
 import { extractErrorMessage } from "../core/ui";
 
+/**
+ * hex is a static snapshot of the SOURCE presentation's theme at extraction
+ * time (render-sidecar/app.py's resolve_theme_color) — always present,
+ * always the fallback. themeRole, when non-null, is an Office.js
+ * ThemeColorScheme role name (e.g. "Accent1") that resolveColorForInsert
+ * below re-resolves live against whatever presentation this item is being
+ * inserted INTO, so a theme-colored shape lands as the target's own
+ * Accent1 rather than a baked-in hex that goes wrong (commonly white-on-
+ * white) the moment the source and target themes differ.
+ */
+export interface ColorSpec {
+  hex: string;
+  themeRole: string | null;
+}
+
 export interface TextRunSpec {
   text: string;
   bold: boolean | null;
   italic: boolean | null;
   size: number | null;
   fontName: string | null;
-  color: string | null;
+  color: ColorSpec | null;
 }
 
 export interface ParagraphSpec {
   level: number;
   bullet: { char: string; font: string } | null;
+  align: string | null;
   runs: TextRunSpec[];
 }
 
@@ -43,8 +59,9 @@ export interface ShapeSpec {
   width: number;
   height: number;
   rotation: number;
-  fill: { type: "solid"; color: string } | null;
-  line: { color: string; widthPt: number } | null;
+  fill: { type: "solid"; color: ColorSpec } | null;
+  line: { color: ColorSpec; widthPt: number } | null;
+  verticalAlignment: string | null;
   paragraphs: ParagraphSpec[] | null;
 }
 
@@ -232,7 +249,74 @@ export async function finishFileInsert(handle: FileInsertHandle, options: { keep
 // temporary slide involved.
 // ---------------------------------------------------------------------------
 
-function applyParagraphs(shape: PowerPoint.Shape, paragraphs: ParagraphSpec[]): void {
+/**
+ * Slide masters' ThemeColorScheme needs PowerPointApi 1.10 — same gate
+ * fillLineColors.ts's getThemeColors() already uses for the same API.
+ * A spec's themeRole is only ever honored when this passes; otherwise
+ * every color falls back to its static hex, unchanged from before this
+ * lived-resolution feature existed.
+ */
+function isLiveThemeColorSupported(): boolean {
+  return Office.context.requirements.isSetSupported("PowerPointApi", "1.10");
+}
+
+function collectThemeRoles(spec: ReconstructSpec, roles: Set<string>): void {
+  const shapes = spec.kind === "group" ? spec.shapes : [spec];
+  for (const shape of shapes) {
+    if (shape.fill?.color.themeRole) roles.add(shape.fill.color.themeRole);
+    if (shape.line?.color.themeRole) roles.add(shape.line.color.themeRole);
+    for (const paragraph of shape.paragraphs ?? []) {
+      for (const run of paragraph.runs) {
+        if (run.color?.themeRole) roles.add(run.color.themeRole);
+      }
+    }
+  }
+}
+
+/**
+ * Two-phase resolve, required by the Office.js batching model: queuing a
+ * getThemeColor() call doesn't return a usable value until context.sync()
+ * runs, so every role a spec references has to be collected and resolved
+ * up front, before any shape is built — reading the TARGET/current
+ * presentation's own live theme (via the same slide.themeColorScheme
+ * mechanism fillLineColors.ts's getThemeColors() already uses), not the
+ * source's. Returns an empty map (all colors fall back to static hex)
+ * when unsupported or when the spec references no theme roles at all.
+ */
+async function resolveThemeRoles(
+  context: PowerPoint.RequestContext,
+  slide: PowerPoint.Slide,
+  spec: ReconstructSpec
+): Promise<Map<string, string>> {
+  const roleMap = new Map<string, string>();
+  if (!isLiveThemeColorSupported()) return roleMap;
+
+  const roles = new Set<string>();
+  collectThemeRoles(spec, roles);
+  if (roles.size === 0) return roleMap;
+
+  const scheme = slide.themeColorScheme;
+  const pending = [...roles].map((role) => ({
+    role,
+    result: scheme.getThemeColor(role as PowerPoint.ThemeColor),
+  }));
+  await context.sync();
+  for (const { role, result } of pending) {
+    const hex = result.value.trim();
+    roleMap.set(role, hex.startsWith("#") ? hex : `#${hex}`);
+  }
+  return roleMap;
+}
+
+function resolveColor(spec: ColorSpec, roleMap: Map<string, string>): string {
+  if (spec.themeRole) {
+    const resolved = roleMap.get(spec.themeRole);
+    if (resolved) return resolved;
+  }
+  return spec.hex;
+}
+
+function applyParagraphs(shape: PowerPoint.Shape, paragraphs: ParagraphSpec[], roleMap: Map<string, string>): void {
   const textRange = shape.textFrame.textRange;
   textRange.text = paragraphs.map((p) => p.runs.map((r) => r.text).join("")).join("\r");
 
@@ -254,17 +338,22 @@ function applyParagraphs(shape: PowerPoint.Shape, paragraphs: ParagraphSpec[]): 
       if (run.italic !== null) range.font.italic = run.italic;
       if (run.size !== null) range.font.size = run.size;
       if (run.fontName !== null) range.font.name = run.fontName;
-      if (run.color !== null) range.font.color = run.color;
+      if (run.color !== null) range.font.color = resolveColor(run.color, roleMap);
       // indentLevel needs PowerPointApi 1.10 (this feature otherwise only
       // needs 1.2) — only touch it when a paragraph actually needs
       // indenting, so the common flat case works on older builds too.
       if (paragraph.level > 0) range.paragraphFormat.indentLevel = paragraph.level;
+      // horizontalAlignment is PowerPointApi 1.4, same floor as .font
+      // above (already touched unconditionally) — no separate gate needed.
+      if (paragraph.align !== null) {
+        range.paragraphFormat.horizontalAlignment = paragraph.align as PowerPoint.ParagraphHorizontalAlignment;
+      }
     }
     charOffset += paragraphText.length + 1; // +1 for the "\r" paragraph break
   }
 }
 
-export function buildShape(slide: PowerPoint.Slide, spec: ShapeSpec): PowerPoint.Shape {
+export function buildShape(slide: PowerPoint.Slide, spec: ShapeSpec, roleMap: Map<string, string>): PowerPoint.Shape {
   const options: PowerPoint.ShapeAddOptions = {
     left: spec.left,
     top: spec.top,
@@ -283,21 +372,27 @@ export function buildShape(slide: PowerPoint.Slide, spec: ShapeSpec): PowerPoint
   if (spec.rotation !== 0) shape.rotation = spec.rotation;
 
   if (spec.fill) {
-    shape.fill.setSolidColor(spec.fill.color);
+    shape.fill.setSolidColor(resolveColor(spec.fill.color, roleMap));
   } else {
     shape.fill.clear();
   }
 
   if (spec.line) {
     shape.lineFormat.visible = true;
-    shape.lineFormat.color = spec.line.color;
+    shape.lineFormat.color = resolveColor(spec.line.color, roleMap);
     shape.lineFormat.weight = spec.line.widthPt;
   } else {
     shape.lineFormat.visible = false;
   }
 
+  // TextFrame.verticalAlignment is PowerPointApi 1.4, same floor as .font
+  // (already touched unconditionally below) — no separate gate needed.
+  if (spec.verticalAlignment) {
+    shape.textFrame.verticalAlignment = spec.verticalAlignment as PowerPoint.TextVerticalAlignment;
+  }
+
   if (spec.paragraphs && spec.paragraphs.length > 0) {
-    applyParagraphs(shape, spec.paragraphs);
+    applyParagraphs(shape, spec.paragraphs, roleMap);
   }
 
   return shape;
@@ -306,15 +401,16 @@ export function buildShape(slide: PowerPoint.Slide, spec: ShapeSpec): PowerPoint
 export async function insertReconstructedItem(spec: ReconstructSpec): Promise<void> {
   await PowerPoint.run(async (context) => {
     const slide = await getTargetSlide(context);
+    const roleMap = await resolveThemeRoles(context, slide, spec);
 
     if (spec.kind === "group") {
-      const children = spec.shapes.map((shapeSpec) => buildShape(slide, shapeSpec));
+      const children = spec.shapes.map((shapeSpec) => buildShape(slide, shapeSpec, roleMap));
       await context.sync();
       if (children.length > 1) {
         slide.shapes.addGroup(children);
       }
     } else {
-      buildShape(slide, spec);
+      buildShape(slide, spec, roleMap);
     }
 
     await context.sync();
@@ -360,15 +456,16 @@ export async function insertReconstructedItemOnTempSlide(spec: ReconstructSpec):
     slides.load("items/id");
     await context.sync();
     const tempSlide = slides.items[slides.items.length - 1];
+    const roleMap = await resolveThemeRoles(context, tempSlide, spec);
 
     if (spec.kind === "group") {
-      const children = spec.shapes.map((shapeSpec) => buildShape(tempSlide, shapeSpec));
+      const children = spec.shapes.map((shapeSpec) => buildShape(tempSlide, shapeSpec, roleMap));
       await context.sync();
       if (children.length > 1) {
         tempSlide.shapes.addGroup(children);
       }
     } else {
-      buildShape(tempSlide, spec);
+      buildShape(tempSlide, spec, roleMap);
     }
     await context.sync();
 
