@@ -36,7 +36,7 @@ let myCompanyDomain: string | null = null;
  */
 let deleteArmed = false;
 let deleteArmedTimer: number | undefined;
-const DELETE_LABEL = "Delete";
+const DELETE_LABEL = "Delete Template";
 const DELETE_CONFIRM_LABEL = "Click again to confirm";
 
 function resetDeleteArm(): void {

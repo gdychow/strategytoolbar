@@ -1918,7 +1918,7 @@ app.get("/admin", async (req, res) => {
           <span class="admin-card-error"></span>
         </form>
         <form class="admin-card-delete" method="POST" action="/admin/catalog/${item.id}/delete">
-          <button type="submit">Delete</button>
+          <button type="submit">Delete Graphic</button>
         </form>
       </div>`;
   }
@@ -1979,7 +1979,7 @@ app.get("/admin", async (req, res) => {
   res.send(`<!doctype html><html><head>${ADMIN_HEAD}</head><body>
     <div id="adminSaveBar" class="admin-save-bar">
       <span id="adminSaveStatus">No changes</span>
-      <button id="adminSaveAll" type="button" disabled>Save</button>
+      <button id="adminSaveAll" type="button" disabled>Update Metadata</button>
     </div>
     <h1>Welcome, admin</h1>
     <p>Signed in as ${escapeHtml(req.user.email)}.<span id="admin-reorder-status" class="admin-reorder-status"></span></p>
@@ -2176,13 +2176,13 @@ app.get("/admin", async (req, res) => {
             clearTimeout(armedTimer);
             armedTimer = setTimeout(() => {
               armed = false;
-              btn.textContent = "Delete";
+              btn.textContent = "Delete Graphic";
             }, 4000);
             return;
           }
           armed = false;
           clearTimeout(armedTimer);
-          btn.textContent = "Delete";
+          btn.textContent = "Delete Graphic";
           fetch(form.action, { method: "POST", headers: { Accept: "application/json" } })
             .then((res) => {
               if (!res.ok) throw new Error("HTTP " + res.status);

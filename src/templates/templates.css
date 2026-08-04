@@ -182,17 +182,34 @@ body {
   color: var(--text);
 }
 
+/*
+ * Base button style is neutral — only #btnUse (the primary action,
+ * equivalent to the gallery's "Insert Graphic") gets the accent color,
+ * matching the gallery preview panel's own button convention.
+ */
 .template-preview button {
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px 14px;
   font-size: 13px;
   cursor: pointer;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: #fff;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text);
   border-radius: 0;
 }
 
 .template-preview button:hover {
+  background: var(--bg-hover);
+}
+
+#btnUse {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+#btnUse:hover {
   background: var(--accent-hover);
 }
 
@@ -200,6 +217,16 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
+
+/*
+ * Delete visually separated from Update Metadata — same hairline-divider
+ * treatment the gallery uses to separate Edit/Delete from the metadata
+ * section above it.
+ */
+.template-manage-danger {
   padding-top: 8px;
   border-top: 1px solid var(--border-light);
 }
@@ -222,27 +249,6 @@ body {
   color: var(--text);
   font-family: inherit;
   resize: vertical;
-}
-
-.template-manage-row .btn-row {
-  display: flex;
-  gap: 8px;
-}
-
-.template-manage-row .btn-row button {
-  flex: 1 1 auto;
-  padding: 6px 0;
-  font-size: 12px;
-}
-
-#btnDelete {
-  border-color: var(--border) !important;
-  background: var(--bg-alt) !important;
-  color: var(--text) !important;
-}
-
-#btnDelete:hover {
-  background: var(--bg-hover) !important;
 }
 
 .error {
