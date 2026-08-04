@@ -186,6 +186,25 @@ def has_custom_bullet_char(element) -> bool:
     return element.find(".//" + qn("a:buChar")) is not None
 
 
+def has_generic_bullet_fallback(element) -> bool:
+    """True if this shape uses a bullet scheme this app can't replicate
+    exactly anywhere in its tree: a custom <a:buChar> glyph (no
+    Office.js BulletFormat setter for an arbitrary character -- confirmed
+    directly against PowerPoint.BulletFormat's own type definition, which
+    only exposes a fixed auto-numbering style enum) or an <a:buAutoNum>
+    type with no entry in BU_AUTONUM_TO_OFFICEJS. Used as a per-shape
+    fallback signal in extract_bullet for paragraphs whose own <a:pPr>
+    carries no explicit bullet element -- very common, since PowerPoint
+    usually defines the bullet once in the shape's <a:lstStyle> per
+    outline level rather than repeating it on every paragraph. Rather
+    than routing the whole shape to 'file' mode over this (the previous
+    behavior), a paragraph that falls back this way gets a plain
+    PowerPoint.BulletType.Unnumbered marker instead -- the target
+    presentation's own default bullet appearance, not an attempt to
+    reproduce the source's exact glyph."""
+    return has_custom_bullet_char(element) or has_unmapped_auto_number(element)
+
+
 # Maps an OOXML <a:prstGeom prst="..."> value to the exact string
 # PowerPoint.GeometricShapeType's TypeScript enum uses. NOT a mechanical
 # capitalization -- a deliberately conservative, hand-checked subset against
@@ -374,13 +393,14 @@ MSO_AUTO_SIZE_TO_OFFICEJS = {
 # e.g. "1. 2. 3." or "a. b. c.") -> PowerPoint.BulletFormat's style enum,
 # which supports exactly this same fixed set of numbering schemes (unlike
 # <a:buChar>, an arbitrary custom glyph, which BulletFormat cannot express
-# at all -- that's still routed to 'file' mode unconditionally). Only the
-# common Western/CJK/Thai schemes with an unambiguous Office.js
-# counterpart are mapped; a handful of OOXML ST_TextAutonumberScheme
-# values (hebrew2Minus and others) are deliberately left out rather than
-# guessed -- an unmapped buAutoNum type routes the whole shape to 'file'
-# mode (see classify_shape_tree), the same conservative fallback already
-# used for buChar.
+# at all). Only the common Western/CJK/Thai schemes with an unambiguous
+# Office.js counterpart are mapped; a handful of OOXML
+# ST_TextAutonumberScheme values (hebrew2Minus and others) are
+# deliberately left out rather than guessed. A paragraph with a buChar or
+# an unmapped buAutoNum type doesn't lose its bullet or force the whole
+# shape to 'file' mode -- it degrades to a plain
+# PowerPoint.BulletType.Unnumbered marker instead (see extract_bullet,
+# has_generic_bullet_fallback).
 BU_AUTONUM_TO_OFFICEJS = {
     "alphaLcParenBoth": "AlphabetLowercaseParenthesesBoth",
     "alphaLcParenR": "AlphabetLowercaseParenthesisRight",
@@ -464,9 +484,10 @@ def has_unreconstructable_fill(shape) -> bool:
 def has_unmapped_auto_number(element) -> bool:
     """True if any paragraph under this shape uses a buAutoNum numbering
     scheme this app can't translate to an Office.js BulletFormat.style
-    value (see BU_AUTONUM_TO_OFFICEJS) -- routes the whole shape to 'file'
-    mode rather than silently dropping that paragraph's numbering, the
-    same conservative fallback already used for buChar."""
+    value (see BU_AUTONUM_TO_OFFICEJS). Feeds into
+    has_generic_bullet_fallback -- a paragraph affected by this degrades
+    to a plain Unnumbered bullet marker rather than the shape being
+    routed to 'file' mode entirely (see extract_bullet)."""
     for bu in element.findall(".//" + qn("a:buAutoNum")):
         if bu.get("type") not in BU_AUTONUM_TO_OFFICEJS:
             return True
@@ -480,9 +501,7 @@ def classify_shape_tree(shape) -> str:
         has_cust_geom(el)
         or has_picture(el)
         or has_other_graphic_frame(el)
-        or has_custom_bullet_char(el)
         or has_unreconstructable_fill(shape)
-        or has_unmapped_auto_number(el)
     ):
         return "file"
     if shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
@@ -973,27 +992,46 @@ def extract_line(shape, theme_cache):
         return None
 
 
-def extract_bullet(p):
-    """Returns {"style": ...} for a paragraph using one of Office.js's
-    built-in auto-numbering schemes (<a:buAutoNum>), else None. A shape
-    with a buAutoNum whose type isn't in BU_AUTONUM_TO_OFFICEJS never
-    reaches here at all -- classify_shape_tree already routed it to 'file'
-    mode (has_unmapped_auto_number), the same as it already does for
-    <a:buChar>'s arbitrary custom glyphs, which BulletFormat has no way to
-    express regardless."""
+def extract_bullet(p, shape_fallback):
+    """Returns {"style": <style-or-None>} to give this paragraph a bullet,
+    else None for no bullet at all.
+
+    style is a real BU_AUTONUM_TO_OFFICEJS value when the paragraph's own
+    <a:pPr> carries a mapped <a:buAutoNum> -- an exact reproduction of the
+    source's numbering scheme. style is None (a generic marker, applied
+    client-side as PowerPoint.BulletType.Unnumbered -- the target
+    presentation's own default bullet appearance) when the paragraph uses
+    a custom <a:buChar> glyph directly, an unmapped <a:buAutoNum> type
+    directly, or -- the common case -- carries no bullet element of its
+    own at all but the shape as a whole uses an unreconstructable scheme
+    somewhere (shape_fallback, from has_generic_bullet_fallback): most
+    real content defines the bullet once in the shape's <a:lstStyle> per
+    outline level rather than repeating it on every paragraph, so a
+    paragraph's own <a:pPr> is very often just `<a:pPr lvl="1"/>` with no
+    bullet info of its own.
+
+    An explicit <a:buNone/> on the paragraph always wins (no bullet at
+    all) -- this is how a real source deck marks "this specific paragraph
+    opts out of the shape's usual bullet," e.g. a non-bulleted lead-in
+    line inside an otherwise-bulleted content placeholder."""
     pPr = p._p.find(qn("a:pPr"))
-    if pPr is None:
+    if pPr is not None and pPr.find(qn("a:buNone")) is not None:
         return None
-    bu = pPr.find(qn("a:buAutoNum"))
-    if bu is None:
-        return None
-    style = BU_AUTONUM_TO_OFFICEJS.get(bu.get("type"))
-    return {"style": style} if style else None
+    if pPr is not None:
+        bu_auto = pPr.find(qn("a:buAutoNum"))
+        if bu_auto is not None:
+            return {"style": BU_AUTONUM_TO_OFFICEJS.get(bu_auto.get("type"))}
+        if pPr.find(qn("a:buChar")) is not None:
+            return {"style": None}
+    if shape_fallback:
+        return {"style": None}
+    return None
 
 
 def extract_text_spec(shape, theme_cache):
     if not shape.has_text_frame:
         return None
+    shape_fallback = has_generic_bullet_fallback(shape._element)
     paragraphs = []
     for p in shape.text_frame.paragraphs:
         runs = []
@@ -1035,7 +1073,7 @@ def extract_text_spec(shape, theme_cache):
                 align = ALGN_TO_OFFICEJS_ALIGNMENT.get(PP_ALIGN.to_xml(p.alignment))
         except Exception:
             align = None
-        paragraphs.append({"level": p.level, "bullet": extract_bullet(p), "align": align, "runs": runs})
+        paragraphs.append({"level": p.level, "bullet": extract_bullet(p, shape_fallback), "align": align, "runs": runs})
     return paragraphs
 
 

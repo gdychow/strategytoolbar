@@ -6,10 +6,11 @@
  * - 'reconstruct': built directly on the current slide via addTextBox/
  *   addGeometricShape/addGroup, from a structured spec. True one-click
  *   insert, matching the VBA original's actual behaviour.
- * - 'file': PowerPoint JS has no API for custom vector geometry or custom
- *   bullet characters (confirmed while porting L_Other_Tweaks.bas — see
- *   otherTweaks.ts), so these items are pre-sliced into their own
- *   single-slide .pptx and brought in via insertSlidesFromBase64, which
+ * - 'file': PowerPoint JS has no API for custom vector geometry, embedded
+ *   pictures, or a handful of other unrepresentable properties (see
+ *   render-sidecar/app.py's classify_shape_tree), so these items are
+ *   pre-sliced into their own single-slide .pptx and brought in via
+ *   insertSlidesFromBase64, which
  *   can only insert a new slide, never merge into the current one (no
  *   shape-level copy/import or clipboard API exists anywhere in Office.js
  *   or the Common API). insertFileItem() automates everything around that
@@ -47,12 +48,17 @@ export interface TextRunSpec {
 
 export interface ParagraphSpec {
   level: number;
-  // Only ever a built-in auto-numbering scheme (BulletFormat.style) —
-  // a custom bullet character (<a:buChar>) has no Office.js equivalent
-  // (BulletFormat can't set an arbitrary glyph), so shapes using one are
-  // permanently routed to 'file' mode at content-prep time and never
-  // reach this spec at all.
-  bullet: { style: string } | null;
+  // style is a real BulletFormat.style value (an auto-numbering scheme)
+  // when the source used a matching <a:buAutoNum>. style is null when the
+  // source used a custom <a:buChar> glyph or an unmapped <a:buAutoNum>
+  // type — Office.js's BulletFormat has no way to set an arbitrary
+  // character (confirmed against its own type definition: only a fixed
+  // style enum), so applyParagraphs falls back to a plain
+  // PowerPoint.BulletType.Unnumbered marker in that case — the target
+  // presentation's own default bullet appearance, not an attempt to
+  // reproduce the source's exact glyph. bullet is null (not this object
+  // at all) when the paragraph has no bullet.
+  bullet: { style: string | null } | null;
   align: string | null;
   runs: TextRunSpec[];
 }
@@ -345,10 +351,7 @@ function applyParagraphs(shape: PowerPoint.Shape, paragraphs: ParagraphSpec[], r
   // through getSubstring(start, length) instead. Run-level formatting is
   // similarly re-applied per paragraph here (one style per paragraph,
   // matching every item currently seeded — none mixes styles within a
-  // single paragraph). paragraph.bullet is only ever a built-in
-  // auto-numbering scheme — a custom bullet character has no BulletFormat
-  // equivalent (confirmed in otherTweaks.ts) and is routed to 'file' mode
-  // at content-prep time, so it never reaches here.
+  // single paragraph).
   let charOffset = 0;
   for (const paragraph of paragraphs) {
     const paragraphText = paragraph.runs.map((r) => r.text).join("");
@@ -368,8 +371,17 @@ function applyParagraphs(shape: PowerPoint.Shape, paragraphs: ParagraphSpec[], r
       if (paragraph.level > 0) range.paragraphFormat.indentLevel = paragraph.level;
       if (paragraph.bullet) {
         const bulletFormat = range.paragraphFormat.bulletFormat;
-        bulletFormat.type = "Numbered" as PowerPoint.BulletType;
-        bulletFormat.style = paragraph.bullet.style as PowerPoint.BulletStyle;
+        if (paragraph.bullet.style) {
+          bulletFormat.type = "Numbered" as PowerPoint.BulletType;
+          bulletFormat.style = paragraph.bullet.style as PowerPoint.BulletStyle;
+        } else {
+          // No BulletFormat equivalent for the source's exact bullet
+          // (a custom <a:buChar> glyph or an unmapped auto-number
+          // scheme) — a plain Unnumbered marker uses the target
+          // presentation's own default bullet appearance instead of
+          // leaving the paragraph unbulleted entirely.
+          bulletFormat.type = "Unnumbered" as PowerPoint.BulletType;
+        }
         bulletFormat.visible = true;
       }
       // horizontalAlignment is PowerPointApi 1.4, same floor as .font
