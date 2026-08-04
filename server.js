@@ -466,14 +466,6 @@ app.get("/api/catalog/file/:itemId", async (req, res) => {
 // (temp-slide + copy/paste) even when its content was simple enough to
 // insert natively in one click.
 async function classifySingleSlidePptx(buffer) {
-  // TEMPORARY DEBUG CAPTURE — remove once the theme-color investigation is
-  // done. Saves the raw bytes Slide.exportAsBase64() actually produced, so
-  // the real OOXML can be inspected directly (reconstruct-mode catalog
-  // rows never keep their source pptx, so this is otherwise unrecoverable
-  // after the fact).
-  await fs.promises
-    .writeFile(path.join(ADMIN_ADDED_DIR, "debug-last-export.pptx"), buffer)
-    .catch((err) => console.error("debug capture failed:", err.message));
   const slides = await convertPptxToSlides(buffer, "slide.pptx");
   const slide = slides[0];
   if (!slide) throw new Error("Conversion produced no slides.");
@@ -803,6 +795,13 @@ app.post("/api/admin/library-upload", uploadLibraryFiles.array("files", 20), asy
       const file = req.files[i];
       job.files[i].status = "converting";
       try {
+        // TEMPORARY DEBUG CAPTURE — remove once the theme-color
+        // investigation is done. Saves the raw uploaded .pptx exactly as
+        // received, before it reaches the render sidecar, so the real
+        // source theme XML can be inspected directly.
+        await fs.promises
+          .writeFile(path.join(ADMIN_ADDED_DIR, "debug-last-bulk-upload.pptx"), file.buffer)
+          .catch((err) => console.error("debug capture failed:", err.message));
         const slides = await convertPptxToSlides(file.buffer, file.originalname);
         job.files[i].status = "done";
         job.files[i].slideCount = slides.length;
