@@ -25,6 +25,7 @@ pipeline, ported here so admin bulk uploads get the same one-click
 the heavier temp-slide/copy-paste "file" flow).
 """
 
+import colorsys
 import io
 import json
 import os
@@ -247,22 +248,37 @@ ALGN_TO_OFFICEJS_ALIGNMENT = {
 # models both as one enum.
 ANCHOR_TO_OFFICEJS_VERTICAL_ALIGNMENT = {"t": "Top", "ctr": "Middle", "b": "Bottom"}
 
-# python-pptx's MSO_LINE_DASH_STYLE is itself modeled directly on the same
-# legacy msoLineDashStyle enum Office.js's ShapeLineDashStyle reuses
-# verbatim -- confirmed by comparing member lists, not via any OOXML
-# round-trip (unlike theme colors/alignment above, no translation of
-# *meaning* happens here, only of Python's SCREAMING_SNAKE_CASE names to
-# Office.js's PascalCase strings). DASH_STYLE_MIXED has no single value and
-# is intentionally absent.
-MSO_DASH_TO_OFFICEJS = {
-    "DASH": "Dash",
-    "DASH_DOT": "DashDot",
-    "DASH_DOT_DOT": "DashDotDot",
-    "LONG_DASH": "LongDash",
-    "LONG_DASH_DOT": "LongDashDot",
-    "ROUND_DOT": "RoundDot",
-    "SOLID": "Solid",
-    "SQUARE_DOT": "SquareDot",
+# Raw OOXML <a:prstDash val="..."> -> Office.js ShapeLineDashStyle, by
+# literal name correspondence -- NOT via python-pptx's MSO_LINE_DASH_STYLE,
+# which was tried first and confirmed wrong: that enum's ROUND_DOT/
+# SQUARE_DOT members are python-pptx's own reading of the legacy VBA
+# msoLineDashStyle names, which round-trip to the *system* dash variants
+# (raw "sysDot"/"sysDash" -- confirmed via MSO_LINE_DASH_STYLE.to_xml() and
+# .from_xml(), both directions agree). Office.js's dashStyle enum has
+# SystemDash/SystemDot/SystemDashDot as their own distinct, separately-named
+# values alongside RoundDot/SquareDot, which only makes sense if Office.js's
+# enum is keyed to the literal raw OOXML names (sys* -> System*) rather than
+# the legacy VBA aliasing python-pptx uses -- confirmed as the actual bug
+# after a real round-trip test showed a source line saved as "Square Dot"
+# (raw prstDash="sysDash") pasting as something other than square-dotted
+# once mapped through the old SQUARE_DOT->"SquareDot" table. Read directly
+# off line._ln's raw XML instead of via line.dash_style, bypassing
+# python-pptx's enum entirely so this table is the only translation layer.
+# sysDashDotDot has no Office.js equivalent by name; DashDotDot is the only
+# remaining unclaimed Office.js value, so it's the least-wrong fallback
+# rather than dropping the dash style entirely.
+PRST_DASH_TO_OFFICEJS = {
+    "solid": "Solid",
+    "dot": "RoundDot",
+    "dash": "Dash",
+    "lgDash": "LongDash",
+    "dashDot": "DashDot",
+    "lgDashDot": "LongDashDot",
+    "lgDashDotDot": "LongDashDotDot",
+    "sysDash": "SystemDash",
+    "sysDot": "SystemDot",
+    "sysDashDot": "SystemDashDot",
+    "sysDashDotDot": "DashDotDot",
 }
 
 # <a:ln cmpd="..."> (compound/parallel-line style -- a different OOXML
@@ -453,6 +469,62 @@ def classify_shape_tree(shape) -> str:
 # ---------------------------------------------------------------------------
 
 
+# Named preset colors (<a:prstClr val="...">) that a theme's <a:clrScheme>
+# could in principle use in place of a literal RGB value -- rare, but a
+# custom/converted template is exactly the kind of file likely to. Not the
+# full CSS/ST_PresetColorVal list (150+ names), just enough common ones to
+# avoid dropping a color entirely when this form is actually used; anything
+# not in this small table still falls through to the theme-role-only
+# fallback in resolve_color_spec rather than guessing.
+PRST_CLR_TO_HEX = {
+    "black": "000000", "white": "FFFFFF", "red": "FF0000", "green": "008000",
+    "blue": "0000FF", "yellow": "FFFF00", "gray": "808080", "grey": "808080",
+    "darkGray": "A9A9A9", "darkGrey": "A9A9A9", "lightGray": "D3D3D3", "lightGrey": "D3D3D3",
+    "orange": "FFA500", "purple": "800080", "teal": "008080", "navy": "000080",
+    "maroon": "800000", "olive": "808000", "silver": "C0C0C0", "aqua": "00FFFF",
+    "fuchsia": "FF00FF", "lime": "00FF00",
+}
+
+
+def _hsl_clr_to_hex(el):
+    """Converts an <a:hslClr hue="0-21600000" sat="0-100000" lum="0-100000">
+    element to a #RRGGBB hex string -- one of three ways OOXML can express a
+    theme color (alongside srgbClr and sysClr, already handled), seen in
+    templates authored or converted via tools that store colors as HSL
+    rather than RGB. hue is in 60,000ths of a degree; sat/lum are in
+    1,000ths of a percent -- both confirmed against the OOXML DrawingML
+    schema (CT_HslColor), not assumed from the attribute names alone."""
+    try:
+        hue = (int(el.get("hue")) / 60000.0) / 360.0
+        sat = int(el.get("sat")) / 100000.0
+        lum = int(el.get("lum")) / 100000.0
+    except (TypeError, ValueError):
+        return None
+    r, g, b = colorsys.hls_to_rgb(hue, lum, sat)
+    return f"{round(r * 255):02X}{round(g * 255):02X}{round(b * 255):02X}"
+
+
+def _resolve_scheme_color_element(child):
+    """A <a:clrScheme> slot's color can be expressed as srgbClr, sysClr,
+    hslClr, or prstClr -- returns the raw hex (no '#') for whichever form
+    is actually present, or None if it's some other/unrecognized form
+    (e.g. scrgbClr, a scientific-RGB form no real template has been seen
+    using for a theme color)."""
+    srgb = child.find(qn("a:srgbClr"))
+    if srgb is not None:
+        return srgb.get("val")
+    sys_clr = child.find(qn("a:sysClr"))
+    if sys_clr is not None:
+        return sys_clr.get("lastClr")
+    hsl_clr = child.find(qn("a:hslClr"))
+    if hsl_clr is not None:
+        return _hsl_clr_to_hex(hsl_clr)
+    prst_clr = child.find(qn("a:prstClr"))
+    if prst_clr is not None:
+        return PRST_CLR_TO_HEX.get(prst_clr.get("val"))
+    return None
+
+
 def _load_master_theme(master):
     """Returns (clr_map, clr_scheme) for a slide master, both plain dicts of
     XML slot name -> value. Cached per (per-request) theme_cache dict, since
@@ -475,12 +547,9 @@ def _load_master_theme(master):
         if clr_scheme_el is not None:
             for child in clr_scheme_el:
                 tag = etree.QName(child).localname
-                srgb = child.find(qn("a:srgbClr"))
-                sys_clr = child.find(qn("a:sysClr"))
-                if srgb is not None:
-                    scheme[tag] = srgb.get("val")
-                elif sys_clr is not None:
-                    scheme[tag] = sys_clr.get("lastClr")
+                hexval = _resolve_scheme_color_element(child)
+                if hexval:
+                    scheme[tag] = hexval
 
     return clr_map, scheme
 
@@ -555,8 +624,22 @@ def resolve_color_spec(color_format, shape, theme_cache):
     """Resolves a python-pptx ColorFormat to {"hex", "themeRole"}: hex a
     real #RRGGBB string, themeRole a live Office.js theme-color role name
     when this color is theme-derived and mappable, else None. Returns None
-    entirely if no color is set, or for the rare color types (HSL/preset/
-    system/scRGB) this doesn't handle -- safer to omit than to guess."""
+    entirely if no color is set, or for the rare color types (preset/
+    scRGB) this doesn't handle -- safer to omit than to guess.
+
+    Bug fixed here: previously required BOTH hex and role to resolve
+    before keeping the color at all ("if hexval else None"), which threw
+    away a perfectly good theme role -- and with it, the shape's entire
+    fill/line/font color -- whenever the static hex snapshot alone failed
+    to compute (e.g. a custom-named brand color like "Dark Teal" defined
+    via <a:hslClr> rather than <a:srgbClr>/<a:sysClr>, before those were
+    handled in _load_master_theme). A resolvable role is enough on its own:
+    the insert-time client resolves it live against the target
+    presentation's actual theme (see libraryInsert.ts's resolveThemeRoles)
+    and never even looks at hex unless live resolution is unavailable. A
+    neutral gray placeholder hex is used only for that fallback case,
+    instead of dropping the color (and silently rendering as white-on-
+    white, or here, no fill at all) whenever the snapshot alone fails."""
     try:
         color_type = color_format.type
     except Exception:
@@ -565,7 +648,9 @@ def resolve_color_spec(color_format, shape, theme_cache):
         return {"hex": f"#{color_format.rgb}", "themeRole": None}
     if color_type == MSO_COLOR_TYPE.SCHEME:
         hexval, role = resolve_theme_color(shape, color_format.theme_color, theme_cache)
-        return {"hex": hexval, "themeRole": role} if hexval else None
+        if not hexval and not role:
+            return None
+        return {"hex": hexval or "#808080", "themeRole": role}
     return None
 
 
@@ -619,8 +704,9 @@ def extract_line(shape, theme_cache):
         dash_style = None
         compound_style = None
         try:
-            if line.dash_style is not None:
-                dash_style = MSO_DASH_TO_OFFICEJS.get(line.dash_style.name)
+            prst_dash_el = line._ln.find(qn("a:prstDash"))
+            if prst_dash_el is not None:
+                dash_style = PRST_DASH_TO_OFFICEJS.get(prst_dash_el.get("val"))
         except Exception:
             dash_style = None
         try:
