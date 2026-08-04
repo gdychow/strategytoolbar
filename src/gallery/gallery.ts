@@ -191,6 +191,11 @@ function renderMetaSection(item: CatalogItem, editable: boolean): void {
 
   if (isPersonal) return;
 
+  // Reset any in-progress "+ Add new group…" entry left over from a
+  // previous selection — switching items shouldn't leave the group select
+  // swapped out for the inline name input.
+  hideNewGroupRow();
+
   tagsDisplay.style.display = editable ? "none" : "";
   tagsInput.style.display = editable ? "" : "none";
   groupDisplay.style.display = editable ? "none" : "";
@@ -332,17 +337,47 @@ function scopeForActiveCategory(): { category: string } | { companyDomain: strin
  * cached group list instead of a server-rendered <select>. Only new-group
  * *creation* lives here; renaming/reordering/deleting groups stays
  * /admin-only, same as category reassignment and thumbnail replacement.
+ *
+ * Swaps the <select> out for an inline text input + Add/Cancel buttons
+ * instead of window.prompt() — confirmed broken here for the same reason
+ * window.confirm() was (see resetDeleteArm's comment): this dialog is
+ * displayDialogAsync-hosted, and native JS dialogs don't reliably work in
+ * that context on Mac.
  */
-async function handleEditGroupChange(): Promise<void> {
+function showNewGroupRow(): void {
   const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
-  if (!groupSelect || groupSelect.value !== "__new__") {
-    if (groupSelect) editGroupPreviousValue = groupSelect.value;
-    return;
-  }
+  const row = document.getElementById("newGroupRow");
+  const input = document.getElementById("newGroupName") as HTMLInputElement | null;
+  if (!groupSelect || !row || !input) return;
+  groupSelect.style.display = "none";
+  row.style.display = "flex";
+  input.value = "";
+  input.focus();
+}
 
-  const name = window.prompt("New group name:")?.trim();
+function hideNewGroupRow(): void {
+  const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
+  const row = document.getElementById("newGroupRow");
+  if (!groupSelect || !row) return;
+  row.style.display = "none";
+  groupSelect.style.display = "";
+}
+
+function cancelNewGroup(): void {
+  const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
+  if (groupSelect) groupSelect.value = editGroupPreviousValue;
+  hideNewGroupRow();
+}
+
+async function confirmNewGroup(): Promise<void> {
+  const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
+  const input = document.getElementById("newGroupName") as HTMLInputElement | null;
+  const errorEl = document.getElementById("editError");
+  if (!groupSelect || !input) return;
+
+  const name = input.value.trim();
   if (!name) {
-    groupSelect.value = editGroupPreviousValue;
+    input.focus();
     return;
   }
 
@@ -364,10 +399,23 @@ async function handleEditGroupChange(): Promise<void> {
     groupSelect.insertBefore(opt, groupSelect.querySelector('option[value="__new__"]'));
     groupSelect.value = String(body.id);
     editGroupPreviousValue = groupSelect.value;
+    hideNewGroupRow();
   } catch (err) {
-    window.alert(`Couldn't create group: ${err instanceof Error ? err.message : String(err)}`);
-    groupSelect.value = editGroupPreviousValue;
+    if (errorEl) {
+      errorEl.textContent = `Couldn't create group: ${err instanceof Error ? err.message : String(err)}`;
+      errorEl.style.display = "block";
+    }
   }
+}
+
+function handleEditGroupChange(): void {
+  const groupSelect = document.getElementById("editGroup") as HTMLSelectElement | null;
+  if (!groupSelect) return;
+  if (groupSelect.value === "__new__") {
+    showNewGroupRow();
+    return;
+  }
+  editGroupPreviousValue = groupSelect.value;
 }
 
 /**
@@ -693,7 +741,18 @@ Office.onReady(async () => {
   document.getElementById("btnSaveDetails")?.addEventListener("click", () => {
     if (selectedItem) saveEditDetails(selectedItem).catch(() => {});
   });
-  document.getElementById("editGroup")?.addEventListener("change", () => {
-    handleEditGroupChange().catch(() => {});
+  document.getElementById("editGroup")?.addEventListener("change", handleEditGroupChange);
+  document.getElementById("btnAddGroupConfirm")?.addEventListener("click", () => {
+    confirmNewGroup().catch(() => {});
+  });
+  document.getElementById("btnAddGroupCancel")?.addEventListener("click", cancelNewGroup);
+  document.getElementById("newGroupName")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      confirmNewGroup().catch(() => {});
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelNewGroup();
+    }
   });
 });

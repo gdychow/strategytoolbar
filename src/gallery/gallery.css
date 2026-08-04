@@ -331,3 +331,38 @@ body {
   font-size: 11px;
   color: var(--error-text);
 }
+
+/*
+ * Inline replacement for the "+ Add new group…" option's old
+ * window.prompt() call — confirmed broken for the same reason
+ * window.confirm() was (displayDialogAsync-hosted dialogs don't reliably
+ * support native JS dialogs). Swaps in for #editGroup in place, rather
+ * than opening anything new, so it reads as "the select turned into a
+ * text box" rather than a separate popup.
+ */
+.new-group-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.new-group-row input {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.new-group-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.new-group-actions button {
+  flex: 1 1 0;
+}
