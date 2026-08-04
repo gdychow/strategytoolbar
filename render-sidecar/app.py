@@ -426,12 +426,24 @@ BU_AUTONUM_TO_OFFICEJS = {
 # resolution with no way to verify the round-trip without a live
 # PowerPoint test, so the safer, already-proven file-mode path is used
 # instead, exactly like a real <p:pic> object already is.
+#
+# MSO_FILL_TYPE.BACKGROUND does NOT belong here, despite the name sounding
+# like "a complex background fill" -- it's what python-pptx reports for a
+# shape with an explicit <a:noFill/>, i.e. plain "no fill at all"
+# (confirmed directly against python-pptx's own _NoFill.type source). That
+# is fully reconstructable (Office.js: shape.fill.clear()) and is also the
+# single most common fill state in real content -- PowerPoint writes
+# <a:noFill/> explicitly on the overwhelming majority of plain text boxes.
+# Including it here was a real bug: it silently routed nearly every plain
+# text box (any shape with no fill at all) to 'file' mode, confirmed by
+# reproducing against the actual Text.pptx boilerplate, where every single
+# slide -- including plain single-text-box ones with nothing else going
+# on -- classified as 'file' until this was removed.
 NON_RECONSTRUCTABLE_FILL_TYPES = {
     MSO_FILL_TYPE.GRADIENT,
     MSO_FILL_TYPE.PATTERNED,
     MSO_FILL_TYPE.PICTURE,
     MSO_FILL_TYPE.TEXTURED,
-    MSO_FILL_TYPE.BACKGROUND,
 }
 
 
