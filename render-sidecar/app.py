@@ -37,9 +37,9 @@ import zipfile
 from lxml import etree
 from flask import Flask, jsonify, request, send_file
 from pptx import Presentation
-from pptx.enum.dml import MSO_COLOR_TYPE, MSO_THEME_COLOR
+from pptx.enum.dml import MSO_COLOR_TYPE, MSO_FILL_TYPE, MSO_LINE_DASH_STYLE, MSO_THEME_COLOR
 from pptx.enum.shapes import MSO_SHAPE_TYPE, PP_PLACEHOLDER
-from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, MSO_UNDERLINE, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Emu
 
@@ -247,11 +247,176 @@ ALGN_TO_OFFICEJS_ALIGNMENT = {
 # models both as one enum.
 ANCHOR_TO_OFFICEJS_VERTICAL_ALIGNMENT = {"t": "Top", "ctr": "Middle", "b": "Bottom"}
 
+# python-pptx's MSO_LINE_DASH_STYLE is itself modeled directly on the same
+# legacy msoLineDashStyle enum Office.js's ShapeLineDashStyle reuses
+# verbatim -- confirmed by comparing member lists, not via any OOXML
+# round-trip (unlike theme colors/alignment above, no translation of
+# *meaning* happens here, only of Python's SCREAMING_SNAKE_CASE names to
+# Office.js's PascalCase strings). DASH_STYLE_MIXED has no single value and
+# is intentionally absent.
+MSO_DASH_TO_OFFICEJS = {
+    "DASH": "Dash",
+    "DASH_DOT": "DashDot",
+    "DASH_DOT_DOT": "DashDotDot",
+    "LONG_DASH": "LongDash",
+    "LONG_DASH_DOT": "LongDashDot",
+    "ROUND_DOT": "RoundDot",
+    "SOLID": "Solid",
+    "SQUARE_DOT": "SquareDot",
+}
+
+# <a:ln cmpd="..."> (compound/parallel-line style -- a different OOXML
+# attribute from dash style) -> PowerPoint.ShapeLineStyle. Not exposed by
+# python-pptx's public LineFormat API at all, read directly off line._ln
+# below. "tri" (a thin-thick-thin triple line) is the best conceptual
+# match for Office.js's "ThickBetweenThin" (a thick line sandwiched
+# between two thin ones) -- the two enums don't share a common ancestor
+# the way dash style's does, so this mapping is a best-effort semantic
+# match, not a verified 1:1 correspondence.
+CMPD_TO_OFFICEJS = {
+    "sng": "Single",
+    "dbl": "ThinThin",
+    "thickThin": "ThickThin",
+    "thinThick": "ThinThick",
+    "tri": "ThickBetweenThin",
+}
+
+# MSO_UNDERLINE member name -> PowerPoint.ShapeFontUnderlineStyle. Built by
+# hand rather than via to_xml() (unlike dash style above, the member names
+# themselves already carry a direct "strip the _LINE suffix" correspondence
+# to Office.js's names, so a hand-written table is simpler and no less
+# accurate than round-tripping through the raw <a:u val="..."> value).
+# WORDS (underline non-space runs only) and MIXED have no Office.js
+# equivalent and are intentionally absent -- left unmapped rather than
+# guessed, per this file's established "omit over guess" convention.
+MSO_UNDERLINE_TO_OFFICEJS = {
+    "NONE": "None",
+    "SINGLE_LINE": "Single",
+    "DOUBLE_LINE": "Double",
+    "HEAVY_LINE": "Heavy",
+    "DOTTED_LINE": "Dotted",
+    "DOTTED_HEAVY_LINE": "DottedHeavy",
+    "DASH_LINE": "Dash",
+    "DASH_HEAVY_LINE": "DashHeavy",
+    "DASH_LONG_LINE": "DashLong",
+    "DASH_LONG_HEAVY_LINE": "DashLongHeavy",
+    "DOT_DASH_LINE": "DotDash",
+    "DOT_DASH_HEAVY_LINE": "DotDashHeavy",
+    "DOT_DOT_DASH_LINE": "DotDotDash",
+    "DOT_DOT_DASH_HEAVY_LINE": "DotDotDashHeavy",
+    "WAVY_LINE": "Wavy",
+    "WAVY_HEAVY_LINE": "WavyHeavy",
+    "WAVY_DOUBLE_LINE": "WavyDouble",
+}
+
+# MSO_AUTO_SIZE member name -> PowerPoint.ShapeAutoSize. Note the two
+# libraries name the "shape grows/shrinks" and "text shrinks" cases the
+# opposite way round from each other (python-pptx's SHAPE_TO_FIT_TEXT --
+# the shape resizes -- is Office.js's autoSizeShapeToFitText; python-pptx's
+# TEXT_TO_FIT_SHAPE -- the text shrinks -- is autoSizeTextToFitShape) --
+# confirmed by reading both enums' own descriptions, not assumed from the
+# similar-looking names. MIXED has no single value.
+MSO_AUTO_SIZE_TO_OFFICEJS = {
+    "NONE": "AutoSizeNone",
+    "SHAPE_TO_FIT_TEXT": "AutoSizeShapeToFitText",
+    "TEXT_TO_FIT_SHAPE": "AutoSizeTextToFitShape",
+}
+
+# <a:buAutoNum type="..."> (a PowerPoint built-in auto-numbering scheme,
+# e.g. "1. 2. 3." or "a. b. c.") -> PowerPoint.BulletFormat's style enum,
+# which supports exactly this same fixed set of numbering schemes (unlike
+# <a:buChar>, an arbitrary custom glyph, which BulletFormat cannot express
+# at all -- that's still routed to 'file' mode unconditionally). Only the
+# common Western/CJK/Thai schemes with an unambiguous Office.js
+# counterpart are mapped; a handful of OOXML ST_TextAutonumberScheme
+# values (hebrew2Minus and others) are deliberately left out rather than
+# guessed -- an unmapped buAutoNum type routes the whole shape to 'file'
+# mode (see classify_shape_tree), the same conservative fallback already
+# used for buChar.
+BU_AUTONUM_TO_OFFICEJS = {
+    "alphaLcParenBoth": "AlphabetLowercaseParenthesesBoth",
+    "alphaLcParenR": "AlphabetLowercaseParenthesisRight",
+    "alphaLcPeriod": "AlphabetLowercasePeriod",
+    "alphaUcParenBoth": "AlphabetUppercaseParenthesesBoth",
+    "alphaUcParenR": "AlphabetUppercaseParenthesisRight",
+    "alphaUcPeriod": "AlphabetUppercasePeriod",
+    "arabicParenBoth": "ArabicNumeralParenthesesBoth",
+    "arabicParenR": "ArabicNumeralParenthesisRight",
+    "arabicPeriod": "ArabicNumeralPeriod",
+    "arabicPlain": "ArabicNumeralPlain",
+    "romanLcParenBoth": "RomanLowercaseParenthesesBoth",
+    "romanLcParenR": "RomanLowercaseParenthesisRight",
+    "romanLcPeriod": "RomanLowercasePeriod",
+    "romanUcParenBoth": "RomanUppercaseParenthesesBoth",
+    "romanUcParenR": "RomanUppercaseParenthesisRight",
+    "romanUcPeriod": "RomanUppercasePeriod",
+    "circleNumDbPlain": "CircleNumberDoubleBytePlain",
+    "circleNumWdBlackPlain": "CircleNumberWideDoubleByteBlackPlain",
+    "circleNumWdWhitePlain": "CircleNumberWideDoubleByteWhitePlain",
+    "arabicDbPeriod": "ArabicDoubleBytePeriod",
+    "arabicDbPlain": "ArabicDoubleBytePlain",
+    "ea1ChsPeriod": "SimplifiedChinesePeriod",
+    "ea1ChsPlain": "SimplifiedChinesePlain",
+    "ea1ChtPeriod": "TraditionalChinesePeriod",
+    "ea1ChtPlain": "TraditionalChinesePlain",
+    "thaiAlphaParenBoth": "ThaiAlphabetParenthesesBoth",
+    "thaiAlphaParenR": "ThaiAlphabetParenthesisRight",
+    "thaiAlphaPeriod": "ThaiAlphabetPeriod",
+    "thaiNumParenBoth": "ThaiNumeralParenthesesBoth",
+    "thaiNumParenR": "ThaiNumeralParenthesisRight",
+    "thaiNumPeriod": "ThaiNumeralPeriod",
+}
+
+# Fill types with no Office.js ShapeFill setter at all (only setSolidColor
+# and setImage exist -- confirmed against @types/office-js) -- routed to
+# 'file' mode the same as custom geometry, rather than silently reaching
+# extract_fill and coming back None (today's actual bug: these shapes
+# currently classify as 'reconstruct' and lose their fill entirely).
+# PICTURE is deliberately included here too, even though setImage() could
+# in principle carry it across -- extracting the underlying image blob
+# needs reaching past python-pptx's public FillFormat API into relationship
+# resolution with no way to verify the round-trip without a live
+# PowerPoint test, so the safer, already-proven file-mode path is used
+# instead, exactly like a real <p:pic> object already is.
+NON_RECONSTRUCTABLE_FILL_TYPES = {
+    MSO_FILL_TYPE.GRADIENT,
+    MSO_FILL_TYPE.PATTERNED,
+    MSO_FILL_TYPE.PICTURE,
+    MSO_FILL_TYPE.TEXTURED,
+    MSO_FILL_TYPE.BACKGROUND,
+}
+
+
+def has_unreconstructable_fill(shape) -> bool:
+    try:
+        return shape.fill.type in NON_RECONSTRUCTABLE_FILL_TYPES
+    except Exception:
+        return False
+
+
+def has_unmapped_auto_number(element) -> bool:
+    """True if any paragraph under this shape uses a buAutoNum numbering
+    scheme this app can't translate to an Office.js BulletFormat.style
+    value (see BU_AUTONUM_TO_OFFICEJS) -- routes the whole shape to 'file'
+    mode rather than silently dropping that paragraph's numbering, the
+    same conservative fallback already used for buChar."""
+    for bu in element.findall(".//" + qn("a:buAutoNum")):
+        if bu.get("type") not in BU_AUTONUM_TO_OFFICEJS:
+            return True
+    return False
+
 
 def classify_shape_tree(shape) -> str:
     """Returns 'file' if anything under this shape can't be reconstructed, else 'reconstruct'."""
     el = shape._element
-    if has_cust_geom(el) or has_picture(el) or has_other_graphic_frame(el) or has_custom_bullet_char(el):
+    if (
+        has_cust_geom(el)
+        or has_picture(el)
+        or has_other_graphic_frame(el)
+        or has_custom_bullet_char(el)
+        or has_unreconstructable_fill(shape)
+        or has_unmapped_auto_number(el)
+    ):
         return "file"
     if shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
         return "reconstruct"
@@ -404,6 +569,29 @@ def resolve_color_spec(color_format, shape, theme_cache):
     return None
 
 
+def extract_alpha(color_format):
+    """Returns transparency as a 0.0 (opaque) - 1.0 (fully clear) fraction,
+    matching Office.js's ShapeFill.transparency/ShapeLineFormat.transparency
+    convention -- read from OOXML's <a:alpha val="N"/> (N = thousandths of
+    a percent OPACITY, 100000 = fully opaque), which isn't exposed by
+    python-pptx's public ColorFormat API at all, so read directly off the
+    color's own raw XML element (color_format._color._xClr -- the same
+    private-internals pattern already used elsewhere in this file, e.g.
+    shape._element, line._ln). Returns 0.0 (opaque, i.e. no-op when applied)
+    for any color type/internal shape this can't reach, rather than raise."""
+    try:
+        color_el = color_format._color._xClr
+    except Exception:
+        return 0.0
+    alpha_el = color_el.find(qn("a:alpha"))
+    if alpha_el is None:
+        return 0.0
+    try:
+        return max(0.0, min(1.0, 1.0 - int(alpha_el.get("val")) / 100000.0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def extract_fill(shape, theme_cache):
     try:
         fill = shape.fill
@@ -411,7 +599,9 @@ def extract_fill(shape, theme_cache):
             return None
         if str(fill.type) == "MSO_FILL_TYPE.SOLID (1)" or fill.type == 1:
             color = resolve_color_spec(fill.fore_color, shape, theme_cache)
-            return {"type": "solid", "color": color} if color else None
+            if not color:
+                return None
+            return {"type": "solid", "color": color, "transparency": extract_alpha(fill.fore_color)}
         return None
     except Exception:
         return None
@@ -424,9 +614,46 @@ def extract_line(shape, theme_cache):
             return None
         width_pt = emu_to_pt(line.width) if line.width else None
         color = resolve_color_spec(line.color, shape, theme_cache)
-        return {"color": color, "widthPt": width_pt} if color else None
+        if not color:
+            return None
+        dash_style = None
+        compound_style = None
+        try:
+            if line.dash_style is not None:
+                dash_style = MSO_DASH_TO_OFFICEJS.get(line.dash_style.name)
+        except Exception:
+            dash_style = None
+        try:
+            compound_style = CMPD_TO_OFFICEJS.get(line._ln.get("cmpd"))
+        except Exception:
+            compound_style = None
+        return {
+            "color": color,
+            "widthPt": width_pt,
+            "transparency": extract_alpha(line.color),
+            "dashStyle": dash_style,
+            "compoundStyle": compound_style,
+        }
     except Exception:
         return None
+
+
+def extract_bullet(p):
+    """Returns {"style": ...} for a paragraph using one of Office.js's
+    built-in auto-numbering schemes (<a:buAutoNum>), else None. A shape
+    with a buAutoNum whose type isn't in BU_AUTONUM_TO_OFFICEJS never
+    reaches here at all -- classify_shape_tree already routed it to 'file'
+    mode (has_unmapped_auto_number), the same as it already does for
+    <a:buChar>'s arbitrary custom glyphs, which BulletFormat has no way to
+    express regardless."""
+    pPr = p._p.find(qn("a:pPr"))
+    if pPr is None:
+        return None
+    bu = pPr.find(qn("a:buAutoNum"))
+    if bu is None:
+        return None
+    style = BU_AUTONUM_TO_OFFICEJS.get(bu.get("type"))
+    return {"style": style} if style else None
 
 
 def extract_text_spec(shape, theme_cache):
@@ -436,11 +663,22 @@ def extract_text_spec(shape, theme_cache):
     for p in shape.text_frame.paragraphs:
         runs = []
         for r in p.runs:
+            underline = None
+            try:
+                if r.font.underline is not None and r.font.underline is not True and r.font.underline is not False:
+                    underline = MSO_UNDERLINE_TO_OFFICEJS.get(r.font.underline.name)
+                elif r.font.underline is True:
+                    underline = "Single"
+                elif r.font.underline is False:
+                    underline = "None"
+            except Exception:
+                underline = None
             runs.append(
                 {
                     "text": r.text,
                     "bold": r.font.bold,
                     "italic": r.font.italic,
+                    "underline": underline,
                     "size": r.font.size.pt if r.font.size else None,
                     "fontName": r.font.name,
                     "color": resolve_color_spec(r.font.color, shape, theme_cache) if r.font.color else None,
@@ -452,7 +690,7 @@ def extract_text_spec(shape, theme_cache):
                 align = ALGN_TO_OFFICEJS_ALIGNMENT.get(PP_ALIGN.to_xml(p.alignment))
         except Exception:
             align = None
-        paragraphs.append({"level": p.level, "bullet": None, "align": align, "runs": runs})
+        paragraphs.append({"level": p.level, "bullet": extract_bullet(p), "align": align, "runs": runs})
     return paragraphs
 
 
@@ -473,8 +711,52 @@ def extract_vertical_alignment(shape):
     return f"{base}Centered" if body_pr.get("anchorCtr") == "1" else base
 
 
+def extract_text_frame_props(shape):
+    """wordWrap/autoSize/margins -- all real python-pptx TextFrame
+    properties (word_wrap, auto_size, margin_left/right/top/bottom), just
+    never threaded through to the reconstruct spec until now. Returns a
+    dict of Nones (not applied at insert time -- see buildShape) when the
+    shape has no text frame, or for whichever individual fields aren't
+    set/mappable, rather than guessing a default."""
+    if not shape.has_text_frame:
+        return {"wordWrap": None, "autoSize": None, "marginLeft": None, "marginRight": None, "marginTop": None, "marginBottom": None}
+    tf = shape.text_frame
+    auto_size = None
+    try:
+        if tf.auto_size is not None:
+            auto_size = MSO_AUTO_SIZE_TO_OFFICEJS.get(tf.auto_size.name)
+    except Exception:
+        auto_size = None
+    return {
+        "wordWrap": tf.word_wrap,
+        "autoSize": auto_size,
+        "marginLeft": emu_to_pt(tf.margin_left),
+        "marginRight": emu_to_pt(tf.margin_right),
+        "marginTop": emu_to_pt(tf.margin_top),
+        "marginBottom": emu_to_pt(tf.margin_bottom),
+    }
+
+
+def extract_adjustments(shape):
+    """Adjustment-handle values (e.g. a rounded rectangle's corner radius,
+    a chevron's arrow point, a callout's tail position -- <a:avLst><a:gd
+    name="adj" fmla="val N"/></a:avLst>). Only autoshapes with adjustment
+    handles expose shape.adjustments at all (python-pptx raises/lacks the
+    attribute for a plain textbox or a shape with no adjustable geometry) --
+    confirmed empirically that python-pptx's normalized fraction (e.g.
+    0.16667 for a default rounded rectangle) and Office.js's
+    Shape.adjustments.get/set use the identical 0.0-1.0 convention, so no
+    unit conversion is needed, unlike almost everything else in this file."""
+    try:
+        values = list(shape.adjustments)
+    except Exception:
+        return None
+    return values if values else None
+
+
 def extract_reconstruct_spec(shape, theme_cache):
     is_text_box = shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX
+    text_frame_props = extract_text_frame_props(shape)
     spec = {
         "kind": "textBox" if is_text_box else "geometricShape",
         "left": emu_to_pt(shape.left),
@@ -482,9 +764,16 @@ def extract_reconstruct_spec(shape, theme_cache):
         "width": emu_to_pt(shape.width),
         "height": emu_to_pt(shape.height),
         "rotation": shape.rotation,
+        "adjustments": extract_adjustments(shape),
         "fill": extract_fill(shape, theme_cache),
         "line": extract_line(shape, theme_cache),
         "verticalAlignment": extract_vertical_alignment(shape),
+        "wordWrap": text_frame_props["wordWrap"],
+        "autoSize": text_frame_props["autoSize"],
+        "marginLeft": text_frame_props["marginLeft"],
+        "marginRight": text_frame_props["marginRight"],
+        "marginTop": text_frame_props["marginTop"],
+        "marginBottom": text_frame_props["marginBottom"],
         "paragraphs": extract_text_spec(shape, theme_cache),
     }
     if not is_text_box:

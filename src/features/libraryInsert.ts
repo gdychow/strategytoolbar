@@ -39,6 +39,7 @@ export interface TextRunSpec {
   text: string;
   bold: boolean | null;
   italic: boolean | null;
+  underline: string | null;
   size: number | null;
   fontName: string | null;
   color: ColorSpec | null;
@@ -46,7 +47,12 @@ export interface TextRunSpec {
 
 export interface ParagraphSpec {
   level: number;
-  bullet: { char: string; font: string } | null;
+  // Only ever a built-in auto-numbering scheme (BulletFormat.style) —
+  // a custom bullet character (<a:buChar>) has no Office.js equivalent
+  // (BulletFormat can't set an arbitrary glyph), so shapes using one are
+  // permanently routed to 'file' mode at content-prep time and never
+  // reach this spec at all.
+  bullet: { style: string } | null;
   align: string | null;
   runs: TextRunSpec[];
 }
@@ -59,9 +65,24 @@ export interface ShapeSpec {
   width: number;
   height: number;
   rotation: number;
-  fill: { type: "solid"; color: ColorSpec } | null;
-  line: { color: ColorSpec; widthPt: number } | null;
+  // Adjustment-handle values (e.g. a rounded rectangle's corner radius, a
+  // chevron's arrow point) — index-aligned with PowerPoint.Shape.adjustments.
+  adjustments: number[] | null;
+  fill: { type: "solid"; color: ColorSpec; transparency: number } | null;
+  line: {
+    color: ColorSpec;
+    widthPt: number;
+    transparency: number;
+    dashStyle: string | null;
+    compoundStyle: string | null;
+  } | null;
   verticalAlignment: string | null;
+  wordWrap: boolean | null;
+  autoSize: string | null;
+  marginLeft: number | null;
+  marginRight: number | null;
+  marginTop: number | null;
+  marginBottom: number | null;
   paragraphs: ParagraphSpec[] | null;
 }
 
@@ -324,10 +345,10 @@ function applyParagraphs(shape: PowerPoint.Shape, paragraphs: ParagraphSpec[], r
   // through getSubstring(start, length) instead. Run-level formatting is
   // similarly re-applied per paragraph here (one style per paragraph,
   // matching every item currently seeded — none mixes styles within a
-  // single paragraph). BulletFormat can't set a custom character/font
-  // (confirmed in otherTweaks.ts) — items needing that are routed to
-  // 'file' mode at content-prep time, so paragraphs reaching here are
-  // expected to have no bullet.
+  // single paragraph). paragraph.bullet is only ever a built-in
+  // auto-numbering scheme — a custom bullet character has no BulletFormat
+  // equivalent (confirmed in otherTweaks.ts) and is routed to 'file' mode
+  // at content-prep time, so it never reaches here.
   let charOffset = 0;
   for (const paragraph of paragraphs) {
     const paragraphText = paragraph.runs.map((r) => r.text).join("");
@@ -336,13 +357,21 @@ function applyParagraphs(shape: PowerPoint.Shape, paragraphs: ParagraphSpec[], r
       const range = textRange.getSubstring(charOffset, paragraphText.length);
       if (run.bold !== null) range.font.bold = run.bold;
       if (run.italic !== null) range.font.italic = run.italic;
+      if (run.underline !== null) range.font.underline = run.underline as PowerPoint.ShapeFontUnderlineStyle;
       if (run.size !== null) range.font.size = run.size;
       if (run.fontName !== null) range.font.name = run.fontName;
       if (run.color !== null) range.font.color = resolveColor(run.color, roleMap);
-      // indentLevel needs PowerPointApi 1.10 (this feature otherwise only
-      // needs 1.2) — only touch it when a paragraph actually needs
-      // indenting, so the common flat case works on older builds too.
+      // indentLevel and BulletFormat.style/type need PowerPointApi 1.10
+      // (this feature otherwise only needs 1.2) — only touched when a
+      // paragraph actually needs them, so the common flat/unbulleted case
+      // works on older builds too.
       if (paragraph.level > 0) range.paragraphFormat.indentLevel = paragraph.level;
+      if (paragraph.bullet) {
+        const bulletFormat = range.paragraphFormat.bulletFormat;
+        bulletFormat.type = "Numbered" as PowerPoint.BulletType;
+        bulletFormat.style = paragraph.bullet.style as PowerPoint.BulletStyle;
+        bulletFormat.visible = true;
+      }
       // horizontalAlignment is PowerPointApi 1.4, same floor as .font
       // above (already touched unconditionally) — no separate gate needed.
       if (paragraph.align !== null) {
@@ -371,8 +400,19 @@ export function buildShape(slide: PowerPoint.Slide, spec: ShapeSpec, roleMap: Ma
   // case (every item currently seeded) works on older builds too.
   if (spec.rotation !== 0) shape.rotation = spec.rotation;
 
+  // Adjustments needs PowerPointApi 1.10 — only touched for shapes that
+  // actually have adjustment handles (e.g. a rounded rectangle's corner
+  // radius), so a plain rect/textbox with no avLst never calls this.
+  if (spec.adjustments) {
+    spec.adjustments.forEach((value, index) => shape.adjustments.set(index, value));
+  }
+
   if (spec.fill) {
     shape.fill.setSolidColor(resolveColor(spec.fill.color, roleMap));
+    // transparency is PowerPointApi 1.4, same floor as setSolidColor above
+    // — only set when non-zero (0 = opaque = the API's own default), so
+    // the common opaque case works on older builds too.
+    if (spec.fill.transparency > 0) shape.fill.transparency = spec.fill.transparency;
   } else {
     shape.fill.clear();
   }
@@ -381,15 +421,28 @@ export function buildShape(slide: PowerPoint.Slide, spec: ShapeSpec, roleMap: Ma
     shape.lineFormat.visible = true;
     shape.lineFormat.color = resolveColor(spec.line.color, roleMap);
     shape.lineFormat.weight = spec.line.widthPt;
+    // transparency/dashStyle/style are all PowerPointApi 1.4, same floor
+    // as color/weight above — only set when present/non-zero, so the
+    // common solid-opaque-line case works on older builds too.
+    if (spec.line.transparency > 0) shape.lineFormat.transparency = spec.line.transparency;
+    if (spec.line.dashStyle) shape.lineFormat.dashStyle = spec.line.dashStyle as PowerPoint.ShapeLineDashStyle;
+    if (spec.line.compoundStyle) shape.lineFormat.style = spec.line.compoundStyle as PowerPoint.ShapeLineStyle;
   } else {
     shape.lineFormat.visible = false;
   }
 
-  // TextFrame.verticalAlignment is PowerPointApi 1.4, same floor as .font
-  // (already touched unconditionally below) — no separate gate needed.
+  // TextFrame.verticalAlignment/wordWrap/margins are all PowerPointApi
+  // 1.4, same floor as .font (already touched unconditionally below) — no
+  // separate gate needed. autoSizeSetting is also 1.4.
   if (spec.verticalAlignment) {
     shape.textFrame.verticalAlignment = spec.verticalAlignment as PowerPoint.TextVerticalAlignment;
   }
+  if (spec.wordWrap !== null) shape.textFrame.wordWrap = spec.wordWrap;
+  if (spec.autoSize) shape.textFrame.autoSizeSetting = spec.autoSize as PowerPoint.ShapeAutoSize;
+  if (spec.marginLeft !== null) shape.textFrame.leftMargin = spec.marginLeft;
+  if (spec.marginRight !== null) shape.textFrame.rightMargin = spec.marginRight;
+  if (spec.marginTop !== null) shape.textFrame.topMargin = spec.marginTop;
+  if (spec.marginBottom !== null) shape.textFrame.bottomMargin = spec.marginBottom;
 
   if (spec.paragraphs && spec.paragraphs.length > 0) {
     applyParagraphs(shape, spec.paragraphs, roleMap);
