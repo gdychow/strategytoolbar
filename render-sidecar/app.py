@@ -134,6 +134,30 @@ def is_think_cell_placeholder(shape) -> bool:
     return THINK_CELL_MARKER in shape._element.xml
 
 
+def is_unused_layout_placeholder(shape) -> bool:
+    """A layout placeholder (Title, Subtitle, Content, etc.) the admin
+    never actually clicked into still shows up in slide.shapes as a real
+    shape -- confirmed directly: a bare 'Title Slide'-layout slide with
+    only one real shape added still has 3 shapes total (2 empty
+    placeholders + the real one). An untouched placeholder carries no
+    explicit <a:prstGeom> at all (its geometry is purely inherited from
+    the layout, invisibly), so classify_shape_tree would otherwise
+    misclassify the whole slide as 'file' purely because of an invisible,
+    content-free placeholder sitting on it -- this is exactly why
+    Slide.exportAsBase64()'s "capture the whole current slide" (used by
+    the task pane's "Add to Library"/Edit flows) could classify
+    differently than the Bulk Upload pipeline's pre-isolated single-shape
+    source files for what is visually the identical piece of content.
+    Filtered out the same way is_think_cell_placeholder already filters
+    that other kind of invisible-but-present artifact. A placeholder the
+    admin DID type real text into is a genuine content shape and is not
+    filtered -- only a placeholder with no text at all is treated as
+    unused."""
+    if not shape.is_placeholder:
+        return False
+    return not (shape.has_text_frame and shape.text_frame.text.strip())
+
+
 def emu_to_pt(value):
     return round(Emu(value).pt, 2) if value is not None else None
 
@@ -935,7 +959,9 @@ def convert():
                 zf.write(trimmed_png, thumb_name)
 
                 slide = prs.slides[index]
-                real_shapes = [s for s in slide.shapes if not is_think_cell_placeholder(s)]
+                real_shapes = [
+                    s for s in slide.shapes if not is_think_cell_placeholder(s) and not is_unused_layout_placeholder(s)
+                ]
 
                 entry = {
                     "index": index,
