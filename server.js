@@ -1710,6 +1710,16 @@ const ADMIN_STYLE = `
     font-size: 11px; padding: 3px 5px; border: 1px solid var(--border); border-radius: 0; width: 100%; box-sizing: border-box;
     background: var(--card-bg); color: var(--text);
   }
+  .admin-new-group-row { display: none; flex-direction: column; gap: 4px; }
+  .admin-new-group-row input {
+    font-size: 11px; padding: 3px 5px; border: 1px solid var(--border); border-radius: 0; width: 100%; box-sizing: border-box;
+    background: var(--card-bg); color: var(--text);
+  }
+  .admin-new-group-actions { display: flex; gap: 4px; }
+  .admin-new-group-actions button {
+    flex: 1 1 0; font-size: 11px; padding: 3px 5px; cursor: pointer; border: 1px solid var(--border); border-radius: 0;
+    background: var(--bg-alt); color: var(--text);
+  }
   .admin-card-mode { font-size: 10px; color: var(--text-faint); text-transform: uppercase; align-self: flex-start; cursor: help; }
   .admin-card-error { font-size: 10px; color: var(--error-text); }
   .admin-card-delete button { font-size: 11px; padding: 4px 8px; cursor: pointer; border: 1px solid var(--border); border-radius: 0; background: var(--bg-alt); color: var(--text); width: 100%; }
@@ -1912,6 +1922,13 @@ app.get("/admin", async (req, res) => {
           <input class="admin-card-title" name="title" value="${escapeHtml(item.title)}">
           ${isCompanyScope ? "" : `<select name="category">${categoryOptions}</select>`}
           <select name="groupId">${groupOptionsFor(item.group_id)}</select>
+          <div class="admin-new-group-row">
+            <input type="text" class="admin-new-group-name" placeholder="New group name">
+            <div class="admin-new-group-actions">
+              <button type="button" class="admin-new-group-confirm">Add Group</button>
+              <button type="button" class="admin-new-group-cancel">Cancel</button>
+            </div>
+          </div>
           <input class="admin-card-tags tags-input" name="tags" placeholder="tags" value="${escapeHtml((item.tags || []).join(", "))}">
           <span class="admin-card-mode" title="${escapeHtml(mode?.title ?? "")}">${escapeHtml(mode?.label ?? item.insert_mode)}</span>
           <input name="thumbnail" type="file" accept="image/png,image/jpeg,image/webp,image/gif" title="Replaces the thumbnail preview image only — not the underlying inserted content.">
@@ -2080,7 +2097,7 @@ app.get("/admin", async (req, res) => {
       document.querySelectorAll(".admin-card").forEach((form) => {
         const wrap = form.closest(".admin-card-wrap");
         form.querySelectorAll("input, select").forEach((field) => {
-          if (field.name === "groupId") return;
+          if (field.name === "groupId" || field.classList.contains("admin-new-group-name")) return;
           field.addEventListener("input", () => markDirty(wrap));
           field.addEventListener("change", () => markDirty(wrap));
         });
@@ -2314,17 +2331,38 @@ app.get("/admin", async (req, res) => {
       }
 
       // Create: the "+ Add new group…" option in any card's group select.
+      // Swaps the select out for an inline text input + Add/Cancel buttons
+      // instead of window.prompt() (Admin UI Phase 23) — matching the
+      // gallery dialog's own fix for the same interaction. /admin is an
+      // ordinary browser tab, so window.prompt() did technically work
+      // here, unlike the gallery's displayDialogAsync-hosted case — but a
+      // jarring native OS popup was a inconsistent experience next to the
+      // gallery's inline swap, so this brings the two in line.
       document.querySelectorAll('select[name="groupId"]').forEach((select) => {
         select.dataset.prevValue = select.value;
-        select.addEventListener("change", () => {
-          if (select.value !== "__new__") {
-            select.dataset.prevValue = select.value;
-            markDirty(select.closest(".admin-card-wrap"));
-            return;
-          }
-          const name = (prompt("New group name:") || "").trim();
+        const card = select.closest(".admin-card");
+        const newGroupRow = card.querySelector(".admin-new-group-row");
+        const newGroupInput = newGroupRow.querySelector(".admin-new-group-name");
+        const errorEl = card.querySelector(".admin-card-error");
+
+        function showNewGroupRow() {
+          select.style.display = "none";
+          newGroupRow.style.display = "flex";
+          newGroupInput.value = "";
+          newGroupInput.focus();
+        }
+        function hideNewGroupRow() {
+          newGroupRow.style.display = "none";
+          select.style.display = "";
+        }
+        function cancelNewGroup() {
+          select.value = select.dataset.prevValue;
+          hideNewGroupRow();
+        }
+        function confirmNewGroup() {
+          const name = newGroupInput.value.trim();
           if (!name) {
-            select.value = select.dataset.prevValue;
+            newGroupInput.focus();
             return;
           }
           const sortOrder = document.querySelectorAll('.admin-cluster[data-group-id]:not([data-group-id=""])').length;
@@ -2343,11 +2381,31 @@ app.get("/admin", async (req, res) => {
               select.value = String(body.id);
               select.dataset.prevValue = select.value;
               markDirty(select.closest(".admin-card-wrap"));
+              hideNewGroupRow();
             })
             .catch((err) => {
-              alert("Couldn't create group: " + err.message);
-              select.value = select.dataset.prevValue;
+              if (errorEl) errorEl.textContent = "Couldn't create group: " + err.message;
             });
+        }
+
+        select.addEventListener("change", () => {
+          if (select.value !== "__new__") {
+            select.dataset.prevValue = select.value;
+            markDirty(select.closest(".admin-card-wrap"));
+            return;
+          }
+          showNewGroupRow();
+        });
+        newGroupRow.querySelector(".admin-new-group-confirm").addEventListener("click", confirmNewGroup);
+        newGroupRow.querySelector(".admin-new-group-cancel").addEventListener("click", cancelNewGroup);
+        newGroupInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            confirmNewGroup();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            cancelNewGroup();
+          }
         });
       });
 
