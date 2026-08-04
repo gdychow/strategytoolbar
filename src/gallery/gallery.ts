@@ -83,8 +83,34 @@ function renderTabs(): void {
   }
 }
 
+/**
+ * window.confirm() doesn't reliably produce a visible native dialog in
+ * this displayDialogAsync-hosted webview — confirmed directly (the same
+ * gap already found and fixed the same way in the Template Library
+ * dialog, src/templates/templates.ts): clicking Delete with a plain
+ * window.confirm() call silently did nothing, no dialog, no error, no
+ * deletion. The comment this replaced claimed this dialog is "an ordinary
+ * browser context where window.confirm works fine" — that was never
+ * actually true for a displayDialogAsync-hosted page specifically (it was
+ * confirmed only for /admin's separate, real-browser-tab context, a
+ * genuinely different host). A two-click "click again to confirm" on the
+ * button itself has no dependency on the host's native dialog support.
+ */
+let deleteArmed = false;
+let deleteArmedTimer: number | undefined;
+const DELETE_LABEL = "Delete";
+const DELETE_CONFIRM_LABEL = "Click again to confirm";
+
+function resetDeleteArm(): void {
+  deleteArmed = false;
+  window.clearTimeout(deleteArmedTimer);
+  const btn = document.getElementById("btnDelete");
+  if (btn) btn.textContent = DELETE_LABEL;
+}
+
 function hidePreview(): void {
   selectedItem = null;
+  resetDeleteArm();
   const panel = document.getElementById("previewPanel");
   if (panel) panel.style.display = "none";
 }
@@ -115,6 +141,7 @@ function showPreview(item: CatalogItem): void {
   const editDetailsBtn = document.getElementById("btnEditDetails");
   const deleteBtn = document.getElementById("btnDelete");
   if (!panel || !img || !title) return;
+  resetDeleteArm(); // switching selection shouldn't leave a stale "click again to confirm" pointed at the wrong item
   // Only 'file'-mode items go through the temp-slide/copy-paste/Finish
   // dance at all — 'reconstruct'/'unicode-char' items already insert
   // directly in one step, so a second "as new slide" route is meaningless
@@ -325,15 +352,17 @@ function insertItemAsSlide(item: CatalogItem): void {
   Office.context.ui.messageParent(JSON.stringify({ action: "insert-as-slide", item }));
 }
 
-/**
- * Deletion asks for confirmation right here via window.confirm — unlike
- * the task pane's own embedded webview, this dialog is an ordinary browser
- * context where window.confirm works fine (confirmed directly this
- * session while building the color picker/admin-add flows), so there's no
- * need for the task pane's two-step arm/confirm workaround for this action.
- */
+/** Two-click arm/confirm (see resetDeleteArm's comment for why, not window.confirm) — the actual deletion still happens back in the task pane via messageParent, same as every other action here. */
 function deleteItem(item: CatalogItem): void {
-  if (!window.confirm(`Delete "${item.title}" from the library? This can't be undone.`)) return;
+  const btn = document.getElementById("btnDelete");
+  if (!deleteArmed) {
+    deleteArmed = true;
+    if (btn) btn.textContent = DELETE_CONFIRM_LABEL;
+    window.clearTimeout(deleteArmedTimer);
+    deleteArmedTimer = window.setTimeout(resetDeleteArm, 4000);
+    return;
+  }
+  resetDeleteArm();
   Office.context.ui.messageParent(JSON.stringify({ action: "delete", item }));
 }
 
