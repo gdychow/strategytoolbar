@@ -265,6 +265,60 @@ button.upload-secondary:hover {
   font-family: inherit;
 }
 
+.upload-review-group-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upload-review-group {
+  font-size: 12px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
+/*
+ * Inline "+ Add new group…" swap-in, matching gallery.ts's own fix for the
+ * same interaction — window.prompt() doesn't reliably work in this
+ * displayDialogAsync-hosted dialog, so this replaces the select with a
+ * plain text input + Add Group/Cancel buttons instead.
+ */
+.upload-review-new-group-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upload-review-new-group-row input {
+  font-size: 12px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.upload-review-new-group-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.upload-review-new-group-actions button {
+  flex: 1 1 0;
+  padding: 5px 10px;
+  font-size: 11.5px;
+}
+
+.upload-review-group-error {
+  margin: 0;
+  padding: 4px 6px;
+}
+
 .error {
   margin: 0 0 10px;
   font-size: 11px;

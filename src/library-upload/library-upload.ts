@@ -56,6 +56,13 @@ interface JobItem {
 
 interface ReviewItem extends JobItem {
   tagsRaw: string;
+  groupId: number | null;
+}
+
+interface GroupOption {
+  id: number;
+  name: string;
+  sortOrder: number;
 }
 
 let isAdmin = false;
@@ -66,6 +73,13 @@ let scope: Scope = "global";
 let chosenFiles: FileEntry[] = [];
 let jobId: string | null = null;
 let pollTimer: number | undefined;
+// Groups are scoped per category for global-scope uploads (one job can mix
+// several categories, one per source file — see the review screen's
+// per-file heading) or per company for company-scope uploads, matching how
+// catalog_groups itself is scoped (see db/init.sql). COMPANY_GROUP_SCOPE_KEY
+// is a synthetic key since company-scope items carry no category at all.
+const COMPANY_GROUP_SCOPE_KEY = "__company__";
+let groupsByScope = new Map<string, GroupOption[]>();
 let reviewItems: ReviewItem[] = [];
 
 function showScreen(id: "setupScreen" | "progressScreen" | "reviewScreen" | "doneScreen"): void {
@@ -244,7 +258,7 @@ function pollJob(): void {
         if (back) (back as HTMLElement).style.display = "";
       } else if (body.status === "done") {
         window.clearInterval(pollTimer);
-        enterReview(body.items);
+        await enterReview(body.items);
       }
     } catch (err) {
       window.clearInterval(pollTimer);
@@ -256,8 +270,31 @@ function pollJob(): void {
   }, 1200);
 }
 
-function enterReview(items: JobItem[]): void {
-  reviewItems = items.map((item) => ({ ...item, tagsRaw: "" }));
+/** category is null for company-scope items (see item.category's own comment), so COMPANY_GROUP_SCOPE_KEY stands in as this dialog's own synthetic scope key wherever a real category string would otherwise go. */
+function groupScopeKeyFor(item: ReviewItem): string {
+  return item.category ?? COMPANY_GROUP_SCOPE_KEY;
+}
+
+/** {category} for global-scope groups, {companyDomain} for company-scope — the exact body shape POST /admin/groups already expects (see gallery.ts/server.js's own inline group-create flow, which this mirrors). */
+function groupScopeBodyFor(scopeKey: string): { category: string } | { companyDomain: string } {
+  return scopeKey === COMPANY_GROUP_SCOPE_KEY ? { companyDomain: companyDomain! } : { category: scopeKey };
+}
+
+/** Reuses the existing GET /api/catalog/:category and GET /api/catalog/company routes purely for their groups array — no dedicated "just groups" endpoint exists, and both responses are small enough that fetching the items alongside (and ignoring them) isn't worth a new route just to avoid. */
+async function fetchGroupsForScope(scopeKey: string): Promise<GroupOption[]> {
+  const url = scopeKey === COMPANY_GROUP_SCOPE_KEY ? "/api/catalog/company" : `/api/catalog/${scopeKey}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const body = await res.json();
+    return Array.isArray(body.groups) ? body.groups : [];
+  } catch {
+    return [];
+  }
+}
+
+async function enterReview(items: JobItem[]): Promise<void> {
+  reviewItems = items.map((item) => ({ ...item, tagsRaw: "", groupId: null }));
   if (reviewItems.length === 0) {
     showScreen("doneScreen");
     const status = document.getElementById("doneStatus");
@@ -269,6 +306,11 @@ function enterReview(items: JobItem[]): void {
   if (summary) {
     summary.textContent = `${reviewItems.length} slide(s) from ${fileCount} file(s). Uncheck any you don't want to add.`;
   }
+
+  const scopeKeys = [...new Set(reviewItems.map(groupScopeKeyFor))];
+  const fetched = await Promise.all(scopeKeys.map((key) => fetchGroupsForScope(key)));
+  groupsByScope = new Map(scopeKeys.map((key, i) => [key, fetched[i]]));
+
   renderReview();
   showScreen("reviewScreen");
 }
@@ -345,15 +387,145 @@ function renderReview(): void {
       tagsInput.type = "text";
       tagsInput.className = "upload-review-tags";
       tagsInput.placeholder = "Tags, comma separated";
+      tagsInput.value = item.tagsRaw;
       tagsInput.addEventListener("input", () => {
         item.tagsRaw = tagsInput.value;
       });
       fields.appendChild(tagsInput);
 
+      fields.appendChild(buildGroupControls(item));
+
       row.appendChild(fields);
       list.appendChild(row);
     }
   }
+}
+
+/**
+ * Group select + "+ Add new group…" inline create row for one review item.
+ * Mirrors gallery.ts's own inline-create fix for this exact interaction
+ * (window.prompt() doesn't reliably work in a displayDialogAsync-hosted
+ * dialog like this one) — a text input + Add Group/Cancel buttons swap in
+ * for the select, rather than a native prompt. Built per-item (not one
+ * shared row, unlike gallery's single-selection panel) since every review
+ * row is visible and editable simultaneously here.
+ */
+function buildGroupControls(item: ReviewItem): HTMLElement {
+  const scopeKey = groupScopeKeyFor(item);
+  const wrap = document.createElement("div");
+  wrap.className = "upload-review-group-wrap";
+
+  const select = document.createElement("select");
+  select.className = "upload-review-group";
+  const noneOption = document.createElement("option");
+  noneOption.value = "";
+  noneOption.textContent = "No group";
+  select.appendChild(noneOption);
+  for (const group of [...(groupsByScope.get(scopeKey) ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)) {
+    const opt = document.createElement("option");
+    opt.value = String(group.id);
+    opt.textContent = group.name;
+    if (group.id === item.groupId) opt.selected = true;
+    select.appendChild(opt);
+  }
+  const newOption = document.createElement("option");
+  newOption.value = "__new__";
+  newOption.textContent = "+ Add new group…";
+  select.appendChild(newOption);
+  wrap.appendChild(select);
+
+  const newGroupRow = document.createElement("div");
+  newGroupRow.className = "upload-review-new-group-row";
+  newGroupRow.style.display = "none";
+  const newGroupInput = document.createElement("input");
+  newGroupInput.type = "text";
+  newGroupInput.placeholder = "New group name";
+  newGroupRow.appendChild(newGroupInput);
+  const newGroupActions = document.createElement("div");
+  newGroupActions.className = "upload-review-new-group-actions";
+  const confirmBtn = document.createElement("button");
+  confirmBtn.type = "button";
+  confirmBtn.textContent = "Add Group";
+  newGroupActions.appendChild(confirmBtn);
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "upload-secondary";
+  cancelBtn.textContent = "Cancel";
+  newGroupActions.appendChild(cancelBtn);
+  newGroupRow.appendChild(newGroupActions);
+  wrap.appendChild(newGroupRow);
+
+  const errorEl = document.createElement("p");
+  errorEl.className = "error upload-review-group-error";
+  errorEl.style.display = "none";
+  wrap.appendChild(errorEl);
+
+  function showNewGroupRow(): void {
+    select.style.display = "none";
+    newGroupRow.style.display = "flex";
+    newGroupInput.value = "";
+    newGroupInput.focus();
+  }
+  function hideNewGroupRow(): void {
+    newGroupRow.style.display = "none";
+    select.style.display = "";
+  }
+  function cancelNewGroup(): void {
+    select.value = item.groupId !== null ? String(item.groupId) : "";
+    hideNewGroupRow();
+  }
+  async function confirmNewGroup(): Promise<void> {
+    const name = newGroupInput.value.trim();
+    if (!name) {
+      newGroupInput.focus();
+      return;
+    }
+    errorEl.style.display = "none";
+    const sortOrder = groupsByScope.get(scopeKey)?.length ?? 0;
+    try {
+      const res = await fetch("/admin/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ ...groupScopeBodyFor(scopeKey), name, sortOrder }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      const existing = groupsByScope.get(scopeKey) ?? [];
+      groupsByScope.set(scopeKey, [...existing, { id: body.id, name: body.name, sortOrder }]);
+      item.groupId = body.id;
+      // Re-rendering the whole list (rather than patching every other
+      // select sharing this scope by hand) is simplest and safe here —
+      // every field's live value lives on the reviewItems array already
+      // (title/tagsRaw/groupId), not just in the DOM, so nothing is lost.
+      renderReview();
+    } catch (err) {
+      errorEl.textContent = `Couldn't create group: ${err instanceof Error ? err.message : String(err)}`;
+      errorEl.style.display = "block";
+    }
+  }
+
+  select.addEventListener("change", () => {
+    if (select.value === "__new__") {
+      showNewGroupRow();
+      return;
+    }
+    item.groupId = select.value ? Number(select.value) : null;
+  });
+  confirmBtn.addEventListener("click", () => {
+    confirmNewGroup().catch(() => {});
+  });
+  cancelBtn.addEventListener("click", cancelNewGroup);
+  newGroupInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      confirmNewGroup().catch(() => {});
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelNewGroup();
+    }
+  });
+
+  return wrap;
 }
 
 function setCommitError(message: string): void {
@@ -377,6 +549,7 @@ async function commit(): Promise<void> {
           tempId: item.tempId,
           title: item.title,
           category: item.category,
+          groupId: item.groupId,
           included: item.included,
           tags: item.tagsRaw
             .split(",")

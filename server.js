@@ -882,6 +882,11 @@ app.post("/api/admin/library-upload/:jobId/commit", express.json({ limit: "2mb" 
     const tags = Array.isArray(edit.tags)
       ? [...new Set(edit.tags.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim()))]
       : [];
+    // Not scope-checked against the item's own category/company here —
+    // same trust-the-client-supplied-id pattern POST /admin/catalog/:id
+    // already uses, since the select's own options are always populated
+    // from a real, correctly-scoped group list to begin with.
+    const groupId = Number.isInteger(edit.groupId) && edit.groupId > 0 ? edit.groupId : null;
 
     const fileId = crypto.randomUUID();
     const thumbnailPath = `${fileId}.png`;
@@ -904,6 +909,7 @@ app.post("/api/admin/library-upload/:jobId/commit", express.json({ limit: "2mb" 
       reconstructSpec: item.insertMode === "reconstruct" ? item.reconstructSpec : undefined,
       thumbnailPath,
       sortOrder: 0,
+      groupId,
     });
     if (tags.length) await setItemTags(row.id, tags);
     created++;
